@@ -604,6 +604,7 @@ class SkeletonVisualizer3D:
         activity_label: Optional[str] = None,
         confidence: Optional[float] = None,
         is_fall: bool = False,
+        person_id: Optional[int] = None,
     ) -> np.ndarray:
         """
         Renders the interactive 3D skeleton frame with vectorized math and depth sorting.
@@ -627,7 +628,7 @@ class SkeletonVisualizer3D:
                 1,
                 cv2.LINE_AA,
             )
-            self._draw_overlay_hud(canvas, activity_label, confidence, is_fall)
+            self._draw_overlay_hud(canvas, activity_label, confidence, is_fall, person_id=person_id)
             if canvas.shape[1] > 2:
                 canvas[:, 0:1] = (42, 38, 52)
                 canvas[:, 1:2] = (68, 66, 82)
@@ -832,7 +833,7 @@ class SkeletonVisualizer3D:
                     cv2.circle(canvas, center, max(1, radius // 2), (255, 255, 255), -1, cv2.LINE_AA)
 
         # Draw HUD overlays and instructions
-        self._draw_overlay_hud(canvas, activity_label, confidence, is_fall)
+        self._draw_overlay_hud(canvas, activity_label, confidence, is_fall, person_id=person_id)
 
         # Clear visual boundary along left edge separating 2D camera feed from 3D viewport
         if canvas.shape[1] > 2:
@@ -851,6 +852,7 @@ class SkeletonVisualizer3D:
         activity: Optional[str],
         confidence: Optional[float],
         is_fall: bool,
+        person_id: Optional[int] = None,
     ) -> None:
         """Renders camera info, mouse tips, and active state pill."""
         # Top HUD Card with translucent dark backdrop
@@ -865,10 +867,11 @@ class SkeletonVisualizer3D:
                 cv2.addWeighted(roi, 0.22, np.full_like(roi, 20), 0.78, 0, roi)
                 cv2.rectangle(canvas, (cx1, cy1), (cx2, cy2), (55, 52, 68), 1)
 
-            # Top Title
+            # Top Title with active person tracking indicator
+            title = f"3D SKELETON [PERSON {person_id}]" if person_id is not None else "3D SKELETON VIEW"
             cv2.putText(
                 canvas,
-                "3D SKELETON VIEW",
+                title,
                 (cx1 + 10, cy1 + 20),
                 cv2.FONT_HERSHEY_SIMPLEX,
                 0.46,

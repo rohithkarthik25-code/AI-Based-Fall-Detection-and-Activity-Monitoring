@@ -64,15 +64,26 @@ class PersonTracker:
         areaB = (b[2] - b[0]) * (b[3] - b[1])
         return inter / float(min(areaA, areaB))
 
-    def _nms_tracks(self, tracks: List[Tuple], iomin_thresh: float = 0.30) -> List[Tuple]:
-        """Suppress overlapping tracks — keep the fall-detected or largest box."""
+    def _nms_tracks(self, tracks: List[Tuple], iou_thresh: float = 0.65, iomin_thresh: float = 0.80) -> List[Tuple]:
+        """
+        Suppress duplicate bounding boxes of the SAME person while preserving
+        distinct individuals standing or moving in close proximity.
+
+        ByteTrack handles multi-person tracking and assigns unique track IDs.
+        We only suppress if two boxes truly represent the same physical body:
+        1. High IoU (>= 0.65): heavy geometric overlap of the same person.
+        2. High IoMIN (>= 0.80) with aligned horizontal centers: sub-box nested inside
+           a full body box (e.g. accidental torso-only detection).
+        """
         if len(tracks) <= 1:
             return tracks
 
         def priority(t):
             _, box, state = t
             area = (box[2] - box[0]) * (box[3] - box[1])
-            return (int(state.get("fall_detected", False)), area)
+            is_fall = int(state.get("fall_detected", False))
+            is_cand = int(state.get("candidate_frames", 0) > 0)
+            return (is_fall, is_cand, area)
 
         tracks = sorted(tracks, key=priority, reverse=True)
 
@@ -80,13 +91,27 @@ class PersonTracker:
         for track in tracks:
             _, box, _ = track
             suppress = False
+            b_cx = (box[0] + box[2]) / 2.0
+            b_w = max(1.0, float(box[2] - box[0]))
+
             for _, kept_box, _ in kept:
-                if self._iou(box, kept_box) >= 0.45:
+                iou = self._iou(box, kept_box)
+                iomin = self._iomin(box, kept_box)
+                k_cx = (kept_box[0] + kept_box[2]) / 2.0
+                k_w = max(1.0, float(kept_box[2] - kept_box[0]))
+
+                # 1. Direct duplicate detection (high IoU)
+                if iou >= iou_thresh:
                     suppress = True
                     break
-                if self._iomin(box, kept_box) >= 0.25:   # was 0.40
+
+                # 2. Nested duplicate sub-box (high containment + aligned center)
+                center_dist_x = abs(b_cx - k_cx)
+                min_w = min(b_w, k_w)
+                if iomin >= iomin_thresh and (center_dist_x / min_w) < 0.25:
                     suppress = True
                     break
+
             if not suppress:
                 kept.append(track)
 
@@ -161,5 +186,10 @@ class PersonTracker:
                 if self._states[tid]["missing"] >= self.max_missing:
                     del self._states[tid]
 
-        results = [(tid, s["box"], s) for tid, s in self._states.items()]
+        # Active tracks: seen in this frame, OR recently fallen (up to 5 frames tolerance)
+        results = [
+            (tid, s["box"], s)
+            for tid, s in self._states.items()
+            if s["missing"] == 0 or (s.get("fall_detected", False) and s["missing"] <= 5)
+        ]
         return self._nms_tracks(results)

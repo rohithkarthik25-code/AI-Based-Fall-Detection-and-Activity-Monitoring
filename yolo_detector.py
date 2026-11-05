@@ -31,7 +31,7 @@ class YOLODetector:
         self,
         model_path: str = "yolov8n.pt",
         person_class_id: int = 0,
-        confidence: float = 0.50,
+        confidence: float = 0.35,
         tracker: str = "bytetrack.yaml",
         imgsz: int = 480,
         device: Optional[str] = "cpu",

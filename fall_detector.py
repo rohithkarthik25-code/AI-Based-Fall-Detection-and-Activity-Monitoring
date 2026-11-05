@@ -63,6 +63,7 @@ class FallDetector:
         self.activity_monitor = ActivityMonitor() if enable_activity else None
         self.visualizer_3d = SkeletonVisualizer3D() if enable_3d else None
         self._mouse_attached = False
+        self.selected_person_id: Optional[int] = None
 
         self.output_path = output_path
         self.display = display
@@ -162,7 +163,9 @@ class FallDetector:
                     if not s.get("fall_detected", False)
                 )
 
-                conf = 0.25 if any_fall_active else (0.35 if recently_fell else 0.50)
+                # Operating confidence: 0.35 during normal monitoring (allows ByteTrack
+                # secondary association for sitting/occluded persons), 0.25 on active fall
+                conf = 0.25 if any_fall_active else (0.30 if recently_fell else 0.35)
 
                 # ── 2. YOLO Person Detection ──
                 self.profiler.start_stage("yolo_detection")
@@ -181,23 +184,33 @@ class FallDetector:
                 t_score_accum = 0.0
                 t_act_accum = 0.0
 
+                # Multi-person pose scheduling budget:
+                # Emergency & candidates always run; steady background persons alternate
+                poses_computed_this_frame = 0
+                max_steady_poses_per_frame = 2
+
                 for person_id, box, state in tracked:
-                    # ── 4. MediaPipe Pose Estimation (Adaptive) ──
+                    is_emergency = bool(state.get("fall_detected", False) or state.get("candidate_frames", 0) > 0)
+                    has_last_pose = state.get("last_pose") is not None
+
+                    # ── 4. MediaPipe Pose Estimation (Adaptive Multi-Person) ──
                     should_estimate_pose = True
-                    if self.adaptive_pose and state.get("last_pose") is not None:
-                        # Only adapt when in steady NORMAL state and not in candidate/fall
-                        if not state.get("fall_detected", False) and state.get("candidate_frames", 0) == 0:
-                            prev_b = state.get("prev_box")
-                            if prev_b is not None:
-                                d_box = (
-                                    abs(box[0] - prev_b[0])
-                                    + abs(box[1] - prev_b[1])
-                                    + abs(box[2] - prev_b[2])
-                                    + abs(box[3] - prev_b[3])
-                                )
-                                # If bounding box shifted < 8 pixels total, alternate frame estimation
-                                if d_box < 8.0 and (state.get("pose_step", 0) % 2 == 1):
-                                    should_estimate_pose = False
+                    if self.adaptive_pose and has_last_pose and not is_emergency:
+                        prev_b = state.get("prev_box")
+                        if prev_b is not None:
+                            d_box = (
+                                abs(box[0] - prev_b[0])
+                                + abs(box[1] - prev_b[1])
+                                + abs(box[2] - prev_b[2])
+                                + abs(box[3] - prev_b[3])
+                            )
+                            # If bounding box shifted < 10 pixels total, alternate frame estimation
+                            if d_box < 10.0 and (state.get("pose_step", 0) % 2 == 1):
+                                should_estimate_pose = False
+
+                        # In crowded rooms (3+ persons), throttle steady background poses to CPU budget
+                        if should_estimate_pose and len(tracked) >= 3 and poses_computed_this_frame >= max_steady_poses_per_frame:
+                            should_estimate_pose = False
 
                     state["pose_step"] = state.get("pose_step", 0) + 1
                     state["prev_box"] = list(box)
@@ -205,6 +218,8 @@ class FallDetector:
                     t_start_pose = time.perf_counter()
                     if should_estimate_pose:
                         pose_result = self.pose.estimate(frame, box)
+                        if not is_emergency:
+                            poses_computed_this_frame += 1
                     else:
                         pose_result = state.get("last_pose")
                     t_pose_accum += (time.perf_counter() - t_start_pose) * 1000.0
@@ -314,12 +329,33 @@ class FallDetector:
                 focus_act_label = None
                 focus_act_conf = None
                 focus_is_fall = False
+                focus_person_id = None
 
                 if tracked:
+                    # Allow user manual override or priority selection:
+                    # Emergency fall > warning candidate > manual selection > highest visibility
+                    user_chosen = None
+                    if self.selected_person_id is not None:
+                        for p in tracked:
+                            if p[0] == self.selected_person_id:
+                                user_chosen = p
+                                break
+
                     fall_candidates = [p for p in tracked if p[2].get("fall_detected")]
-                    chosen = fall_candidates[0] if fall_candidates else max(
-                        tracked, key=lambda p: getattr(p[2].get("last_pose"), "visibility", 0)
-                    )
+                    warn_candidates = [p for p in tracked if p[2].get("candidate_frames", 0) > 0]
+
+                    if fall_candidates:
+                        chosen = fall_candidates[0]
+                    elif warn_candidates:
+                        chosen = warn_candidates[0]
+                    elif user_chosen is not None:
+                        chosen = user_chosen
+                    else:
+                        chosen = max(
+                            tracked, key=lambda p: getattr(p[2].get("last_pose"), "visibility", 0)
+                        )
+
+                    focus_person_id = chosen[0]
                     focus_state = chosen[2]
                     focus_state["person_id"] = chosen[0]
                     last_p = focus_state.get("last_pose")
@@ -362,6 +398,7 @@ class FallDetector:
                         activity_label=focus_act_label,
                         confidence=focus_act_conf,
                         is_fall=focus_is_fall,
+                        person_id=focus_person_id,
                     )
                     out_frame = np.hstack([frame, canvas_3d])
                 else:
@@ -391,6 +428,23 @@ class FallDetector:
                     key = cv2.waitKey(1) & 0xFF
                     if key == ord("q"):
                         break
+                    # Multi-person interactive focus selector:
+                    # 1-9: Select Person ID directly
+                    # 0 or 'a': Reset to auto emergency priority
+                    # TAB (9): Cycle to next detected person
+                    if ord("1") <= key <= ord("9"):
+                        self.selected_person_id = key - ord("0")
+                    elif key in (ord("0"), ord("a"), ord("A")):
+                        self.selected_person_id = None
+                    elif key == 9:  # TAB
+                        if tracked:
+                            active_pids = [p[0] for p in tracked]
+                            if self.selected_person_id in active_pids:
+                                cur_idx = active_pids.index(self.selected_person_id)
+                                self.selected_person_id = active_pids[(cur_idx + 1) % len(active_pids)]
+                            else:
+                                self.selected_person_id = active_pids[0]
+
                     if self.enable_3d and self.visualizer_3d:
                         self.visualizer_3d.handle_key(key)
                 self.profiler.end_stage("frame_output")
