@@ -57,6 +57,43 @@ def build_parser() -> argparse.ArgumentParser:
         help="Show preview every N frames"
     )
 
+    parser.add_argument(
+        "--no-3d",
+        action="store_true",
+        help="Disable interactive 3D skeleton visualization"
+    )
+
+    parser.add_argument(
+        "--no-activity",
+        action="store_true",
+        help="Disable activity monitoring (sitting, standing, walking, etc.)"
+    )
+
+    parser.add_argument(
+        "--imgsz",
+        type=int,
+        default=480,
+        help="YOLO inference image size (default: 480)"
+    )
+
+    parser.add_argument(
+        "--no-adaptive-pose",
+        action="store_true",
+        help="Disable adaptive pose estimation"
+    )
+
+    parser.add_argument(
+        "--no-alerts",
+        action="store_true",
+        help="Disable multi-channel alert dispatch (Telegram / Email)"
+    )
+
+    parser.add_argument(
+        "--alert-config",
+        default="alert_config.json",
+        help="Path to alert dispatcher configuration JSON"
+    )
+
     return parser
 
 
@@ -83,12 +120,21 @@ def main() -> int:
         print("Download pose_landmarker.task and place it beside these files.")
         return 1
 
+    # For live webcam feeds, default to 1 for fluid 30 FPS preview & interactive controls
+    display_every = 1 if isinstance(video_source, int) and args.display_every == 5 else args.display_every
+
     detector = FallDetector(
         yolo_model_path=args.yolo_model,
         pose_model_path=args.pose_model,
         output_path=args.output,
         display=not args.no_display,
-        display_every_n_frames=args.display_every,
+        display_every_n_frames=display_every,
+        enable_3d=not args.no_3d,
+        enable_activity=not args.no_activity,
+        adaptive_pose=not args.no_adaptive_pose,
+        imgsz=args.imgsz,
+        enable_alerts=not args.no_alerts,
+        alert_config_path=args.alert_config,
     )
 
     try:
@@ -100,6 +146,8 @@ def main() -> int:
         return 130
 
     except Exception as exc:
+        import traceback
+        traceback.print_exc()
         print(f"[ERROR] {exc}")
         return 1
 

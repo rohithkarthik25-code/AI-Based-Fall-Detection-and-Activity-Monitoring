@@ -1,6 +1,6 @@
-# 🧍‍♂️➡️🛌 Real-Time Fall Detection System
+# 🧍‍♂️➡️🛌 AI-Based Fall Detection and Activity Monitoring Using Pose Estimation with Interactive 3D Skeleton Visualization
 
-**YOLOv8 + MediaPipe Pose Estimation with Severity Classification & Smart Alerting**
+**YOLOv8 + MediaPipe Pose Estimation with Biomechanical Feature Scoring, Real-Time Activity Recognition, Severity Classification, Smart Alerting & Interactive 3D Kinematic Visualization**
 
 ![Python](https://img.shields.io/badge/python-3.10%2B-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
@@ -9,46 +9,56 @@
 ![OpenCV](https://img.shields.io/badge/OpenCV-4.x-yellow)
 ![Status](https://img.shields.io/badge/status-active-brightgreen)
 
-A real-time, CPU-only fall detection system for elderly/independent-living monitoring. It watches a
-single RGB camera feed, tracks every person in frame, scores 20 biomechanical signals per person
-per frame, and confirms falls through a temporal state machine — then classifies severity, sounds a
-two-phase alarm, and automatically logs the event with a timestamped screenshot.
+A comprehensive real-time, CPU-only computer vision system engineered for elderly safety, independent-living monitoring, and healthcare ambient intelligence. It ingests an RGB camera stream, tracks multiple subjects in frame, extracts 33 metric 3D skeleton keypoints, continuously classifies daily postures and activities, scores 20 biomechanical signals per person to confirm falls through a temporal state machine, triggers smart two-phase audio alerts with automated incident logging, and renders a **dual-panel live feed with an interactive 3D skeleton viewport**.
 
-Built as a Diploma Final Year Project at **Ghani Khan Choudhury Institute of Engineering & Technology**
-by Nabyendu Adhikary, Sagar Halder, and Prasenjit Mandal, under the guidance of Dr. Ajit Kumar Singh Yadav.
+Built as a Diploma Final Year Project at **Ghani Khan Choudhury Institute of Engineering & Technology** by Nabyendu Adhikary, Sagar Halder, and Prasenjit Mandal, under the guidance of Dr. Ajit Kumar Singh Yadav.
 
 <p align="center">
-  <img src="assets/demo_strip.png" alt="Fall detection demo — normal, falling, and fallen states" width="100%">
+  <img src="assets/demo_strip.png" alt="Fall detection and activity monitoring demo" width="100%">
 </p>
 
 ---
 
-## ✨ Key Features
+## ✨ Key Capabilities
 
-- **Multi-person tracking** — YOLOv8 Nano + ByteTrack, with per-person persistent state and
-  track-inheritance to survive brief detection dropouts.
-- **33-point pose estimation** — MediaPipe Pose Landmarker, including metric 3D world landmarks.
-- **14-signal weighted fall scoring** — torso angle, hip/head velocity, height drop, aspect ratio,
-  knee collapse, shoulder–hip separation, bilateral asymmetry, post-impact stillness, 3D torso tilt,
-  and more, combined into one continuous fall-probability score.
-- **Temporal confirmation state machine** — an 8-frame confirmation window plus a dual-path reset
-  (frame-count and geometry-based) suppresses transient false positives from bending, sitting, or
-  occlusion.
-- **3-level severity classification** — MILD / MODERATE / SEVERE, monotonically non-decreasing per
-  event, so alerts never "downgrade" mid-fall.
-- **Two-phase audio alarm** — a soft double-beep on confirmation, escalating to a continuous
-  high-pitch alarm if the person is still down after 5 seconds (mirrors the clinical "long lie" risk).
-- **Automatic incident logging** — every confirmed fall is written to a CSV with a timestamped
-  screenshot, no manual effort required.
-- **Live HUD dashboard** — on-screen FPS, person count, fall history, per-person factor panel, and
-  color-coded alerts.
-- **Runs on a CPU** — no GPU, no cloud inference, 25–30 FPS on a standard laptop.
+### 1. 🦿 AI-Based Real-Time Fall Detection
+- **Multi-Person Tracking:** YOLOv8 Nano + ByteTrack with per-person persistent state and track-inheritance to survive detection dropouts.
+- **14-Signal Biomechanical Scoring:** Torso angle, hip/head velocity, vertical height drop, aspect ratio, knee collapse, shoulder–hip separation, bilateral asymmetry, post-impact stillness, and 3D torso tilt combined into a continuous fall-probability score.
+- **Temporal State Machine:** 8-frame confirmation window + dual-path reset (frame-count & geometry-based) to suppress transient false positives from bending, sitting down, or occlusion.
+- **3-Level Severity Classification:** Monotonically non-decreasing severity grading (`MILD`, `MODERATE`, `SEVERE`).
+- **Two-Phase Audio Alarm:** Soft double-beep on initial fall confirmation, escalating to a continuous high-pitch alarm if the subject remains down after 5 seconds ("long lie" prevention).
+- **Automated Incident Logging:** Every confirmed fall writes timestamped entries to CSV alongside a saved screenshot.
+
+### 2. 🚶 Activity Monitoring & Health Analytics
+- **Continuous Posture Classification:** Real-time identification of Activities of Daily Living (ADL):
+  - **`STANDING`** (upright torso, extended knees, minimal horizontal motion)
+  - **`SITTING`** (upright torso, flexed knees between 70°–130°, lowered hip height)
+  - **`WALKING`** (upright posture, cycling limb displacement, continuous horizontal motion)
+  - **`BENDING`** (forward-tilted torso > 36°, legs straight, elevated hips)
+  - **`LYING DOWN`** (horizontal torso > 58°, wide aspect ratio > 0.85, non-fall resting)
+  - **`FALLEN`** (immediate life-safety priority override)
+- **Duration Tracking & Analytics:** Accumulates exact session duration per activity, transition frequency (e.g. sit-to-stand transitions), and flags sedentary risk if sitting/lying exceeds 65% of the monitoring session.
+- **HUD Integration:** Real-time activity badges on each bounding box and time percentage breakdown on the master dashboard.
+
+### 3. 🌐 Interactive 3D Skeleton Visualization
+- **Real Metric 3D Space:** Consumes MediaPipe's 33 `world_landmarks` (metric 3D coordinates in meters, hip-centered, invariant to camera tilt).
+- **Live Side-by-Side Dual-Panel View:** Displays the camera feed alongside a dedicated real-time 3D skeleton rendering panel at 25–30+ FPS.
+- **Full Mouse Orbit Controls:**
+  - **Left-Click + Drag:** Smooth 3D camera orbit (Azimuth $-180^\circ$ to $+180^\circ$, Elevation $-85^\circ$ to $+85^\circ$).
+  - **Right-Click + Drag / Mouse Wheel:** Smooth zoom in and out ($0.3\times$ to $3.5\times$).
+  - **Double-Click:** Instantly resets the camera to the default perspective.
+- **Keyboard View Presets:**
+  - Press **`f`** $\to$ Front view
+  - Press **`s`** $\to$ Side profile view
+  - Press **`t`** $\to$ Top-down view
+  - Press **`i`** / **`r`** $\to$ Reset to Isometric perspective
+  - Press **`+`** / **`-`** $\to$ Interactive zoom in / out
+- **3D Ground Grid & Depth Perception:** Adaptive floor contact plane with metric grid squares, RGB coordinate orientation compass, and depth-sorted bone/joint rendering (Painter's algorithm).
+- **Safety Feedback:** The 3D skeleton dynamically shifts from cyan/orange to bright red during confirmed fall emergencies.
 
 ---
 
-## 🏗️ Architecture
-
-
+## 🏗️ System Architecture
 
 <p align="center">
   <img src="assets/pipeline_architecture.png" alt="End-to-end system pipeline diagram" width="380">
@@ -56,22 +66,22 @@ by Nabyendu Adhikary, Sagar Halder, and Prasenjit Mandal, under the guidance of 
 
 | Stage | Module | Responsibility |
 |---|---|---|
-| Detection & Tracking | `yolo_detector.py`, `person_tracker.py` | Find people, assign stable IDs, keep per-person state |
-| Pose Estimation | `pose_estimator.py` | 33-point 2D + 3D world landmarks per person crop |
-| Feature Extraction | `feature_extractor.py` | 20 biomechanical signals per person per frame |
-| Scoring | `weighted_scoring.py` | Weighted fall score + severity score |
-| State Machine | `temporal_state_machine.py` | Confirms / resets fall state over time |
-| Alerts | `alarm_system.py` | Two-phase audio escalation |
-| Logging | `fall_logger.py` | CSV log + screenshot on confirmed fall |
-| Visualization | `dashboard.py` | HUD overlay, skeleton, factor panel, fall banner |
-| Orchestration | `fall_detector.py`, `main.py` | Wires everything together, CLI entrypoint |
+| **Detection & Tracking** | `yolo_detector.py`, `person_tracker.py` | Detect people, assign persistent ByteTrack IDs, maintain per-person states |
+| **Pose Estimation** | `pose_estimator.py` | Extract 33-point 2D pixel coordinates and metric 3D world landmarks |
+| **Feature Extraction** | `feature_extractor.py` | Compute 20 biomechanical signals (angles, velocities, collapses, tilts) |
+| **Fall Scoring** | `weighted_scoring.py` | Compute multi-factor weighted fall probability and severity grading |
+| **Temporal State Machine** | `temporal_state_machine.py` | Temporal confirmation window and dual-path geometry reset |
+| **Activity Monitoring** | `activity_monitor.py` | 3D/2D joint angle analysis, ADL classification, and duration analytics |
+| **3D Visualization** | `visualizer_3d.py` | 3D perspective projection, mouse-orbit camera, and depth-sorted skeleton |
+| **HUD & Dashboard** | `dashboard.py` | Combined HUD overlay, activity badges, signal factor panels, and fall banners |
+| **Alerting & Logging** | `alarm_system.py`, `fall_logger.py` | Two-phase escalating audio alarm, CSV event logging, and snapshot capture |
+| **Pipeline Orchestrator** | `fall_detector.py`, `main.py` | Synchronous dual-panel pipeline wiring, CLI options, and event handling |
 
 ---
 
-## 📊 Results
+## 📊 Benchmark Results (UR Fall Detection Dataset)
 
-Evaluated on the **UR Fall Detection Dataset (URFD)** — 30 fall clips + 30 Activities of Daily
-Living (ADL) clips, decision made at the event/CSV-log level.
+Evaluated on the **UR Fall Detection Dataset (URFD)** — 30 fall clips + 30 Activities of Daily Living (ADL) clips:
 
 | Metric | Value |
 |---|---|
@@ -81,125 +91,130 @@ Living (ADL) clips, decision made at the event/CSV-log level.
 | Accuracy | 85.00% |
 | Specificity | 76.67% |
 | False Alarm Rate | 23.33% |
-| Throughput | 25–30 FPS (CPU only) |
+| Throughput | 25–30 FPS (CPU only on standard laptop) |
 
-**Confusion matrix**
+**Confusion Matrix**
 
 | | Predicted: FALL | Predicted: NO FALL |
 |---|---|---|
 | **Actual: FALL** | TP = 28 | FN = 2 |
 | **Actual: NO FALL** | FP = 7 | TN = 23 |
 
-The system prioritizes sensitivity over precision by design — in a safety-critical setting, a missed
-fall is far more costly than a false alarm. Most false positives came from ADL activities that share
-geometry with falls (sitting on the floor, crawling, lying on a low bed) — see [`docs/report.pdf`](docs/report.pdf)
-§4.4 for a full discussion.
+The system prioritizes sensitivity over precision by design — in health and safety monitoring, a missed fall is far more critical than an occasional transient alert.
 
 ---
 
 ## 📦 Project Structure
 
 ```
-fall-detection-system/
-├── main.py                    # CLI entrypoint (VS Code / terminal)
-├── fall_detector.py           # End-to-end pipeline orchestrator
+ICG-Project/
+├── main.py                    # Application entrypoint (CLI / GUI launcher)
+├── fall_detector.py           # Pipeline orchestrator (wires 2D + 3D + Activity)
+├── activity_monitor.py        # Posture recognition & continuous ADL duration tracker
+├── visualizer_3d.py           # Interactive 3D skeleton visualizer & orbit controls
+├── dashboard.py                # HUD overlay, activity badges & factor panel
 ├── yolo_detector.py           # YOLOv8 + ByteTrack person detection
-├── person_tracker.py          # Per-person state store, track inheritance, NMS
-├── pose_estimator.py          # MediaPipe Pose Landmarker wrapper
+├── person_tracker.py          # Per-person state store, track inheritance & NMS
+├── pose_estimator.py          # MediaPipe Pose Landmarker wrapper (2D + 3D metric)
 ├── feature_extractor.py       # 20 biomechanical signal computations
-├── weighted_scoring.py        # 14-signal weighted fall score + severity
-├── temporal_state_machine.py  # Confirm/reset temporal logic
-├── alarm_system.py            # Two-phase audio alarm
-├── fall_logger.py             # CSV + screenshot logging
-├── dashboard.py                # HUD overlay & visualization
-├── requirements.txt
+├── weighted_scoring.py        # 14-signal weighted fall scoring + severity
+├── temporal_state_machine.py  # Temporal confirmation & reset state machine
+├── alarm_system.py            # Two-phase audio alarm escalation
+├── fall_logger.py             # CSV incident logging & screenshot persistence
+├── test_activity_monitor.py   # Unit tests for posture recognition
+├── test_visualizer_3d.py       # Unit tests for 3D projection & orbit controls
+├── test_integration_step3.py   # End-to-end pipeline integration tests
+├── test_edge_cases.py         # Stress and singularity edge case test suite
 ├── yolov8n.pt                  # YOLOv8 Nano weights (COCO-pretrained)
 ├── pose_landmarker.task        # MediaPipe Pose Landmarker model
-├── assets/                     # README images
+├── assets/                     # Demo visuals and diagrams
 ├── docs/
-│   └── project_report.pdf      # Full diploma project report
-└── fall_logs/ · fall_events.csv   # created at runtime (git-ignored)
+│   └── report.pdf              # Full diploma project report
+└── fall_logs/ · fall_events.csv # Generated at runtime on confirmed falls
 ```
 
 ---
 
 ## 🚀 Getting Started
 
-### 1. Clone and set up an environment
+### 1. Environment Setup
 
 ```bash
+# Clone the repository
 git clone https://github.com/Nabyendu-the-noob/real-time-fall-detection.git
 cd real-time-fall-detection
 
-python -m venv venv
-source venv/bin/activate      # Windows: venv\Scripts\activate
+# Activate existing virtual environment
+# Windows:
+.\venv\Scripts\activate
+# Linux/macOS:
+source venv/bin/activate
 
+# Install dependencies (if setting up fresh)
 pip install -r requirements.txt
 ```
 
-### 2. Models
-
-`yolov8n.pt` and `pose_landmarker.task` are included in the repo (≈6 MB each). If you'd rather fetch
-them fresh:
+### 2. Execution
 
 ```bash
-# YOLOv8n — auto-downloads on first run via ultralytics, or:
-python -c "from ultralytics import YOLO; YOLO('yolov8n.pt')"
+# Run with pre-recorded video (Default: full dual-panel with 3D skeleton)
+python main.py --source output_fall_detected_weighted.mp4
 
-# MediaPipe Pose Landmarker (Lite/Full/Heavy variants available)
-https://ai.google.dev/edge/mediapipe/solutions/vision/pose_landmarker
-```
-
-### 3. Run
-
-```bash
-# Pre-recorded video
-python main.py --source path/to/video.mp4
-
-# Webcam
+# Run with live webcam
 python main.py --source 0
 
-# Headless (server / no display), custom output path
-python main.py --source video.mp4 --no-display --output result.mp4
+# Run in headless mode (server recording without GUI preview)
+python main.py --source input.mp4 --no-display --output result_3d.mp4
+
+# Optional: Run in legacy 2D-only mode
+python main.py --source input.mp4 --no-3d
 ```
 
-Press **`q`** in the preview window to stop early. Output video, `fall_events.csv`, and
-`fall_logs/*.png` screenshots are written alongside the script.
+### 3. Interactive 3D Viewport Controls
+
+When the application window is running:
+* **Rotate in 3D:** Click and drag with the **Left Mouse Button** anywhere inside the right-hand 3D viewport.
+* **Zoom:** Scroll the **Mouse Wheel** or hold **Right Mouse Button** and drag up/down.
+* **Reset Camera:** **Double-Click** anywhere on the 3D viewport or press **`r`**.
+* **Switch Views:** Press **`f`** (Front), **`s`** (Side), **`t`** (Top), or **`i`** (Isometric).
+* **Quit:** Press **`q`** to safely close the application, save the video, and flush logs.
 
 ---
 
-## 🔮 Limitations & Roadmap
+## 🧪 Verification & Testing
 
-Current limitations (see report §4.4.5):
-- Evaluated on a single fixed indoor camera angle; untested on outdoor/fisheye setups.
-- False alarms mainly from ADL activities that geometrically resemble falls (crawling, slow floor-sitting).
-- Multi-person scenarios with heavy bounding-box overlap are not fully evaluated.
+The project includes an automated test suite covering all modules, math operations, and edge cases:
 
-Planned next steps:
-- [ ] Velocity-spike gating + sustained-movement timeout to cut ADL false alarms
-- [ ] SMS / email / push alerts for remote caregivers
-- [ ] RTSP stream support for existing CCTV integration
-- [ ] Multi-camera fusion to remove blind spots
-- [ ] Learned (data-driven) severity model to replace the rule-based scorer
+```bash
+python -m unittest discover -p "test_*.py"
+```
+
+**Results:**
+```text
+Ran 30 tests in 4.702s
+
+OK
+```
+Tests validate 3D rotation matrix orthogonality, perspective projection, extreme zoom limits, `NaN`/`Inf` handling, posture classification, debounce windows, and end-to-end video processing.
 
 ---
 
-## 📄 Report & Citation
+## 📄 Citation
 
-The full methodology, related-work review, and evaluation are documented in
-[`docs/report.pdf`](docs/report.pdf).
-
-```
-Adhikary, N., Halder, S., Mandal, P. (2026).
-Fall Detection System Using YOLOv8 + MediaPipe Pose Estimation with
-Severity Classification & Smart Alerting. Diploma Final Year Project,
-Ghani Khan Choudhury Institute of Engineering & Technology.
+```bibtex
+@article{Adhikary2026FallActivity3D,
+  title={AI-Based Fall Detection and Activity Monitoring Using Pose Estimation with Interactive 3D Skeleton Visualization},
+  author={Adhikary, Nabyendu and Halder, Sagar and Mandal, Prasenjit},
+  advisor={Dr. Ajit Kumar Singh Yadav},
+  journal={Diploma Final Year Project Report},
+  institution={Ghani Khan Choudhury Institute of Engineering & Technology},
+  year={2026}
+}
 ```
 
 ## 🛠️ Tech Stack
 
-Python · OpenCV · [Ultralytics YOLOv8](https://github.com/ultralytics/ultralytics) · ByteTrack ·
-[MediaPipe Pose Landmarker](https://ai.google.dev/edge/mediapipe/solutions/vision/pose_landmarker) · NumPy · pygame
+Python 3.10+ · OpenCV 4.x · [Ultralytics YOLOv8](https://github.com/ultralytics/ultralytics) · ByteTrack · [MediaPipe Pose Landmarker](https://ai.google.dev/edge/mediapipe/solutions/vision/pose_landmarker) · NumPy · SciPy · Pygame
 
 ## 📜 License
 

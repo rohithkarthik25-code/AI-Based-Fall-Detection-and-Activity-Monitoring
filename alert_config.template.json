@@ -1,0 +1,19 @@
+{
+  "enabled": true,
+  "simulation_mode": false,
+  "cooldown_seconds": 30.0,
+  "telegram": {
+    "enabled": true,
+    "bot_token": "YOUR_TELEGRAM_BOT_TOKEN",
+    "chat_id": "YOUR_TELEGRAM_CHAT_ID"
+  },
+  "email": {
+    "enabled": false,
+    "smtp_server": "smtp.gmail.com",
+    "smtp_port": 587,
+    "use_tls": true,
+    "sender_email": "your_email@gmail.com",
+    "sender_password": "your_16_char_app_password",
+    "recipient_email": "caregiver_or_doctor@gmail.com"
+  }
+}
