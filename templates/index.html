@@ -1,0 +1,833 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Fall Detection & Biomechanical Monitoring</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Outfit:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-base: #090a10;
+            --bg-surface: #10131e;
+            --bg-elevated: #161b2a;
+            --bg-card: rgba(22, 27, 42, 0.7);
+            --border-dim: #1e2538;
+            --border-glow: #2d3752;
+            
+            --text-main: #f1f5f9;
+            --text-dim: #94a3b8;
+            --text-muted: #64748b;
+
+            --status-normal: #10b981;
+            --status-normal-glow: rgba(16, 185, 129, 0.25);
+            --status-warning: #f59e0b;
+            --status-warning-glow: rgba(245, 158, 11, 0.25);
+            --status-fall: #ef4444;
+            --status-fall-glow: rgba(239, 68, 68, 0.35);
+            --status-recovery: #3b82f6;
+            --status-recovery-glow: rgba(59, 130, 246, 0.25);
+
+            --accent-cyan: #06b6d4;
+            --accent-purple: #8b5cf6;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            background-color: var(--bg-base);
+            color: var(--text-main);
+            font-family: 'Outfit', -apple-system, BlinkMacSystemFont, sans-serif;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow-x: hidden;
+        }
+
+        /* ── Top Navigation Bar ── */
+        header {
+            background: linear-gradient(180deg, #131726 0%, #0d101b 100%);
+            border-bottom: 1px solid var(--border-dim);
+            padding: 12px 24px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        .brand-container {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+        }
+
+        .brand-icon {
+            width: 38px;
+            height: 38px;
+            background: linear-gradient(135deg, #0ea5e9, #6366f1);
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 0 16px rgba(99, 102, 241, 0.4);
+        }
+
+        .brand-icon svg {
+            width: 22px;
+            height: 22px;
+            fill: white;
+        }
+
+        .brand-text h1 {
+            font-size: 1.05rem;
+            font-weight: 700;
+            letter-spacing: 0.5px;
+            color: #ffffff;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .brand-text p {
+            font-size: 0.72rem;
+            color: var(--text-dim);
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        .header-actions {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .live-badge {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 6px 14px;
+            background: rgba(16, 185, 129, 0.12);
+            border: 1px solid rgba(16, 185, 129, 0.3);
+            border-radius: 20px;
+            font-size: 0.78rem;
+            font-weight: 600;
+            color: var(--status-normal);
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        .live-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background-color: var(--status-normal);
+            animation: pulse-emerald 1.8s infinite ease-in-out;
+        }
+
+        @keyframes pulse-emerald {
+            0%, 100% { opacity: 1; transform: scale(1); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7); }
+            50% { opacity: 0.6; transform: scale(1.15); box-shadow: 0 0 0 6px rgba(16, 185, 129, 0); }
+        }
+
+        /* ── Emergency Status Banner ── */
+        .status-banner {
+            padding: 14px 24px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            transition: all 0.3s ease;
+            border-bottom: 1px solid var(--border-dim);
+        }
+
+        .status-banner.normal {
+            background: linear-gradient(90deg, rgba(16, 185, 129, 0.15), rgba(16, 185, 129, 0.03));
+            border-color: rgba(16, 185, 129, 0.3);
+        }
+
+        .status-banner.warning {
+            background: linear-gradient(90deg, rgba(245, 158, 11, 0.18), rgba(245, 158, 11, 0.05));
+            border-color: rgba(245, 158, 11, 0.4);
+        }
+
+        .status-banner.fall {
+            background: linear-gradient(90deg, rgba(239, 68, 68, 0.30), rgba(239, 68, 68, 0.12));
+            border-color: rgba(239, 68, 68, 0.6);
+            animation: pulse-alert 1.2s infinite alternate;
+        }
+
+        .status-banner.recovery {
+            background: linear-gradient(90deg, rgba(59, 130, 246, 0.18), rgba(59, 130, 246, 0.05));
+            border-color: rgba(59, 130, 246, 0.4);
+        }
+
+        @keyframes pulse-alert {
+            0% { box-shadow: inset 0 0 25px rgba(239, 68, 68, 0.2); }
+            100% { box-shadow: inset 0 0 45px rgba(239, 68, 68, 0.5); }
+        }
+
+        .status-main {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+        }
+
+        .status-badge {
+            font-size: 0.85rem;
+            font-weight: 700;
+            padding: 6px 14px;
+            border-radius: 6px;
+            letter-spacing: 0.8px;
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        .status-badge.normal { background: var(--status-normal); color: #042f1a; }
+        .status-badge.warning { background: var(--status-warning); color: #351c02; }
+        .status-badge.fall { background: var(--status-fall); color: #ffffff; }
+        .status-badge.recovery { background: var(--status-recovery); color: #ffffff; }
+
+        .status-desc {
+            font-size: 0.92rem;
+            color: #cbd5e1;
+        }
+
+        .status-stats {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.82rem;
+            color: var(--text-dim);
+        }
+
+        .stat-item span {
+            color: #ffffff;
+            font-weight: 600;
+        }
+
+        /* ── Main Layout Grid ── */
+        .dashboard-container {
+            display: grid;
+            grid-template-columns: 1fr 380px;
+            gap: 20px;
+            padding: 20px 24px;
+            flex: 1;
+        }
+
+        /* ── Video Stream Area ── */
+        .stream-section {
+            display: flex;
+            flex-direction: column;
+            gap: 14px;
+        }
+
+        .stream-wrapper {
+            background-color: #000000;
+            border-radius: 12px;
+            border: 1px solid var(--border-dim);
+            overflow: hidden;
+            position: relative;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            aspect-ratio: 16 / 9;
+        }
+
+        .stream-image {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+            display: block;
+        }
+
+        /* Controls Strip below video */
+        .controls-card {
+            background-color: var(--bg-surface);
+            border: 1px solid var(--border-dim);
+            border-radius: 10px;
+            padding: 14px 18px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            gap: 12px;
+        }
+
+        .control-group {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .group-label {
+            font-size: 0.78rem;
+            color: var(--text-muted);
+            font-family: 'JetBrains Mono', monospace;
+            text-transform: uppercase;
+        }
+
+        .btn {
+            background-color: var(--bg-elevated);
+            color: var(--text-main);
+            border: 1px solid var(--border-glow);
+            padding: 7px 14px;
+            border-radius: 6px;
+            font-size: 0.82rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-family: 'Outfit', sans-serif;
+        }
+
+        .btn:hover {
+            background-color: #22293f;
+            border-color: var(--accent-cyan);
+            color: #ffffff;
+        }
+
+        .btn.active {
+            background: linear-gradient(135deg, rgba(6, 182, 212, 0.25), rgba(99, 102, 241, 0.25));
+            border-color: var(--accent-cyan);
+            color: #38bdf8;
+            font-weight: 600;
+        }
+
+        .btn-danger {
+            background: rgba(239, 68, 68, 0.15);
+            border-color: rgba(239, 68, 68, 0.4);
+            color: #f87171;
+        }
+
+        .btn-danger:hover {
+            background: rgba(239, 68, 68, 0.3);
+            border-color: #ef4444;
+            color: #ffffff;
+        }
+
+        select.source-select {
+            background-color: var(--bg-elevated);
+            color: var(--text-main);
+            border: 1px solid var(--border-glow);
+            padding: 7px 12px;
+            border-radius: 6px;
+            font-size: 0.82rem;
+            font-family: 'JetBrains Mono', monospace;
+            outline: none;
+            cursor: pointer;
+        }
+
+        /* ── Right Telemetry Sidebar ── */
+        .sidebar {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        .panel-card {
+            background-color: var(--bg-surface);
+            border: 1px solid var(--border-dim);
+            border-radius: 10px;
+            padding: 16px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .card-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+            padding-bottom: 10px;
+        }
+
+        .card-title {
+            font-size: 0.84rem;
+            font-weight: 700;
+            color: #e2e8f0;
+            letter-spacing: 0.5px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        /* Metric Counters */
+        .metric-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 10px;
+        }
+
+        .metric-box {
+            background-color: var(--bg-elevated);
+            border: 1px solid var(--border-dim);
+            border-radius: 8px;
+            padding: 12px;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .metric-label {
+            font-size: 0.70rem;
+            color: var(--text-muted);
+            font-family: 'JetBrains Mono', monospace;
+            text-transform: uppercase;
+        }
+
+        .metric-val {
+            font-size: 1.25rem;
+            font-weight: 700;
+            font-family: 'JetBrains Mono', monospace;
+            color: #ffffff;
+        }
+
+        /* Multi-Person Drawer */
+        .person-list {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            max-height: 260px;
+            overflow-y: auto;
+        }
+
+        .person-item {
+            background-color: var(--bg-elevated);
+            border: 1px solid var(--border-dim);
+            border-radius: 8px;
+            padding: 10px 14px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .person-item:hover {
+            border-color: var(--accent-cyan);
+            background-color: #1e2436;
+        }
+
+        .person-item.focused {
+            border-color: #38bdf8;
+            box-shadow: 0 0 10px rgba(56, 189, 248, 0.2);
+            background: linear-gradient(90deg, rgba(56, 189, 248, 0.1), transparent);
+        }
+
+        .person-item.fallen {
+            border-color: #ef4444;
+            background: rgba(239, 68, 68, 0.12);
+        }
+
+        .person-info {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+        }
+
+        .person-id-tag {
+            font-weight: 700;
+            font-size: 0.85rem;
+            color: #ffffff;
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        .person-activity {
+            font-size: 0.76rem;
+            color: var(--text-dim);
+        }
+
+        .person-status-pill {
+            font-size: 0.70rem;
+            font-weight: 600;
+            padding: 3px 8px;
+            border-radius: 4px;
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        /* Incidents Table */
+        .incident-list {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            max-height: 200px;
+            overflow-y: auto;
+            font-size: 0.76rem;
+        }
+
+        .incident-row {
+            background-color: var(--bg-elevated);
+            border: 1px solid var(--border-dim);
+            border-radius: 6px;
+            padding: 8px 10px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        .incident-sev {
+            font-weight: 700;
+            padding: 2px 6px;
+            border-radius: 4px;
+        }
+
+        .sev-SEVERE { background: rgba(239, 68, 68, 0.2); color: #f87171; border: 1px solid #ef4444; }
+        .sev-MODERATE { background: rgba(245, 158, 11, 0.2); color: #fbbf24; border: 1px solid #f59e0b; }
+        .sev-MILD { background: rgba(59, 130, 246, 0.2); color: #60a5fa; border: 1px solid #3b82f6; }
+
+        /* Responsive */
+        @media (max-width: 1024px) {
+            .dashboard-container {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Header Navigation -->
+    <header>
+        <div class="brand-container">
+            <div class="brand-icon">
+                <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm-1-13h2v6h-2zm0 8h2v2h-2z"/></svg>
+            </div>
+            <div class="brand-text">
+                <h1>AI FALL DETECTION & BIOMECHANICAL MONITOR</h1>
+                <p>Dual-Panel Computer Vision & Interactive 3D Kinematics</p>
+            </div>
+        </div>
+
+        <div class="header-actions">
+            <div class="live-badge">
+                <div class="live-dot"></div>
+                LIVE FEED
+            </div>
+            <button class="btn" id="audioToggleBtn" onclick="toggleAudioAlarm()">
+                🔊 Siren: ON
+            </button>
+        </div>
+    </header>
+
+    <!-- Emergency Status Banner -->
+    <div class="status-banner normal" id="statusBanner">
+        <div class="status-main">
+            <div class="status-badge normal" id="statusBadge">NORMAL</div>
+            <div class="status-desc" id="statusDesc">All tracked individuals are in safe, nominal posture.</div>
+        </div>
+        <div class="status-stats">
+            <div class="stat-item">PERSONS: <span id="statPersons">0</span></div>
+            <div class="stat-item">CONFIRMED FALLS: <span id="statFalls">0</span></div>
+            <div class="stat-item">LAST INCIDENT: <span id="statLastTime">--:--:--</span></div>
+        </div>
+    </div>
+
+    <!-- Main Content Area -->
+    <main class="dashboard-container">
+        
+        <!-- Video Stream Player -->
+        <section class="stream-section">
+            <div class="stream-wrapper">
+                <img src="/video_feed" class="stream-image" alt="Dual-Panel AI Video Feed (Camera + 3D Skeleton)" id="videoStream">
+            </div>
+
+            <!-- Quick Controls Toolbar -->
+            <div class="controls-card">
+                <div class="control-group">
+                    <span class="group-label">3D Skeleton Focus:</span>
+                    <button class="btn active" id="btnFocusAuto" onclick="setFocus(null)">Auto (Risk Priority)</button>
+                    <div id="quickPersonButtons" style="display: flex; gap: 6px;"></div>
+                </div>
+
+                <div class="control-group">
+                    <span class="group-label">Input Source:</span>
+                    <select class="source-select" id="sourceSelector" onchange="changeSource(this.value)">
+                        <option value="0">Webcam 0 (Live Device)</option>
+                        <option value="fall01.mp4">Sample Video: fall01.mp4</option>
+                    </select>
+                    <button class="btn btn-danger" onclick="triggerTestAlert()">🚨 Test Alert</button>
+                </div>
+            </div>
+        </section>
+
+        <!-- Right Side Telemetry Drawer -->
+        <aside class="sidebar">
+
+            <!-- System Performance Card -->
+            <div class="panel-card">
+                <div class="card-header">
+                    <span class="card-title">SYSTEM METRICS</span>
+                    <span style="font-size: 0.72rem; color: #10b981; font-family: monospace;">STABLE</span>
+                </div>
+                <div class="metric-grid">
+                    <div class="metric-box">
+                        <span class="metric-label">Inference FPS</span>
+                        <span class="metric-val" id="metricFps">0.0</span>
+                    </div>
+                    <div class="metric-box">
+                        <span class="metric-label">Active Subjects</span>
+                        <span class="metric-val" id="metricPersons">0</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Multi-Person Tracking Card -->
+            <div class="panel-card">
+                <div class="card-header">
+                    <span class="card-title">TRACKED INDIVIDUALS</span>
+                    <span style="font-size: 0.72rem; color: var(--text-dim);" id="trackCountTag">0 Active</span>
+                </div>
+                <div class="person-list" id="personListContainer">
+                    <div style="text-align: center; color: var(--text-muted); font-size: 0.8rem; padding: 20px;">
+                        Waiting for detected subjects...
+                    </div>
+                </div>
+            </div>
+
+            <!-- Recent Incidents Log -->
+            <div class="panel-card">
+                <div class="card-header">
+                    <span class="card-title">INCIDENT LOGS</span>
+                    <button class="btn" style="padding: 3px 8px; font-size: 0.7rem;" onclick="loadIncidents()">Refresh</button>
+                </div>
+                <div class="incident-list" id="incidentListContainer">
+                    <div style="text-align: center; color: var(--text-muted); font-size: 0.8rem; padding: 15px;">
+                        No fall incidents recorded.
+                    </div>
+                </div>
+            </div>
+
+        </aside>
+
+    </main>
+
+    <script>
+        // Web Audio Siren Generator
+        let audioCtx = null;
+        let sirenOsc = null;
+        let sirenGain = null;
+        let sirenActive = false;
+        let sirenMuted = false;
+
+        function initAudio() {
+            if (!audioCtx) {
+                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            }
+        }
+
+        function playSiren() {
+            if (sirenMuted) return;
+            initAudio();
+            if (sirenActive) return;
+
+            sirenOsc = audioCtx.createOscillator();
+            sirenGain = audioCtx.createGain();
+
+            sirenOsc.type = 'sawtooth';
+            sirenOsc.frequency.setValueAtTime(600, audioCtx.currentTime);
+            sirenOsc.frequency.exponentialRampToValueAtTime(1200, audioCtx.currentTime + 0.4);
+
+            sirenGain.gain.setValueAtTime(0.15, audioCtx.currentTime);
+
+            sirenOsc.connect(sirenGain);
+            sirenGain.connect(audioCtx.destination);
+            sirenOsc.start();
+            sirenActive = true;
+
+            // Wobble pitch
+            let high = true;
+            sirenOsc.timer = setInterval(() => {
+                if (!sirenOsc) return;
+                const target = high ? 650 : 1100;
+                sirenOsc.frequency.exponentialRampToValueAtTime(target, audioCtx.currentTime + 0.3);
+                high = !high;
+            }, 350);
+        }
+
+        function stopSiren() {
+            if (!sirenActive) return;
+            if (sirenOsc) {
+                clearInterval(sirenOsc.timer);
+                sirenOsc.stop();
+                sirenOsc.disconnect();
+                sirenOsc = null;
+            }
+            sirenActive = false;
+        }
+
+        function toggleAudioAlarm() {
+            sirenMuted = !sirenMuted;
+            const btn = document.getElementById("audioToggleBtn");
+            if (sirenMuted) {
+                btn.innerText = "🔇 Siren: MUTED";
+                btn.style.color = "#ef4444";
+                stopSiren();
+            } else {
+                btn.innerText = "🔊 Siren: ON";
+                btn.style.color = "";
+            }
+        }
+
+        // Live Telemetry Poller
+        let currentFocusId = null;
+
+        async function pollTelemetry() {
+            try {
+                const res = await fetch('/api/telemetry');
+                if (!res.ok) return;
+                const data = await res.json();
+                updateUI(data);
+            } catch (err) {
+                console.error("Telemetry error:", err);
+            }
+        }
+
+        function updateUI(data) {
+            // Metrics
+            document.getElementById('metricFps').innerText = data.fps ? data.fps.toFixed(1) : "0.0";
+            document.getElementById('metricPersons').innerText = data.active_persons || 0;
+            document.getElementById('statPersons').innerText = data.active_persons || 0;
+            document.getElementById('statFalls').innerText = data.total_falls || 0;
+            document.getElementById('statLastTime').innerText = data.last_fall_time || "--:--:--";
+            document.getElementById('trackCountTag').innerText = `${data.active_persons || 0} Active`;
+
+            currentFocusId = data.focus_person_id;
+
+            // Status Banner
+            const banner = document.getElementById('statusBanner');
+            const badge = document.getElementById('statusBadge');
+            const desc = document.getElementById('statusDesc');
+
+            banner.className = "status-banner " + (data.fall_active ? "fall" : (data.overall_status ? data.overall_status.toLowerCase().replace(" ", "") : "normal"));
+            
+            if (data.fall_active) {
+                badge.className = "status-badge fall";
+                badge.innerText = "FALL DETECTED";
+                desc.innerText = `EMERGENCY: Confirmed fall incident active! Immediate assistance required.`;
+                playSiren();
+            } else if (data.overall_status === "WARNING") {
+                badge.className = "status-badge warning";
+                badge.innerText = "WARNING";
+                desc.innerText = "Subject shows high kinematic descent / unstable posture.";
+                stopSiren();
+            } else if (data.overall_status === "RECOVERY") {
+                badge.className = "status-badge recovery";
+                badge.innerText = "RECOVERY";
+                desc.innerText = "Individual has stood up and recovered normal posture.";
+                stopSiren();
+            } else {
+                badge.className = "status-badge normal";
+                badge.innerText = "NORMAL";
+                desc.innerText = "All tracked individuals are in safe, nominal posture.";
+                stopSiren();
+            }
+
+            // Quick focus buttons
+            const quickBtnContainer = document.getElementById('quickPersonButtons');
+            const persons = data.persons || [];
+            
+            quickBtnContainer.innerHTML = persons.map(p => {
+                const isActive = (currentFocusId === p.id);
+                return `<button class="btn ${isActive ? 'active' : ''}" onclick="setFocus(${p.id})">P${p.id}</button>`;
+            }).join('');
+
+            // Person List Drawer
+            const personList = document.getElementById('personListContainer');
+            if (persons.length === 0) {
+                personList.innerHTML = `<div style="text-align: center; color: var(--text-muted); font-size: 0.8rem; padding: 20px;">No persons currently detected.</div>`;
+            } else {
+                personList.innerHTML = persons.map(p => {
+                    const isFoc = (currentFocusId === p.id);
+                    const isFallen = p.fall_detected;
+                    const confStr = p.confidence ? `${p.confidence}%` : "";
+                    return `
+                        <div class="person-item ${isFoc ? 'focused' : ''} ${isFallen ? 'fallen' : ''}" onclick="setFocus(${p.id})">
+                            <div class="person-info">
+                                <span class="person-id-tag">PERSON #${p.id}</span>
+                                <span class="person-activity">${p.activity.toUpperCase()} ${confStr ? '— ' + confStr : ''}</span>
+                            </div>
+                            <span class="person-status-pill ${isFallen ? 'sev-SEVERE' : 'sev-MILD'}">
+                                ${isFallen ? 'FALLEN' : 'NORMAL'}
+                            </span>
+                        </div>
+                    `;
+                }).join('');
+            }
+        }
+
+        async function setFocus(personId) {
+            try {
+                await fetch('/api/focus', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ person_id: personId })
+                });
+                document.getElementById('btnFocusAuto').className = "btn " + (personId === null ? "active" : "");
+            } catch (e) {
+                console.error("Focus error:", e);
+            }
+        }
+
+        async function changeSource(newSource) {
+            try {
+                await fetch('/api/source', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ source: newSource })
+                });
+            } catch (e) {
+                console.error("Source error:", e);
+            }
+        }
+
+        async function triggerTestAlert() {
+            try {
+                const res = await fetch('/api/test_alarm', { method: 'POST' });
+                const ans = await res.json();
+                alert(ans.message || "Test alert triggered!");
+            } catch (e) {
+                alert("Error triggering test alert: " + e);
+            }
+        }
+
+        async function loadIncidents() {
+            try {
+                const res = await fetch('/api/incidents');
+                if (!res.ok) return;
+                const logs = await res.json();
+                const container = document.getElementById('incidentListContainer');
+                if (logs.length === 0) {
+                    container.innerHTML = `<div style="text-align: center; color: var(--text-muted); font-size: 0.8rem; padding: 15px;">No incidents recorded yet.</div>`;
+                    return;
+                }
+                container.innerHTML = logs.slice(-10).reverse().map(l => {
+                    return `
+                        <div class="incident-row">
+                            <div>
+                                <span style="color:#ffffff;">P${l.Person_ID}</span> | 
+                                <span style="color:var(--text-dim);">${l.Timestamp.split(' ')[1] || l.Timestamp}</span>
+                            </div>
+                            <span class="incident-sev sev-${l.Severity}">${l.Severity} (${l.Fall_Score})</span>
+                        </div>
+                    `;
+                }).join('');
+            } catch (e) {
+                console.error("Incident load error:", e);
+            }
+        }
+
+        // Initialize polling and incident log on load
+        setInterval(pollTelemetry, 250);
+        loadIncidents();
+    </script>
+</body>
+</html>

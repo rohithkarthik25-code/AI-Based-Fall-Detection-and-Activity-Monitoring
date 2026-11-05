@@ -1,0 +1,17 @@
+version: "3.8"
+
+services:
+  fall-detection-app:
+    build: .
+    container_name: fall_detection_web
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      - PYTHONUNBUFFERED=1
+    volumes:
+      - ./fall_logs:/app/fall_logs
+      - ./alert_config.json:/app/alert_config.json:ro
+    # For live USB webcam passthrough on Linux hosts, uncomment below:
+    # devices:
+    #   - "/dev/video0:/dev/video0"
