@@ -147,22 +147,26 @@ class FallDetector:
             is_emergency = bool(state.get("fall_detected", False) or state.get("candidate_frames", 0) > 0)
             has_last_pose = state.get("last_pose") is not None
 
-            # ── 4. MediaPipe Pose Estimation (Adaptive Multi-Person) ──
+            # ── 4. MediaPipe Pose Estimation (Real-Time Multi-Person) ──
+            # For 1-2 persons, estimate pose every single frame for instantaneous 3D response
+            # Only throttle steady background subjects when 3+ persons are present
             should_estimate_pose = True
             if self.adaptive_pose and has_last_pose and not is_emergency:
-                prev_b = state.get("prev_box")
-                if prev_b is not None:
-                    d_box = (
-                        abs(box[0] - prev_b[0])
-                        + abs(box[1] - prev_b[1])
-                        + abs(box[2] - prev_b[2])
-                        + abs(box[3] - prev_b[3])
-                    )
-                    if d_box < 10.0 and (state.get("pose_step", 0) % 2 == 1):
-                        should_estimate_pose = False
+                if len(tracked) >= 3:
+                    prev_b = state.get("prev_box")
+                    if prev_b is not None:
+                        d_box = (
+                            abs(box[0] - prev_b[0])
+                            + abs(box[1] - prev_b[1])
+                            + abs(box[2] - prev_b[2])
+                            + abs(box[3] - prev_b[3])
+                        )
+                        # If virtually motionless in crowded scene, alternate frame
+                        if d_box < 2.5 and (state.get("pose_step", 0) % 2 == 1):
+                            should_estimate_pose = False
 
-                if should_estimate_pose and len(tracked) >= 3 and poses_computed_this_frame >= max_steady_poses_per_frame:
-                    should_estimate_pose = False
+                    if should_estimate_pose and poses_computed_this_frame >= max_steady_poses_per_frame:
+                        should_estimate_pose = False
 
             state["pose_step"] = state.get("pose_step", 0) + 1
             state["prev_box"] = list(box)
@@ -375,6 +379,7 @@ class FallDetector:
             ]
 
         telemetry = {
+            "frame_seq": self.frame_idx,
             "active_persons": len(tracked),
             "fall_active": bool(self.dashboard.fall_active),
             "total_falls": int(self.dashboard.total_falls),
@@ -384,10 +389,14 @@ class FallDetector:
             "focus_world_landmarks": _serialize_world_landmarks(focus_world_landmarks),
             "overall_status": overall_status,
             "camera_frame": frame,
+            "frame_width": w_f,
+            "frame_height": h_f,
             "persons": [
                 {
                     "id": p[0],
                     "box": [int(v) for v in p[1]],
+                    "center_x": round(float((p[1][0] + p[1][2]) / (2.0 * max(1, w_f))), 3),
+                    "center_y": round(float((p[1][1] + p[1][3]) / (2.0 * max(1, h_f))), 3),
                     "activity": str(p[2].get("activity_label", "Unknown")),
                     "confidence": round(float(p[2].get("activity_confidence", 0.0)) * 100, 1) if p[2].get("activity_confidence") is not None else None,
                     "fall_detected": bool(p[2].get("fall_detected", False)),

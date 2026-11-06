@@ -104,14 +104,18 @@ async def video_feed(mode: str = "camera"):
 
 @app.websocket("/ws/telemetry")
 async def websocket_telemetry(websocket: WebSocket):
-    """Real-time 30-60 FPS WebSocket stream of 3D metric landmarks & posture telemetry for Three.js."""
+    """Real-time zero-delay WebSocket stream of 3D metric landmarks & posture telemetry for Three.js."""
     await websocket.accept()
+    last_sent_seq = -1
     try:
         while True:
             if pipeline is not None:
                 telemetry = pipeline.get_telemetry()
-                await websocket.send_json(telemetry)
-            await asyncio.sleep(0.033)  # ~30 FPS stream
+                cur_seq = telemetry.get("frame_seq", 0)
+                if cur_seq != last_sent_seq:
+                    await websocket.send_json(telemetry)
+                    last_sent_seq = cur_seq
+            await asyncio.sleep(0.005)  # 5ms fast poll check -> immediate push upon frame completion
     except (WebSocketDisconnect, Exception):
         pass
 

@@ -301,7 +301,7 @@
             position: absolute;
             top: 10px;
             left: 10px;
-            background: rgba(14, 18, 30, 0.78);
+            background: rgba(14, 18, 30, 0.82);
             backdrop-filter: blur(6px);
             border: 1px solid rgba(255, 255, 255, 0.08);
             padding: 6px 10px;
@@ -629,7 +629,7 @@
             </div>
             <div class="brand-text">
                 <h1>AI FALL DETECTION & BIOMECHANICAL MONITOR</h1>
-                <p>Hardware-Accelerated Three.js WebGL Kinematics</p>
+                <p>Hardware-Accelerated Three.js WebGL Multi-Avatar Kinematics</p>
             </div>
         </div>
 
@@ -687,7 +687,9 @@
                             <span style="color:#06b6d4;">●</span> 3D SKELETON KINEMATICS (THREE.JS)
                         </span>
                         <div style="display: flex; align-items: center; gap: 6px;">
-                            <span style="font-size: 0.68rem; font-family: monospace; color: #94a3b8;" id="threeFocusBadge">FOCUS: AUTO</span>
+                            <span style="font-size: 0.68rem; font-family: monospace; color: #38bdf8;" id="threeAvatarCount">0 Avatars</span>
+                            <span style="font-size: 0.68rem; font-family: monospace; color: #94a3b8;" id="threeFocusBadge">VIEW: ROOM (ALL)</span>
+                            <button class="preset-btn" id="btnViewToggle" onclick="toggleViewMode()">View: All</button>
                             <button class="preset-btn" onclick="resetThreeCamera()">Reset View</button>
                         </div>
                     </div>
@@ -706,7 +708,8 @@
                         <!-- 3D Top Camera Orientation Overlay -->
                         <div class="three-overlay-top" id="threeCameraReadout">
                             <div>CAMERA: <span>AZ <span id="camAz">0</span>° | EL <span id="camEl">15</span>°</span></div>
-                            <div>SCALE: <span>1.0m Metric Grid</span></div>
+                            <div>SCALE: <span>1.0m Metric Room Grid</span></div>
+                            <div>MODE: <span id="cameraModeText">MULTI-AVATAR ROOM</span></div>
                         </div>
 
                         <!-- 3D Bottom Preset Controls -->
@@ -796,7 +799,7 @@
     </main>
 
     <!-- ─────────────────────────────────────────────────────────────
-         Three.js WebGL Interactive 3D Kinematics Engine
+         Three.js WebGL Interactive Multi-Avatar Kinematics Engine
          ───────────────────────────────────────────────────────────── -->
     <script>
         // Anatomical Kinematic Bone Connections (33 MediaPipe raw + 33: Virtual Neck + 34: Virtual Pelvis)
@@ -852,25 +855,438 @@
             [28, 32, "right"],      // Ankle -> Foot Index (Arch)
         ];
 
-        // Three.js PBR Materials
-        const MATERIALS = {
-            left: new THREE.MeshStandardMaterial({ color: 0x06b6d4, roughness: 0.3, metalness: 0.2 }),       // Cyan
-            right: new THREE.MeshStandardMaterial({ color: 0xf97316, roughness: 0.3, metalness: 0.2 }),      // Orange
-            torso: new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.2, metalness: 0.1 }),      // Pure White
-            spine: new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.2, emissive: 0x222222 }),  // Luminescent Spine
-            head: new THREE.MeshStandardMaterial({ color: 0x10b981, roughness: 0.3, metalness: 0.1 }),       // Lime Green
-            fall: new THREE.MeshStandardMaterial({ color: 0xef4444, roughness: 0.2, emissive: 0x881111 }),  // Emergency Red
-            jointCore: new THREE.MeshBasicMaterial({ color: 0xffffff }),
-        };
+        // Distinct Vivid Color Palettes per tracked Subject
+        const PERSON_PALETTES = [
+            {
+                name: "Cyan & Tangerine",
+                left: 0x06b6d4,    // Neon Cyan
+                right: 0xf97316,   // Tangerine Orange
+                spine: 0x38bdf8,   // Sky Blue
+                head: 0x10b981,    // Emerald Green
+                torso: 0xffffff,   // Pure White
+                ring: 0x06b6d4,
+            },
+            {
+                name: "Purple & Amber",
+                left: 0xa855f7,    // Vivid Purple
+                right: 0xf59e0b,   // Amber
+                spine: 0xc084fc,   // Lavender
+                head: 0xec4899,    // Pink
+                torso: 0xffffff,
+                ring: 0xa855f7,
+            },
+            {
+                name: "Emerald & Gold",
+                left: 0x10b981,    // Mint / Emerald
+                right: 0xeab308,   // Golden
+                spine: 0x34d399,
+                head: 0x06b6d4,
+                torso: 0xffffff,
+                ring: 0x10b981,
+            },
+            {
+                name: "Rose & Blue",
+                left: 0xf43f5e,    // Rose
+                right: 0x3b82f6,   // Royal Blue
+                spine: 0xfb7185,
+                head: 0x8b5cf6,
+                torso: 0xffffff,
+                ring: 0xf43f5e,
+            }
+        ];
 
+        const EMERGENCY_FALL_MATERIAL = new THREE.MeshStandardMaterial({
+            color: 0xef4444,
+            roughness: 0.15,
+            metalness: 0.1,
+            emissive: 0xaa1111,
+            emissiveIntensity: 0.95
+        });
+
+        // Dynamic 2D Billboard Canvas Generator for Floating Avatar Nameplates
+        function createBillboardTexture(text, isFall, palette) {
+            const canvas = document.createElement("canvas");
+            canvas.width = 256;
+            canvas.height = 64;
+            const ctx = canvas.getContext("2d");
+
+            ctx.clearRect(0, 0, 256, 64);
+
+            // Pill background
+            ctx.beginPath();
+            const r = 16;
+            ctx.moveTo(r, 8);
+            ctx.lineTo(256 - r, 8);
+            ctx.quadraticCurveTo(256, 8, 256, 8 + r);
+            ctx.lineTo(256, 56 - r);
+            ctx.quadraticCurveTo(256, 56, 256 - r, 56);
+            ctx.lineTo(r, 56);
+            ctx.quadraticCurveTo(0, 56, 0, 56 - r);
+            ctx.lineTo(0, 8 + r);
+            ctx.quadraticCurveTo(0, 8, r, 8);
+            ctx.closePath();
+
+            if (isFall) {
+                ctx.fillStyle = "rgba(239, 68, 68, 0.95)";
+                ctx.fill();
+                ctx.lineWidth = 3;
+                ctx.strokeStyle = "#ffffff";
+                ctx.stroke();
+            } else {
+                ctx.fillStyle = "rgba(15, 23, 42, 0.88)";
+                ctx.fill();
+                ctx.lineWidth = 2;
+                ctx.strokeStyle = "#" + palette.ring.toString(16).padStart(6, "0");
+                ctx.stroke();
+            }
+
+            ctx.fillStyle = "#ffffff";
+            ctx.font = isFall ? "bold 20px 'JetBrains Mono', monospace" : "bold 18px 'JetBrains Mono', monospace";
+            ctx.textAlign = "center";
+            ctx.textBaseline = "middle";
+            ctx.fillText(text, 128, 32);
+
+            const texture = new THREE.CanvasTexture(canvas);
+            texture.minFilter = THREE.LinearFilter;
+            return texture;
+        }
+
+        // ─────────────────────────────────────────────────────────────
+        // Individual 3D Avatar Instance
+        // ─────────────────────────────────────────────────────────────
+        class Avatar3D {
+            constructor(id, scene, sharedGeometries) {
+                this.id = id;
+                this.scene = scene;
+                const paletteIdx = Math.abs(id - 1) % PERSON_PALETTES.length;
+                this.palette = PERSON_PALETTES[paletteIdx];
+                this.lastSeen = performance.now();
+                this.isFall = false;
+                this.activity = "NORMAL";
+                this.confidence = 0;
+                this.visible = false;
+                this.hasEverSnapped = false;
+
+                this.group = new THREE.Group();
+                this.group.name = `avatar_${id}`;
+                this.scene.add(this.group);
+
+                // Ground placement coordinates
+                this.targetGroupX = 0;
+                this.targetGroupZ = 0;
+
+                // Materials
+                this.materials = {
+                    left: new THREE.MeshStandardMaterial({ color: this.palette.left, roughness: 0.3, metalness: 0.2 }),
+                    right: new THREE.MeshStandardMaterial({ color: this.palette.right, roughness: 0.3, metalness: 0.2 }),
+                    torso: new THREE.MeshStandardMaterial({ color: this.palette.torso, roughness: 0.2, metalness: 0.1 }),
+                    spine: new THREE.MeshStandardMaterial({ color: this.palette.spine, roughness: 0.2, emissive: 0x222222 }),
+                    head: new THREE.MeshStandardMaterial({ color: this.palette.head, roughness: 0.3, metalness: 0.1 }),
+                    ring: new THREE.MeshBasicMaterial({ color: this.palette.ring, transparent: true, opacity: 0.6, wireframe: true }),
+                };
+
+                // Joints
+                this.jointMeshes = [];
+                this.targetPositions = [];
+                this.currentPositions = [];
+
+                for (let i = 0; i < 35; i++) {
+                    let r = 0.024;
+                    let mat = this.materials.torso;
+                    if ([11, 12, 23, 24].includes(i)) r = 0.038;
+                    else if ([13, 14, 25, 26, 33, 34].includes(i)) r = 0.034;
+                    else if ([15, 16, 27, 28].includes(i)) r = 0.030;
+                    else if ([0, 2, 5, 7, 8].includes(i)) r = 0.022;
+                    else r = 0.016;
+
+                    if ([11, 13, 15, 17, 19, 21, 23, 25, 27, 29, 31].includes(i)) mat = this.materials.left;
+                    else if ([12, 14, 16, 18, 20, 22, 24, 26, 28, 30, 32].includes(i)) mat = this.materials.right;
+                    else if ([0, 2, 5, 7, 8].includes(i)) mat = this.materials.head;
+                    else mat = this.materials.spine;
+
+                    const mesh = new THREE.Mesh(sharedGeometries.sphere, mat);
+                    mesh.scale.set(r, r, r);
+                    this.group.add(mesh);
+                    this.jointMeshes.push(mesh);
+                    this.targetPositions.push(new THREE.Vector3(0, 0, 0));
+                    this.currentPositions.push(new THREE.Vector3(0, 0, 0));
+                }
+
+                // Volumetric Bones
+                this.boneMeshes = [];
+                for (let i = 0; i < SKELETON_CONNECTIONS.length; i++) {
+                    const conn = SKELETON_CONNECTIONS[i];
+                    const boneType = conn[2];
+                    const mat = this.materials[boneType] || this.materials.torso;
+                    const boneMesh = new THREE.Mesh(sharedGeometries.cylinder, mat);
+                    this.group.add(boneMesh);
+                    this.boneMeshes.push({
+                        mesh: boneMesh,
+                        from: conn[0],
+                        to: conn[1],
+                        type: boneType,
+                        radius: (boneType === "spine" || boneType === "torso") ? 0.022 : 0.016
+                    });
+                }
+
+                // Ground Status Aura Ring
+                const ringGeo = new THREE.RingGeometry(0.30, 0.36, 24);
+                ringGeo.rotateX(-Math.PI / 2);
+                this.ringMesh = new THREE.Mesh(ringGeo, this.materials.ring);
+                this.ringMesh.position.y = -0.91;
+                this.group.add(this.ringMesh);
+
+                // Floating Billboard Sprite
+                const spriteMat = new THREE.SpriteMaterial({ transparent: true });
+                this.billboard = new THREE.Sprite(spriteMat);
+                this.billboard.scale.set(0.68, 0.17, 1);
+                this.group.add(this.billboard);
+                this.lastBillboardText = "";
+            }
+
+            updatePose(landmarks3D, roomX, roomZ, isFall, activity, confidence) {
+                if (!landmarks3D || landmarks3D.length < 33) return;
+
+                this.lastSeen = performance.now();
+                this.visible = true;
+                this.isFall = isFall;
+                this.activity = activity || "Unknown";
+                this.confidence = confidence || 0;
+                this.targetGroupX = roomX;
+                this.targetGroupZ = roomZ;
+
+                // Coordinate conversion: MediaPipe metric (hip-centered) -> Three.js
+                // MediaPipe: X right, Y down, Z depth toward camera
+                // Three.js: -MP.x (mirrored for natural self-view symmetry), -MP.y (upward), -MP.z
+                for (let i = 0; i < 33; i++) {
+                    const lm = landmarks3D[i];
+                    if (lm) {
+                        this.targetPositions[i].set(-lm[0], -lm[1], -lm[2]);
+                    }
+                }
+
+                // Virtual Neck (#33): Midpoint between Shoulders (11, 12)
+                this.targetPositions[33].lerpVectors(this.targetPositions[11], this.targetPositions[12], 0.5);
+
+                // Virtual Pelvis (#34): Midpoint between Hips (23, 24)
+                this.targetPositions[34].lerpVectors(this.targetPositions[23], this.targetPositions[24], 0.5);
+
+                // Update Billboard label
+                const tagText = this.isFall 
+                    ? `⚠️ P${this.id}: FALLEN!`
+                    : `P${this.id}: ${this.activity.toUpperCase()}`;
+                if (tagText !== this.lastBillboardText) {
+                    this.lastBillboardText = tagText;
+                    if (this.billboard.material.map) this.billboard.material.map.dispose();
+                    this.billboard.material.map = createBillboardTexture(tagText, this.isFall, this.palette);
+                    this.billboard.material.needsUpdate = true;
+                }
+
+                // Instant snap on first acquisition to prevent visual gliding lag
+                if (!this.hasEverSnapped) {
+                    this.group.position.x = this.targetGroupX;
+                    this.group.position.z = this.targetGroupZ;
+                    for (let i = 0; i < 35; i++) {
+                        this.currentPositions[i].copy(this.targetPositions[i]);
+                    }
+                    this.hasEverSnapped = true;
+                }
+            }
+
+            animate(now, upVec, dirVec) {
+                if (!this.visible) {
+                    this.group.visible = false;
+                    return;
+                }
+
+                // Auto-fade stale avatars if tracking is lost (> 1.2 seconds)
+                if (now - this.lastSeen > 1200) {
+                    this.visible = false;
+                    this.group.visible = false;
+                    return;
+                }
+
+                this.group.visible = true;
+
+                // Snappy ground X/Z translation lerp
+                const dx = Math.abs(this.group.position.x - this.targetGroupX);
+                const groupLerp = dx > 0.15 ? 0.90 : 0.70;
+                this.group.position.x += (this.targetGroupX - this.group.position.x) * groupLerp;
+                this.group.position.z += (this.targetGroupZ - this.group.position.z) * groupLerp;
+
+                const fallMat = this.isFall ? EMERGENCY_FALL_MATERIAL : null;
+
+                // 1. Joint Interpolation (Ultra-Snappy Dynamic Lerp for ZERO video lag)
+                for (let i = 0; i < 35; i++) {
+                    const cur = this.currentPositions[i];
+                    const tgt = this.targetPositions[i];
+                    const d = cur.distanceTo(tgt);
+
+                    if (d > 0.35) {
+                        // Instant snap on sudden rapid transitions
+                        cur.copy(tgt);
+                    } else {
+                        // Active motion -> 0.94 factor (instant tracking); quiet pose -> 0.72 factor (filter sensor noise)
+                        const k = d > 0.04 ? 0.94 : 0.72;
+                        cur.lerp(tgt, k);
+                    }
+
+                    const jMesh = this.jointMeshes[i];
+                    jMesh.position.copy(cur);
+
+                    if (fallMat) {
+                        jMesh.material = fallMat;
+                    } else {
+                        if ([11, 13, 15, 17, 19, 21, 23, 25, 27, 29, 31].includes(i)) jMesh.material = this.materials.left;
+                        else if ([12, 14, 16, 18, 20, 22, 24, 26, 28, 30, 32].includes(i)) jMesh.material = this.materials.right;
+                        else if ([0, 2, 5, 7, 8].includes(i)) jMesh.material = this.materials.head;
+                        else jMesh.material = this.materials.spine;
+                    }
+                }
+
+                // 2. Volumetric Cylindrical Bone Alignment
+                for (let k = 0; k < this.boneMeshes.length; k++) {
+                    const b = this.boneMeshes[k];
+                    const pA = this.currentPositions[b.from];
+                    const pB = this.currentPositions[b.to];
+                    const dist = pA.distanceTo(pB);
+
+                    if (dist > 0.001) {
+                        b.mesh.position.lerpVectors(pA, pB, 0.5);
+                        b.mesh.scale.set(b.radius, dist, b.radius);
+                        dirVec.subVectors(pB, pA).normalize();
+                        b.mesh.quaternion.setFromUnitVectors(upVec, dirVec);
+                        b.mesh.material = fallMat || (this.materials[b.type] || this.materials.torso);
+                        b.mesh.visible = true;
+                    } else {
+                        b.mesh.visible = false;
+                    }
+                }
+
+                // 3. Ground Status Aura Ring Pulsing
+                if (this.isFall) {
+                    this.materials.ring.color.setHex(0xef4444);
+                    const pulse = 0.5 + 0.5 * Math.sin(now * 0.012);
+                    this.ringMesh.scale.set(1.0 + pulse * 0.3, 1.0 + pulse * 0.3, 1.0);
+                    this.materials.ring.opacity = 0.85;
+                } else {
+                    this.materials.ring.color.setHex(this.palette.ring);
+                    this.ringMesh.scale.set(1.0, 1.0, 1.0);
+                    this.materials.ring.opacity = 0.45;
+                }
+
+                // 4. Floating Billboard Tag above Cranium
+                const headY = this.currentPositions[0].y;
+                this.billboard.position.set(0, headY + 0.32, 0);
+            }
+        }
+
+        // ─────────────────────────────────────────────────────────────
+        // Multi-Avatar Scene Manager
+        // ─────────────────────────────────────────────────────────────
+        class MultiAvatarManager {
+            constructor(scene) {
+                this.scene = scene;
+                this.avatars = new Map(); // personId -> Avatar3D
+                this.sharedGeometries = {
+                    sphere: new THREE.SphereGeometry(1, 16, 16),
+                    cylinder: new THREE.CylinderGeometry(1, 1, 1, 12),
+                };
+                this.upVec = new THREE.Vector3(0, 1, 0);
+                this.dirVec = new THREE.Vector3();
+                this.viewMode = "room"; // "room" or "focus"
+            }
+
+            getOrCreate(id) {
+                if (!this.avatars.has(id)) {
+                    const avatar = new Avatar3D(id, this.scene, this.sharedGeometries);
+                    this.avatars.set(id, avatar);
+                }
+                return this.avatars.get(id);
+            }
+
+            updateFromTelemetry(data) {
+                const persons = data.persons || [];
+                const frameH = data.frame_height || 480;
+                let activeCount = 0;
+
+                if (persons.length > 0) {
+                    for (let i = 0; i < persons.length; i++) {
+                        const p = persons[i];
+                        const lms = p.world_landmarks;
+                        if (!lms || lms.length < 33) continue;
+
+                        // Camera X (0..1) -> Room X (-1.6m .. +1.6m metric range)
+                        const roomX = (p.center_x - 0.5) * 3.2;
+
+                        // Bounding Box Height -> Estimated depth Z
+                        let boxH = 0.45;
+                        if (p.box && frameH) {
+                            boxH = Math.max(0.1, (p.box[3] - p.box[1]) / frameH);
+                        }
+                        const roomZ = THREE.MathUtils.clamp((0.45 - boxH) * 1.8, -0.9, 0.9);
+
+                        const avatar = this.getOrCreate(p.id);
+                        avatar.updatePose(
+                            lms,
+                            roomX,
+                            roomZ,
+                            Boolean(p.fall_detected),
+                            p.activity,
+                            p.confidence
+                        );
+                        activeCount++;
+                    }
+                }
+
+                // Fallback for single focus subject if individual list was empty
+                if (activeCount === 0 && data.focus_world_landmarks && data.focus_world_landmarks.length >= 33) {
+                    const fId = data.focus_person_id || 1;
+                    const avatar = this.getOrCreate(fId);
+                    avatar.updatePose(
+                        data.focus_world_landmarks,
+                        0.0,
+                        0.0,
+                        Boolean(data.fall_active),
+                        data.overall_status,
+                        90
+                    );
+                    activeCount = 1;
+                }
+
+                // Standby watermark handling
+                const watermark = document.getElementById("standbyWatermark");
+                if (watermark) {
+                    watermark.style.display = (activeCount > 0) ? "none" : "flex";
+                }
+
+                // Avatar count readout
+                const countTag = document.getElementById("threeAvatarCount");
+                if (countTag) {
+                    countTag.innerText = `${activeCount} Avatar${activeCount !== 1 ? 's' : ''}`;
+                }
+            }
+
+            animate(now) {
+                for (const [id, avatar] of this.avatars.entries()) {
+                    avatar.animate(now, this.upVec, this.dirVec);
+                }
+            }
+
+            getActiveAvatar(id) {
+                if (id !== null && this.avatars.has(id)) {
+                    const av = this.avatars.get(id);
+                    if (av.visible) return av;
+                }
+                return null;
+            }
+        }
+
+        // ─────────────────────────────────────────────────────────────
+        // Three.js Global Scene Setup
+        // ─────────────────────────────────────────────────────────────
         let scene, camera, renderer, controls;
-        let jointMeshes = [];
-        let boneMeshes = [];
-        let skeletonGroup;
-        let targetPositions = [];
-        let currentPositions = [];
-        let hasPoseData = false;
-        let isEmergencyFall = false;
+        let avatarManager;
 
         function initThreeScene() {
             const container = document.getElementById("threeContainer");
@@ -883,7 +1299,7 @@
 
             // 2. Camera
             camera = new THREE.PerspectiveCamera(45, w / h, 0.05, 50);
-            camera.position.set(0, 0.4, 2.5);
+            camera.position.set(0, 0.35, 2.8);
 
             // 3. Renderer
             renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, powerPreference: "high-performance" });
@@ -896,188 +1312,71 @@
             // 4. Orbit Controls
             controls = new THREE.OrbitControls(camera, renderer.domElement);
             controls.enableDamping = true;
-            controls.dampingFactor = 0.06;
-            controls.target.set(0, 0.0, 0);
-            controls.maxDistance = 6.0;
+            controls.dampingFactor = 0.08;
+            controls.target.set(0, -0.1, 0);
+            controls.maxDistance = 6.5;
             controls.minDistance = 0.5;
-            controls.maxPolarAngle = Math.PI / 2 + 0.05; // Do not go under the ground
+            controls.maxPolarAngle = Math.PI / 2 + 0.05;
 
             // 5. Studio Lighting
-            const ambientLight = new THREE.AmbientLight(0xffffff, 0.75);
+            const ambientLight = new THREE.AmbientLight(0xffffff, 0.80);
             scene.add(ambientLight);
 
-            const dirLight = new THREE.DirectionalLight(0xffffff, 0.9);
+            const dirLight = new THREE.DirectionalLight(0xffffff, 0.95);
             dirLight.position.set(2, 4, 3);
             dirLight.castShadow = true;
             scene.add(dirLight);
 
-            const fillLight = new THREE.DirectionalLight(0x38bdf8, 0.45);
+            const fillLight = new THREE.DirectionalLight(0x38bdf8, 0.5);
             fillLight.position.set(-3, 1, -2);
             scene.add(fillLight);
 
-            // 6. Ground Plane & Metric Grid
+            // 6. Ground Plane & Metric Room Grid (6m x 6m Room)
             const gridHelper = new THREE.GridHelper(6, 12, 0x38bdf8, 0x1e293b);
             gridHelper.position.y = -0.92;
             scene.add(gridHelper);
 
-            // RGB Coordinate Axes at ground center
+            // Center RGB Axis Indicators
             const axesHelper = new THREE.AxesHelper(0.35);
             axesHelper.position.y = -0.92;
             scene.add(axesHelper);
 
-            // 7. Skeleton Group
-            skeletonGroup = new THREE.Group();
-            scene.add(skeletonGroup);
+            // 7. Multi-Avatar Manager
+            avatarManager = new MultiAvatarManager(scene);
 
-            buildSkeletonMeshes();
-
-            // Resize listener
+            // Window resize listener
             window.addEventListener('resize', onWindowResize);
 
             // Start Animation Loop
             animate();
         }
 
-        function buildSkeletonMeshes() {
-            // Create 35 Joint Spheres (33 raw + 33: Neck, 34: Pelvis)
-            const sphereGeo = new THREE.SphereGeometry(1, 16, 16);
-
-            for (let i = 0; i < 35; i++) {
-                // Joint size tuning
-                let r = 0.024;
-                let mat = MATERIALS.torso;
-                if ([11, 12, 23, 24].includes(i)) r = 0.038;         // Shoulders & Hips
-                else if ([13, 14, 25, 26, 33, 34].includes(i)) r = 0.034; // Elbows, Knees, Neck, Pelvis
-                else if ([15, 16, 27, 28].includes(i)) r = 0.030;   // Wrists & Ankles
-                else if ([0, 2, 5, 7, 8].includes(i)) r = 0.022;    // Cranium
-                else r = 0.016;                                      // Fingers & toes
-
-                if ([11, 13, 15, 17, 19, 21, 23, 25, 27, 29, 31].includes(i)) mat = MATERIALS.left;
-                else if ([12, 14, 16, 18, 20, 22, 24, 26, 28, 30, 32].includes(i)) mat = MATERIALS.right;
-                else if ([0, 2, 5, 7, 8].includes(i)) mat = MATERIALS.head;
-                else mat = MATERIALS.spine;
-
-                const mesh = new THREE.Mesh(sphereGeo, mat);
-                mesh.scale.set(r, r, r);
-                mesh.visible = false;
-                skeletonGroup.add(mesh);
-                jointMeshes.push(mesh);
-
-                targetPositions.push(new THREE.Vector3(0, 0, 0));
-                currentPositions.push(new THREE.Vector3(0, 0, 0));
-            }
-
-            // Create Volumetric Cylindrical Bones
-            const cylinderGeo = new THREE.CylinderGeometry(1, 1, 1, 12);
-
-            for (let i = 0; i < SKELETON_CONNECTIONS.length; i++) {
-                const conn = SKELETON_CONNECTIONS[i];
-                const boneType = conn[2];
-                let mat = MATERIALS[boneType] || MATERIALS.torso;
-
-                const boneMesh = new THREE.Mesh(cylinderGeo, mat);
-                boneMesh.visible = false;
-                skeletonGroup.add(boneMesh);
-                boneMeshes.push({
-                    mesh: boneMesh,
-                    from: conn[0],
-                    to: conn[1],
-                    type: boneType,
-                    radius: (boneType === "spine" || boneType === "torso") ? 0.022 : 0.016
-                });
-            }
-        }
-
-        function updateSkeletonGeometry(landmarks3D, isFall) {
-            if (!landmarks3D || landmarks3D.length < 33) {
-                hasPoseData = false;
-                document.getElementById("standbyWatermark").style.display = "flex";
-                for (let j of jointMeshes) j.visible = false;
-                for (let b of boneMeshes) b.mesh.visible = false;
-                return;
-            }
-
-            hasPoseData = true;
-            document.getElementById("standbyWatermark").style.display = "none";
-            isEmergencyFall = isFall;
-
-            // Coordinate conversion: MediaPipe metric (hip-centered) -> Three.js
-            // MP: X right, Y down, Z depth toward camera
-            // Three.js: X = -MP.x (mirrored for self-viewing natural symmetry), Y = -MP.y (upward), Z = -MP.z
-            for (let i = 0; i < 33; i++) {
-                const lm = landmarks3D[i];
-                if (lm) {
-                    targetPositions[i].set(-lm[0], -lm[1], -lm[2]);
-                }
-            }
-
-            // Virtual Neck (#33): Midpoint of Left Shoulder (11) and Right Shoulder (12)
-            targetPositions[33].lerpVectors(targetPositions[11], targetPositions[12], 0.5);
-
-            // Virtual Pelvis (#34): Midpoint of Left Hip (23) and Right Hip (24)
-            targetPositions[34].lerpVectors(targetPositions[23], targetPositions[24], 0.5);
-        }
-
         function animate() {
             requestAnimationFrame(animate);
 
-            controls.update();
+            const now = performance.now();
 
-            // Camera orientation readout
+            // Camera orientation telemetry readout
             if (controls) {
+                controls.update();
                 const az = Math.round(controls.getAzimuthalAngle() * (180 / Math.PI));
                 const el = Math.round(controls.getPolarAngle() * (180 / Math.PI));
                 document.getElementById("camAz").innerText = az;
                 document.getElementById("camEl").innerText = el;
             }
 
-            if (hasPoseData) {
-                const fallMaterial = isEmergencyFall ? MATERIALS.fall : null;
-
-                // 1. Smoothly interpolate (Lerp) joint positions for buttery 60 FPS animation
-                for (let i = 0; i < 35; i++) {
-                    currentPositions[i].lerp(targetPositions[i], 0.35);
-                    const jMesh = jointMeshes[i];
-                    jMesh.position.copy(currentPositions[i]);
-                    jMesh.visible = true;
-
-                    if (fallMaterial) jMesh.material = fallMaterial;
-                    else {
-                        // Reset material
-                        if ([11, 13, 15, 17, 19, 21, 23, 25, 27, 29, 31].includes(i)) jMesh.material = MATERIALS.left;
-                        else if ([12, 14, 16, 18, 20, 22, 24, 26, 28, 30, 32].includes(i)) jMesh.material = MATERIALS.right;
-                        else if ([0, 2, 5, 7, 8].includes(i)) jMesh.material = MATERIALS.head;
-                        else jMesh.material = MATERIALS.spine;
-                    }
+            // Smooth camera tracking when focused on a specific subject
+            if (avatarManager && avatarManager.viewMode === "focus" && currentFocusId !== null) {
+                const focusedAvatar = avatarManager.getActiveAvatar(currentFocusId);
+                if (focusedAvatar) {
+                    const targetCenter = new THREE.Vector3(focusedAvatar.group.position.x, 0.0, focusedAvatar.group.position.z);
+                    controls.target.lerp(targetCenter, 0.12);
                 }
+            }
 
-                // 2. Position and orient volumetric cylindrical bone segments
-                const upVec = new THREE.Vector3(0, 1, 0);
-                const dir = new THREE.Vector3();
-
-                for (let k = 0; k < boneMeshes.length; k++) {
-                    const b = boneMeshes[k];
-                    const pA = currentPositions[b.from];
-                    const pB = currentPositions[b.to];
-
-                    const dist = pA.distanceTo(pB);
-                    if (dist > 0.001) {
-                        // Midpoint
-                        b.mesh.position.lerpVectors(pA, pB, 0.5);
-
-                        // Scale cylinder height to bone distance, radius to bone type
-                        b.mesh.scale.set(b.radius, dist, b.radius);
-
-                        // Align cylinder orientation with vector between joints
-                        dir.subVectors(pB, pA).normalize();
-                        b.mesh.quaternion.setFromUnitVectors(upVec, dir);
-
-                        b.mesh.material = fallMaterial || (MATERIALS[b.type] || MATERIALS.torso);
-                        b.mesh.visible = true;
-                    } else {
-                        b.mesh.visible = false;
-                    }
-                }
+            // Animate all active 3D avatars
+            if (avatarManager) {
+                avatarManager.animate(now);
             }
 
             renderer.render(scene, camera);
@@ -1100,17 +1399,45 @@
 
         function setThreeView(view) {
             if (!camera || !controls) return;
-            controls.target.set(0, 0, 0);
             if (view === 'front') {
-                camera.position.set(0, 0.2, 2.4);
+                camera.position.set(0, 0.35, 2.8);
+                controls.target.set(0, -0.1, 0);
             } else if (view === 'side') {
-                camera.position.set(2.4, 0.2, 0);
+                camera.position.set(2.8, 0.35, 0);
+                controls.target.set(0, -0.1, 0);
             } else if (view === 'top') {
-                camera.position.set(0, 2.7, 0.05);
+                camera.position.set(0, 3.2, 0.05);
+                controls.target.set(0, -0.1, 0);
             } else if (view === 'iso') {
-                camera.position.set(1.8, 1.4, 1.8);
+                camera.position.set(2.2, 1.8, 2.2);
+                controls.target.set(0, -0.1, 0);
             }
             controls.update();
+        }
+
+        function toggleViewMode() {
+            if (!avatarManager) return;
+            const btn = document.getElementById("btnViewToggle");
+            const modeText = document.getElementById("cameraModeText");
+            const badge = document.getElementById("threeFocusBadge");
+
+            if (avatarManager.viewMode === "room") {
+                avatarManager.viewMode = "focus";
+                btn.innerText = "View: Focus";
+                modeText.innerText = "FOCUSED SUBJECT";
+                if (currentFocusId !== null) {
+                    badge.innerText = `FOCUS: PERSON #${currentFocusId}`;
+                } else {
+                    badge.innerText = `FOCUS: AUTO SUBJECT`;
+                }
+            } else {
+                avatarManager.viewMode = "room";
+                btn.innerText = "View: All";
+                modeText.innerText = "MULTI-AVATAR ROOM";
+                badge.innerText = `VIEW: ROOM (ALL)`;
+                controls.target.set(0, -0.1, 0);
+                controls.update();
+            }
         }
 
         // ─────────────────────────────────────────────────────────────
@@ -1153,7 +1480,7 @@
 
                 ws.onclose = () => {
                     document.getElementById("commStatusTag").innerText = "HTTP POLLING";
-                    setTimeout(connectWebSocket, 3000); // Auto-reconnect
+                    setTimeout(connectWebSocket, 2000); // Auto-reconnect
                 };
 
                 ws.onerror = () => {
@@ -1176,19 +1503,21 @@
         }
 
         function handleTelemetryUpdate(data) {
-            // Update 3D Skeleton in Three.js
-            const lms = data.focus_world_landmarks;
-            const isFall = Boolean(data.fall_active);
-            updateSkeletonGeometry(lms, isFall);
+            // Update Multi-Avatar 3D Room in Three.js
+            if (avatarManager) {
+                avatarManager.updateFromTelemetry(data);
+            }
 
             // Update 3D Focus tag
             const focusBadge = document.getElementById("threeFocusBadge");
-            if (data.focus_person_id !== null && data.focus_person_id !== undefined) {
-                focusBadge.innerText = `FOCUS: PERSON #${data.focus_person_id}`;
-                focusBadge.style.color = "#38bdf8";
-            } else {
-                focusBadge.innerText = "FOCUS: AUTO PRIORITY";
-                focusBadge.style.color = "#94a3b8";
+            if (avatarManager && avatarManager.viewMode === "focus") {
+                if (data.focus_person_id !== null && data.focus_person_id !== undefined) {
+                    focusBadge.innerText = `FOCUS: PERSON #${data.focus_person_id}`;
+                    focusBadge.style.color = "#38bdf8";
+                } else {
+                    focusBadge.innerText = "FOCUS: AUTO PRIORITY";
+                    focusBadge.style.color = "#94a3b8";
+                }
             }
 
             // Metrics
@@ -1271,6 +1600,11 @@
                     body: JSON.stringify({ person_id: personId })
                 });
                 document.getElementById('btnFocusAuto').className = "btn " + (personId === null ? "active" : "");
+                if (avatarManager && personId !== null) {
+                    avatarManager.viewMode = "focus";
+                    document.getElementById("btnViewToggle").innerText = "View: Focus";
+                    document.getElementById("cameraModeText").innerText = "FOCUSED SUBJECT";
+                }
             } catch (e) {
                 console.error("Focus error:", e);
             }
@@ -1387,11 +1721,11 @@
             }
         }
 
-        // Initialize Three.js scene, WebSocket, and Fallback poller
+        // Initialize Three.js scene, WebSocket, and fast fallback poller (50ms)
         window.addEventListener('DOMContentLoaded', () => {
             initThreeScene();
             connectWebSocket();
-            setInterval(pollTelemetryFallback, 300);
+            setInterval(pollTelemetryFallback, 50);
             loadIncidents();
         });
     </script>
