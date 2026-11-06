@@ -361,6 +361,19 @@ class FallDetector:
         elif any(p[2].get("fall_reset_time") is not None and (now - p[2]["fall_reset_time"]) < 8.0 for p in tracked):
             overall_status = "RECOVERY"
 
+        def _serialize_world_landmarks(lms):
+            if not lms:
+                return None
+            return [
+                [
+                    round(float(lm.x), 4),
+                    round(float(lm.y), 4),
+                    round(float(lm.z), 4),
+                    round(float(getattr(lm, "visibility", 1.0)), 2),
+                ]
+                for lm in lms
+            ]
+
         telemetry = {
             "active_persons": len(tracked),
             "fall_active": bool(self.dashboard.fall_active),
@@ -368,7 +381,9 @@ class FallDetector:
             "last_fall_time": str(self.dashboard.last_fall_time),
             "fps": round(float(fps), 1),
             "focus_person_id": focus_person_id,
+            "focus_world_landmarks": _serialize_world_landmarks(focus_world_landmarks),
             "overall_status": overall_status,
+            "camera_frame": frame,
             "persons": [
                 {
                     "id": p[0],
@@ -379,6 +394,7 @@ class FallDetector:
                     "severity": str(p[2].get("severity", "NONE")),
                     "fall_score": round(float(p[2].get("fall_score", 0.0)), 2),
                     "fall_duration": round(float(p[2].get("fall_duration", 0.0)), 1),
+                    "world_landmarks": _serialize_world_landmarks(getattr(p[2].get("last_pose"), "world_landmarks", None)),
                 }
                 for p in tracked
             ],

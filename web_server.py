@@ -6,13 +6,14 @@ Layer: Web Server & REST API Gateway
 from __future__ import annotations
 
 import argparse
+import asyncio
 import csv
 import os
 from contextlib import asynccontextmanager
 from typing import Any, Dict, Optional
 
 import uvicorn
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import FastAPI, HTTPException, Request, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
@@ -87,19 +88,37 @@ async def index_page(request: Request):
 
 
 @app.get("/video_feed")
-async def video_feed():
-    """Streams live composited video (Camera Feed + 3D Skeleton) via MJPEG."""
+async def video_feed(mode: str = "camera"):
+    """
+    Streams live video via MJPEG.
+    mode="camera"   -> Clean live camera feed with 2D AI bounding boxes (paired with Three.js 3D viewport)
+    mode="combined" -> Classic side-by-side feed (Camera + OpenCV Python 3D visualizer)
+    """
     if pipeline is None:
         raise HTTPException(status_code=503, detail="Pipeline not initialized")
     return StreamingResponse(
-        pipeline.stream_mjpeg(),
+        pipeline.stream_mjpeg(mode=mode),
         media_type="multipart/x-mixed-replace; boundary=frame",
     )
 
 
+@app.websocket("/ws/telemetry")
+async def websocket_telemetry(websocket: WebSocket):
+    """Real-time 30-60 FPS WebSocket stream of 3D metric landmarks & posture telemetry for Three.js."""
+    await websocket.accept()
+    try:
+        while True:
+            if pipeline is not None:
+                telemetry = pipeline.get_telemetry()
+                await websocket.send_json(telemetry)
+            await asyncio.sleep(0.033)  # ~30 FPS stream
+    except (WebSocketDisconnect, Exception):
+        pass
+
+
 @app.get("/api/telemetry")
 async def get_telemetry() -> Dict[str, Any]:
-    """Returns real-time telemetry: FPS, fall states, posture labels, confidence, and person counts."""
+    """Returns real-time telemetry: FPS, fall states, posture labels, confidence, and 3D world landmarks."""
     if pipeline is None:
         return {"status": "OFFLINE"}
     return pipeline.get_telemetry()

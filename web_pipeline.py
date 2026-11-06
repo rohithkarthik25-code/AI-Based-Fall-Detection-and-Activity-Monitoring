@@ -55,7 +55,8 @@ class WebVideoPipeline:
         self._running = False
         self._worker_thread: Optional[threading.Thread] = None
 
-        self._current_jpeg: Optional[bytes] = None
+        self._current_camera_jpeg: Optional[bytes] = None
+        self._current_combined_jpeg: Optional[bytes] = None
         self._current_telemetry: Dict[str, Any] = {
             "status": "INITIALIZING",
             "active_persons": 0,
@@ -64,6 +65,7 @@ class WebVideoPipeline:
             "last_fall_time": "--:--:--",
             "fps": 0.0,
             "focus_person_id": None,
+            "focus_world_landmarks": None,
             "persons": [],
             "source": str(self.source),
         }
@@ -163,13 +165,19 @@ class WebVideoPipeline:
                 out_frame, telemetry = self.detector.process_single_frame(frame, now=time.time())
                 telemetry["source"] = str(self.source)
 
-                # JPEG compression
-                ret_enc, jpeg_buf = cv2.imencode(".jpg", out_frame, encode_params)
-                if ret_enc:
-                    jpeg_bytes = jpeg_buf.tobytes()
-                    with self._lock:
-                        self._current_jpeg = jpeg_bytes
-                        self._current_telemetry = telemetry
+                camera_frame = telemetry.pop("camera_frame", frame)
+
+                # JPEG compression for both feeds
+                ret_cam, cam_buf = cv2.imencode(".jpg", camera_frame, encode_params)
+                ret_comb, comb_buf = cv2.imencode(".jpg", out_frame, encode_params)
+
+                cam_bytes = cam_buf.tobytes() if ret_cam else None
+                comb_bytes = comb_buf.tobytes() if ret_comb else None
+
+                with self._lock:
+                    self._current_camera_jpeg = cam_bytes
+                    self._current_combined_jpeg = comb_bytes
+                    self._current_telemetry = telemetry
 
             except Exception as e:
                 print(f"[WebVideoPipeline] Inference error: {e}")
@@ -184,11 +192,13 @@ class WebVideoPipeline:
         with self._lock:
             return dict(self._current_telemetry)
 
-    def stream_mjpeg(self):
+    def stream_mjpeg(self, mode: str = "camera"):
         """Generator yielding MJPEG multipart frames for HTTP streaming response."""
         while self._running:
             with self._lock:
-                frame_bytes = self._current_jpeg
+                frame_bytes = self._current_camera_jpeg if mode == "camera" else self._current_combined_jpeg
+                if frame_bytes is None:
+                    frame_bytes = self._current_combined_jpeg or self._current_camera_jpeg
 
             if frame_bytes is not None:
                 yield (
@@ -197,3 +207,4 @@ class WebVideoPipeline:
                 )
             # ~40-50 FPS stream cadence
             time.sleep(0.022)
+

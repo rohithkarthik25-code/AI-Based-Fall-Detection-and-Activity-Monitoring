@@ -3,10 +3,15 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI Fall Detection & Biomechanical Monitoring</title>
+    <title>AI Fall Detection & Biomechanical 3D Monitoring</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Outfit:wght@400;500;600;700&display=swap" rel="stylesheet">
+    
+    <!-- Three.js & OrbitControls from CDN -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+
     <style>
         :root {
             --bg-base: #090a10;
@@ -30,6 +35,7 @@
             --status-recovery-glow: rgba(59, 130, 246, 0.25);
 
             --accent-cyan: #06b6d4;
+            --accent-orange: #f97316;
             --accent-purple: #8b5cf6;
         }
 
@@ -53,7 +59,7 @@
         header {
             background: linear-gradient(180deg, #131726 0%, #0d101b 100%);
             border-bottom: 1px solid var(--border-dim);
-            padding: 12px 24px;
+            padding: 10px 24px;
             display: flex;
             align-items: center;
             justify-content: space-between;
@@ -69,10 +75,10 @@
         }
 
         .brand-icon {
-            width: 38px;
-            height: 38px;
+            width: 36px;
+            height: 36px;
             background: linear-gradient(135deg, #0ea5e9, #6366f1);
-            border-radius: 10px;
+            border-radius: 9px;
             display: flex;
             align-items: center;
             justify-content: center;
@@ -80,13 +86,13 @@
         }
 
         .brand-icon svg {
-            width: 22px;
-            height: 22px;
+            width: 20px;
+            height: 20px;
             fill: white;
         }
 
         .brand-text h1 {
-            font-size: 1.05rem;
+            font-size: 1.02rem;
             font-weight: 700;
             letter-spacing: 0.5px;
             color: #ffffff;
@@ -96,7 +102,7 @@
         }
 
         .brand-text p {
-            font-size: 0.72rem;
+            font-size: 0.70rem;
             color: var(--text-dim);
             font-family: 'JetBrains Mono', monospace;
         }
@@ -104,18 +110,18 @@
         .header-actions {
             display: flex;
             align-items: center;
-            gap: 16px;
+            gap: 14px;
         }
 
         .live-badge {
             display: flex;
             align-items: center;
             gap: 8px;
-            padding: 6px 14px;
+            padding: 5px 12px;
             background: rgba(16, 185, 129, 0.12);
             border: 1px solid rgba(16, 185, 129, 0.3);
             border-radius: 20px;
-            font-size: 0.78rem;
+            font-size: 0.76rem;
             font-weight: 600;
             color: var(--status-normal);
             font-family: 'JetBrains Mono', monospace;
@@ -136,7 +142,7 @@
 
         /* ── Emergency Status Banner ── */
         .status-banner {
-            padding: 14px 24px;
+            padding: 12px 24px;
             display: flex;
             align-items: center;
             justify-content: space-between;
@@ -177,9 +183,9 @@
         }
 
         .status-badge {
-            font-size: 0.85rem;
+            font-size: 0.82rem;
             font-weight: 700;
-            padding: 6px 14px;
+            padding: 5px 12px;
             border-radius: 6px;
             letter-spacing: 0.8px;
             font-family: 'JetBrains Mono', monospace;
@@ -191,7 +197,7 @@
         .status-badge.recovery { background: var(--status-recovery); color: #ffffff; }
 
         .status-desc {
-            font-size: 0.92rem;
+            font-size: 0.88rem;
             color: #cbd5e1;
         }
 
@@ -200,7 +206,7 @@
             align-items: center;
             gap: 20px;
             font-family: 'JetBrains Mono', monospace;
-            font-size: 0.82rem;
+            font-size: 0.80rem;
             color: var(--text-dim);
         }
 
@@ -209,33 +215,66 @@
             font-weight: 600;
         }
 
-        /* ── Main Layout Grid ── */
+        /* ── Main Layout: Dual Viewport + Sidebar ── */
         .dashboard-container {
             display: grid;
-            grid-template-columns: 1fr 380px;
-            gap: 20px;
-            padding: 20px 24px;
+            grid-template-columns: 1fr 340px;
+            gap: 16px;
+            padding: 16px 20px;
             flex: 1;
         }
 
-        /* ── Video Stream Area ── */
-        .stream-section {
+        .viewports-area {
             display: flex;
             flex-direction: column;
             gap: 14px;
         }
 
-        .stream-wrapper {
-            background-color: #000000;
-            border-radius: 12px;
+        /* Dual Stage: Left 2D Camera, Right Three.js 3D Viewport */
+        .dual-stage {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 14px;
+        }
+
+        .viewport-card {
+            background-color: var(--bg-surface);
             border: 1px solid var(--border-dim);
+            border-radius: 10px;
             overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.45);
+        }
+
+        .viewport-header {
+            background: linear-gradient(180deg, #181d2e 0%, #121624 100%);
+            border-bottom: 1px solid var(--border-dim);
+            padding: 8px 14px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .viewport-title {
+            font-size: 0.76rem;
+            font-weight: 700;
+            color: #cbd5e1;
+            font-family: 'JetBrains Mono', monospace;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .viewport-container {
             position: relative;
-            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+            background-color: #05060a;
+            width: 100%;
+            aspect-ratio: 4 / 3;
+            overflow: hidden;
             display: flex;
             align-items: center;
             justify-content: center;
-            aspect-ratio: 16 / 9;
         }
 
         .stream-image {
@@ -245,12 +284,107 @@
             display: block;
         }
 
-        /* Controls Strip below video */
+        /* Three.js Canvas Container */
+        #threeContainer {
+            width: 100%;
+            height: 100%;
+            display: block;
+            cursor: grab;
+        }
+
+        #threeContainer:active {
+            cursor: grabbing;
+        }
+
+        /* 3D Viewport Overlays */
+        .three-overlay-top {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            background: rgba(14, 18, 30, 0.78);
+            backdrop-filter: blur(6px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            padding: 6px 10px;
+            border-radius: 6px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.70rem;
+            color: #94a3b8;
+            pointer-events: none;
+            display: flex;
+            flex-direction: column;
+            gap: 3px;
+        }
+
+        .three-overlay-top span {
+            color: #38bdf8;
+            font-weight: 600;
+        }
+
+        .three-overlay-bottom {
+            position: absolute;
+            bottom: 10px;
+            left: 10px;
+            right: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            pointer-events: none;
+        }
+
+        .preset-buttons {
+            display: flex;
+            gap: 5px;
+            pointer-events: auto;
+        }
+
+        .preset-btn {
+            background: rgba(18, 23, 38, 0.85);
+            backdrop-filter: blur(6px);
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            color: #cbd5e1;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 0.68rem;
+            font-family: 'JetBrains Mono', monospace;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .preset-btn:hover {
+            background: rgba(56, 189, 248, 0.2);
+            border-color: #38bdf8;
+            color: #ffffff;
+        }
+
+        .orbit-hint {
+            background: rgba(18, 23, 38, 0.8);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 0.68rem;
+            font-family: 'JetBrains Mono', monospace;
+            color: #64748b;
+        }
+
+        .standby-watermark {
+            position: absolute;
+            color: #64748b;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.78rem;
+            letter-spacing: 0.5px;
+            pointer-events: none;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 6px;
+        }
+
+        /* Controls Toolbar */
         .controls-card {
             background-color: var(--bg-surface);
             border: 1px solid var(--border-dim);
             border-radius: 10px;
-            padding: 14px 18px;
+            padding: 12px 16px;
             display: flex;
             align-items: center;
             justify-content: space-between;
@@ -261,11 +395,11 @@
         .control-group {
             display: flex;
             align-items: center;
-            gap: 10px;
+            gap: 8px;
         }
 
         .group-label {
-            font-size: 0.78rem;
+            font-size: 0.74rem;
             color: var(--text-muted);
             font-family: 'JetBrains Mono', monospace;
             text-transform: uppercase;
@@ -275,9 +409,9 @@
             background-color: var(--bg-elevated);
             color: var(--text-main);
             border: 1px solid var(--border-glow);
-            padding: 7px 14px;
+            padding: 6px 12px;
             border-radius: 6px;
-            font-size: 0.82rem;
+            font-size: 0.78rem;
             font-weight: 500;
             cursor: pointer;
             transition: all 0.2s ease;
@@ -316,9 +450,9 @@
             background-color: var(--bg-elevated);
             color: var(--text-main);
             border: 1px solid var(--border-glow);
-            padding: 7px 12px;
+            padding: 6px 10px;
             border-radius: 6px;
-            font-size: 0.82rem;
+            font-size: 0.78rem;
             font-family: 'JetBrains Mono', monospace;
             outline: none;
             cursor: pointer;
@@ -328,17 +462,17 @@
         .sidebar {
             display: flex;
             flex-direction: column;
-            gap: 16px;
+            gap: 14px;
         }
 
         .panel-card {
             background-color: var(--bg-surface);
             border: 1px solid var(--border-dim);
             border-radius: 10px;
-            padding: 16px;
+            padding: 14px;
             display: flex;
             flex-direction: column;
-            gap: 12px;
+            gap: 10px;
         }
 
         .card-header {
@@ -346,46 +480,45 @@
             align-items: center;
             justify-content: space-between;
             border-bottom: 1px solid rgba(255, 255, 255, 0.05);
-            padding-bottom: 10px;
+            padding-bottom: 8px;
         }
 
         .card-title {
-            font-size: 0.84rem;
+            font-size: 0.78rem;
             font-weight: 700;
             color: #e2e8f0;
             letter-spacing: 0.5px;
             display: flex;
             align-items: center;
-            gap: 8px;
+            gap: 6px;
             font-family: 'JetBrains Mono', monospace;
         }
 
-        /* Metric Counters */
         .metric-grid {
             display: grid;
             grid-template-columns: repeat(2, 1fr);
-            gap: 10px;
+            gap: 8px;
         }
 
         .metric-box {
             background-color: var(--bg-elevated);
             border: 1px solid var(--border-dim);
-            border-radius: 8px;
-            padding: 12px;
+            border-radius: 6px;
+            padding: 10px;
             display: flex;
             flex-direction: column;
-            gap: 4px;
+            gap: 3px;
         }
 
         .metric-label {
-            font-size: 0.70rem;
+            font-size: 0.66rem;
             color: var(--text-muted);
             font-family: 'JetBrains Mono', monospace;
             text-transform: uppercase;
         }
 
         .metric-val {
-            font-size: 1.25rem;
+            font-size: 1.15rem;
             font-weight: 700;
             font-family: 'JetBrains Mono', monospace;
             color: #ffffff;
@@ -395,16 +528,16 @@
         .person-list {
             display: flex;
             flex-direction: column;
-            gap: 10px;
-            max-height: 260px;
+            gap: 8px;
+            max-height: 220px;
             overflow-y: auto;
         }
 
         .person-item {
             background-color: var(--bg-elevated);
             border: 1px solid var(--border-dim);
-            border-radius: 8px;
-            padding: 10px 14px;
+            border-radius: 6px;
+            padding: 8px 12px;
             display: flex;
             align-items: center;
             justify-content: space-between;
@@ -420,12 +553,12 @@
         .person-item.focused {
             border-color: #38bdf8;
             box-shadow: 0 0 10px rgba(56, 189, 248, 0.2);
-            background: linear-gradient(90deg, rgba(56, 189, 248, 0.1), transparent);
+            background: linear-gradient(90deg, rgba(56, 189, 248, 0.12), transparent);
         }
 
         .person-item.fallen {
             border-color: #ef4444;
-            background: rgba(239, 68, 68, 0.12);
+            background: rgba(239, 68, 68, 0.15);
         }
 
         .person-info {
@@ -436,60 +569,53 @@
 
         .person-id-tag {
             font-weight: 700;
-            font-size: 0.85rem;
+            font-size: 0.80rem;
             color: #ffffff;
             font-family: 'JetBrains Mono', monospace;
         }
 
         .person-activity {
-            font-size: 0.76rem;
+            font-size: 0.72rem;
             color: var(--text-dim);
         }
 
         .person-status-pill {
-            font-size: 0.70rem;
+            font-size: 0.66rem;
             font-weight: 600;
-            padding: 3px 8px;
-            border-radius: 4px;
-            font-family: 'JetBrains Mono', monospace;
-        }
-
-        /* Incidents Table */
-        .incident-list {
-            display: flex;
-            flex-direction: column;
-            gap: 8px;
-            max-height: 200px;
-            overflow-y: auto;
-            font-size: 0.76rem;
-        }
-
-        .incident-row {
-            background-color: var(--bg-elevated);
-            border: 1px solid var(--border-dim);
-            border-radius: 6px;
-            padding: 8px 10px;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            font-family: 'JetBrains Mono', monospace;
-        }
-
-        .incident-sev {
-            font-weight: 700;
             padding: 2px 6px;
             border-radius: 4px;
+            font-family: 'JetBrains Mono', monospace;
         }
 
         .sev-SEVERE { background: rgba(239, 68, 68, 0.2); color: #f87171; border: 1px solid #ef4444; }
         .sev-MODERATE { background: rgba(245, 158, 11, 0.2); color: #fbbf24; border: 1px solid #f59e0b; }
         .sev-MILD { background: rgba(59, 130, 246, 0.2); color: #60a5fa; border: 1px solid #3b82f6; }
 
+        /* Incident log list */
+        .incident-list {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            max-height: 180px;
+            overflow-y: auto;
+            font-size: 0.72rem;
+        }
+
+        .incident-row {
+            background-color: var(--bg-elevated);
+            border: 1px solid var(--border-dim);
+            border-radius: 5px;
+            padding: 6px 8px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            font-family: 'JetBrains Mono', monospace;
+        }
+
         /* Responsive */
-        @media (max-width: 1024px) {
-            .dashboard-container {
-                grid-template-columns: 1fr;
-            }
+        @media (max-width: 1100px) {
+            .dashboard-container { grid-template-columns: 1fr; }
+            .dual-stage { grid-template-columns: 1fr; }
         }
     </style>
 </head>
@@ -503,14 +629,14 @@
             </div>
             <div class="brand-text">
                 <h1>AI FALL DETECTION & BIOMECHANICAL MONITOR</h1>
-                <p>Dual-Panel Computer Vision & Interactive 3D Kinematics</p>
+                <p>Hardware-Accelerated Three.js WebGL Kinematics</p>
             </div>
         </div>
 
         <div class="header-actions">
             <div class="live-badge">
                 <div class="live-dot"></div>
-                LIVE FEED
+                <span id="commStatusTag">WEBGL ACTIVE</span>
             </div>
             <button class="btn" id="audioToggleBtn" onclick="toggleAudioAlarm()">
                 🔊 Siren: ON
@@ -534,39 +660,98 @@
     <!-- Main Content Area -->
     <main class="dashboard-container">
         
-        <!-- Video Stream Player -->
-        <section class="stream-section">
-            <div class="stream-wrapper">
-                <img src="/video_feed" class="stream-image" alt="Dual-Panel AI Video Feed (Camera + 3D Skeleton)" id="videoStream">
+        <div class="viewports-area">
+            
+            <!-- True Dual-Panel Stage: 2D Camera on Left, Three.js 3D on Right -->
+            <div class="dual-stage">
+                
+                <!-- Left: 2D Camera Viewport -->
+                <div class="viewport-card">
+                    <div class="viewport-header">
+                        <span class="viewport-title">
+                            <span style="color:#10b981;">●</span> 2D CAMERA FEED (AI POSE HUD)
+                        </span>
+                        <div style="display: flex; gap: 6px;">
+                            <button class="preset-btn" id="streamModeBtn" onclick="toggleStreamMode()">Mode: Camera Only</button>
+                        </div>
+                    </div>
+                    <div class="viewport-container">
+                        <img src="/video_feed?mode=camera" class="stream-image" alt="Live Camera Feed" id="videoStream">
+                    </div>
+                </div>
+
+                <!-- Right: Three.js Interactive 3D Skeleton Viewport -->
+                <div class="viewport-card">
+                    <div class="viewport-header">
+                        <span class="viewport-title">
+                            <span style="color:#06b6d4;">●</span> 3D SKELETON KINEMATICS (THREE.JS)
+                        </span>
+                        <div style="display: flex; align-items: center; gap: 6px;">
+                            <span style="font-size: 0.68rem; font-family: monospace; color: #94a3b8;" id="threeFocusBadge">FOCUS: AUTO</span>
+                            <button class="preset-btn" onclick="resetThreeCamera()">Reset View</button>
+                        </div>
+                    </div>
+                    <div class="viewport-container" id="threeViewportContainer">
+                        <div id="threeContainer"></div>
+                        
+                        <!-- Standby overlay when no 3D landmarks -->
+                        <div class="standby-watermark" id="standbyWatermark">
+                            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#64748b" stroke-width="2">
+                                <circle cx="12" cy="12" r="10"></circle>
+                                <path d="M12 6v6l4 2"></path>
+                            </svg>
+                            <span>WAITING FOR 3D METRIC POSE...</span>
+                        </div>
+
+                        <!-- 3D Top Camera Orientation Overlay -->
+                        <div class="three-overlay-top" id="threeCameraReadout">
+                            <div>CAMERA: <span>AZ <span id="camAz">0</span>° | EL <span id="camEl">15</span>°</span></div>
+                            <div>SCALE: <span>1.0m Metric Grid</span></div>
+                        </div>
+
+                        <!-- 3D Bottom Preset Controls -->
+                        <div class="three-overlay-bottom">
+                            <div class="preset-buttons">
+                                <button class="preset-btn" onclick="setThreeView('front')">Front</button>
+                                <button class="preset-btn" onclick="setThreeView('side')">Side</button>
+                                <button class="preset-btn" onclick="setThreeView('top')">Top</button>
+                                <button class="preset-btn" onclick="setThreeView('iso')">Isometric</button>
+                            </div>
+                            <div class="orbit-hint">🖱️ Drag: Orbit | Scroll: Zoom</div>
+                        </div>
+                    </div>
+                </div>
+
             </div>
 
-            <!-- Quick Controls Toolbar -->
+            <!-- Controls Toolbar -->
             <div class="controls-card">
                 <div class="control-group">
-                    <span class="group-label">3D Skeleton Focus:</span>
-                    <button class="btn active" id="btnFocusAuto" onclick="setFocus(null)">Auto (Risk Priority)</button>
+                    <span class="group-label">3D Subject Focus:</span>
+                    <button class="btn active" id="btnFocusAuto" onclick="setFocus(null)">Auto Priority</button>
                     <div id="quickPersonButtons" style="display: flex; gap: 6px;"></div>
                 </div>
 
                 <div class="control-group">
                     <span class="group-label">Input Source:</span>
                     <select class="source-select" id="sourceSelector" onchange="changeSource(this.value)">
-                        <option value="0">Webcam 0 (Live Device)</option>
-                        <option value="fall01.mp4">Sample Video: fall01.mp4</option>
+                        <option value="0">Webcam 0 (Live)</option>
+                        <option value="fall01.mp4">Demo: fall01.mp4</option>
                     </select>
-                    <button class="btn btn-danger" onclick="triggerTestAlert()">🚨 Test Alert</button>
+                    <button class="btn btn-danger" onclick="triggerTestAlert()">🚨 Test Alarm</button>
                 </div>
             </div>
-        </section>
+
+        </div>
 
         <!-- Right Side Telemetry Drawer -->
         <aside class="sidebar">
 
-            <!-- System Performance Card -->
+            <!-- System Metrics Card -->
             <div class="panel-card">
                 <div class="card-header">
-                    <span class="card-title">SYSTEM METRICS</span>
-                    <span style="font-size: 0.72rem; color: #10b981; font-family: monospace;">STABLE</span>
+                    <span class="card-title">PERFORMANCE METRICS</span>
+                    <span style="font-size: 0.68rem; color: #10b981; font-family: monospace;">60 FPS WebGL</span>
                 </div>
                 <div class="metric-grid">
                     <div class="metric-box">
@@ -583,11 +768,11 @@
             <!-- Multi-Person Tracking Card -->
             <div class="panel-card">
                 <div class="card-header">
-                    <span class="card-title">TRACKED INDIVIDUALS</span>
-                    <span style="font-size: 0.72rem; color: var(--text-dim);" id="trackCountTag">0 Active</span>
+                    <span class="card-title">TRACKED SUBJECTS</span>
+                    <span style="font-size: 0.70rem; color: var(--text-dim);" id="trackCountTag">0 Active</span>
                 </div>
                 <div class="person-list" id="personListContainer">
-                    <div style="text-align: center; color: var(--text-muted); font-size: 0.8rem; padding: 20px;">
+                    <div style="text-align: center; color: var(--text-muted); font-size: 0.78rem; padding: 20px;">
                         Waiting for detected subjects...
                     </div>
                 </div>
@@ -597,10 +782,10 @@
             <div class="panel-card">
                 <div class="card-header">
                     <span class="card-title">INCIDENT LOGS</span>
-                    <button class="btn" style="padding: 3px 8px; font-size: 0.7rem;" onclick="loadIncidents()">Refresh</button>
+                    <button class="btn" style="padding: 2px 6px; font-size: 0.66rem;" onclick="loadIncidents()">Refresh</button>
                 </div>
                 <div class="incident-list" id="incidentListContainer">
-                    <div style="text-align: center; color: var(--text-muted); font-size: 0.8rem; padding: 15px;">
+                    <div style="text-align: center; color: var(--text-muted); font-size: 0.76rem; padding: 15px;">
                         No fall incidents recorded.
                     </div>
                 </div>
@@ -610,88 +795,402 @@
 
     </main>
 
+    <!-- ─────────────────────────────────────────────────────────────
+         Three.js WebGL Interactive 3D Kinematics Engine
+         ───────────────────────────────────────────────────────────── -->
     <script>
-        // Web Audio Siren Generator
-        let audioCtx = null;
-        let sirenOsc = null;
-        let sirenGain = null;
-        let sirenActive = false;
-        let sirenMuted = false;
+        // Anatomical Kinematic Bone Connections (33 MediaPipe raw + 33: Virtual Neck + 34: Virtual Pelvis)
+        const SKELETON_CONNECTIONS = [
+            // Torso & Central Spine
+            [33, 34, "spine"],      // Neck -> Pelvis (Spine)
+            [11, 33, "torso"],      // Left Shoulder -> Neck
+            [12, 33, "torso"],      // Right Shoulder -> Neck
+            [11, 12, "torso"],      // Shoulder girdle
+            [23, 34, "torso"],      // Left Hip -> Pelvis
+            [24, 34, "torso"],      // Right Hip -> Pelvis
+            [23, 24, "torso"],      // Pelvic basin
+            [11, 23, "torso"],      // Left Flank
+            [12, 24, "torso"],      // Right Flank
 
-        function initAudio() {
-            if (!audioCtx) {
-                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            // Cranium & Face
+            [33, 0, "head"],        // Neck -> Nose
+            [0, 2, "head"],         // Nose -> Left Eye
+            [2, 7, "head"],         // Left Eye -> Left Ear
+            [0, 5, "head"],         // Nose -> Right Eye
+            [5, 8, "head"],         // Right Eye -> Right Ear
+            [7, 33, "head"],        // Left Jaw
+            [8, 33, "head"],        // Right Jaw
+
+            // Left Arm
+            [11, 13, "left"],       // Shoulder -> Elbow
+            [13, 15, "left"],       // Elbow -> Wrist
+            [15, 17, "left"],       // Wrist -> Pinky
+            [17, 19, "left"],       // Pinky -> Index
+            [19, 15, "left"],       // Index -> Wrist (Palm)
+            [15, 21, "left"],       // Wrist -> Thumb
+
+            // Right Arm
+            [12, 14, "right"],      // Shoulder -> Elbow
+            [14, 16, "right"],      // Elbow -> Wrist
+            [16, 18, "right"],      // Wrist -> Pinky
+            [18, 20, "right"],      // Pinky -> Index
+            [20, 16, "right"],      // Index -> Wrist (Palm)
+            [16, 22, "right"],      // Wrist -> Thumb
+
+            // Left Leg
+            [23, 25, "left"],       // Hip -> Knee
+            [25, 27, "left"],       // Knee -> Ankle
+            [27, 29, "left"],       // Ankle -> Heel
+            [29, 31, "left"],       // Heel -> Foot Index (Sole)
+            [27, 31, "left"],       // Ankle -> Foot Index (Arch)
+
+            // Right Leg
+            [24, 26, "right"],      // Hip -> Knee
+            [26, 28, "right"],      // Knee -> Ankle
+            [28, 30, "right"],      // Ankle -> Heel
+            [30, 32, "right"],      // Heel -> Foot Index (Sole)
+            [28, 32, "right"],      // Ankle -> Foot Index (Arch)
+        ];
+
+        // Three.js PBR Materials
+        const MATERIALS = {
+            left: new THREE.MeshStandardMaterial({ color: 0x06b6d4, roughness: 0.3, metalness: 0.2 }),       // Cyan
+            right: new THREE.MeshStandardMaterial({ color: 0xf97316, roughness: 0.3, metalness: 0.2 }),      // Orange
+            torso: new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.2, metalness: 0.1 }),      // Pure White
+            spine: new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.2, emissive: 0x222222 }),  // Luminescent Spine
+            head: new THREE.MeshStandardMaterial({ color: 0x10b981, roughness: 0.3, metalness: 0.1 }),       // Lime Green
+            fall: new THREE.MeshStandardMaterial({ color: 0xef4444, roughness: 0.2, emissive: 0x881111 }),  // Emergency Red
+            jointCore: new THREE.MeshBasicMaterial({ color: 0xffffff }),
+        };
+
+        let scene, camera, renderer, controls;
+        let jointMeshes = [];
+        let boneMeshes = [];
+        let skeletonGroup;
+        let targetPositions = [];
+        let currentPositions = [];
+        let hasPoseData = false;
+        let isEmergencyFall = false;
+
+        function initThreeScene() {
+            const container = document.getElementById("threeContainer");
+            const w = container.clientWidth || 400;
+            const h = container.clientHeight || 300;
+
+            // 1. Scene
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x060810);
+
+            // 2. Camera
+            camera = new THREE.PerspectiveCamera(45, w / h, 0.05, 50);
+            camera.position.set(0, 0.4, 2.5);
+
+            // 3. Renderer
+            renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, powerPreference: "high-performance" });
+            renderer.setSize(w, h);
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+            renderer.shadowMap.enabled = true;
+            renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+            container.appendChild(renderer.domElement);
+
+            // 4. Orbit Controls
+            controls = new THREE.OrbitControls(camera, renderer.domElement);
+            controls.enableDamping = true;
+            controls.dampingFactor = 0.06;
+            controls.target.set(0, 0.0, 0);
+            controls.maxDistance = 6.0;
+            controls.minDistance = 0.5;
+            controls.maxPolarAngle = Math.PI / 2 + 0.05; // Do not go under the ground
+
+            // 5. Studio Lighting
+            const ambientLight = new THREE.AmbientLight(0xffffff, 0.75);
+            scene.add(ambientLight);
+
+            const dirLight = new THREE.DirectionalLight(0xffffff, 0.9);
+            dirLight.position.set(2, 4, 3);
+            dirLight.castShadow = true;
+            scene.add(dirLight);
+
+            const fillLight = new THREE.DirectionalLight(0x38bdf8, 0.45);
+            fillLight.position.set(-3, 1, -2);
+            scene.add(fillLight);
+
+            // 6. Ground Plane & Metric Grid
+            const gridHelper = new THREE.GridHelper(6, 12, 0x38bdf8, 0x1e293b);
+            gridHelper.position.y = -0.92;
+            scene.add(gridHelper);
+
+            // RGB Coordinate Axes at ground center
+            const axesHelper = new THREE.AxesHelper(0.35);
+            axesHelper.position.y = -0.92;
+            scene.add(axesHelper);
+
+            // 7. Skeleton Group
+            skeletonGroup = new THREE.Group();
+            scene.add(skeletonGroup);
+
+            buildSkeletonMeshes();
+
+            // Resize listener
+            window.addEventListener('resize', onWindowResize);
+
+            // Start Animation Loop
+            animate();
+        }
+
+        function buildSkeletonMeshes() {
+            // Create 35 Joint Spheres (33 raw + 33: Neck, 34: Pelvis)
+            const sphereGeo = new THREE.SphereGeometry(1, 16, 16);
+
+            for (let i = 0; i < 35; i++) {
+                // Joint size tuning
+                let r = 0.024;
+                let mat = MATERIALS.torso;
+                if ([11, 12, 23, 24].includes(i)) r = 0.038;         // Shoulders & Hips
+                else if ([13, 14, 25, 26, 33, 34].includes(i)) r = 0.034; // Elbows, Knees, Neck, Pelvis
+                else if ([15, 16, 27, 28].includes(i)) r = 0.030;   // Wrists & Ankles
+                else if ([0, 2, 5, 7, 8].includes(i)) r = 0.022;    // Cranium
+                else r = 0.016;                                      // Fingers & toes
+
+                if ([11, 13, 15, 17, 19, 21, 23, 25, 27, 29, 31].includes(i)) mat = MATERIALS.left;
+                else if ([12, 14, 16, 18, 20, 22, 24, 26, 28, 30, 32].includes(i)) mat = MATERIALS.right;
+                else if ([0, 2, 5, 7, 8].includes(i)) mat = MATERIALS.head;
+                else mat = MATERIALS.spine;
+
+                const mesh = new THREE.Mesh(sphereGeo, mat);
+                mesh.scale.set(r, r, r);
+                mesh.visible = false;
+                skeletonGroup.add(mesh);
+                jointMeshes.push(mesh);
+
+                targetPositions.push(new THREE.Vector3(0, 0, 0));
+                currentPositions.push(new THREE.Vector3(0, 0, 0));
+            }
+
+            // Create Volumetric Cylindrical Bones
+            const cylinderGeo = new THREE.CylinderGeometry(1, 1, 1, 12);
+
+            for (let i = 0; i < SKELETON_CONNECTIONS.length; i++) {
+                const conn = SKELETON_CONNECTIONS[i];
+                const boneType = conn[2];
+                let mat = MATERIALS[boneType] || MATERIALS.torso;
+
+                const boneMesh = new THREE.Mesh(cylinderGeo, mat);
+                boneMesh.visible = false;
+                skeletonGroup.add(boneMesh);
+                boneMeshes.push({
+                    mesh: boneMesh,
+                    from: conn[0],
+                    to: conn[1],
+                    type: boneType,
+                    radius: (boneType === "spine" || boneType === "torso") ? 0.022 : 0.016
+                });
             }
         }
 
-        function playSiren() {
-            if (sirenMuted) return;
-            initAudio();
-            if (sirenActive) return;
-
-            sirenOsc = audioCtx.createOscillator();
-            sirenGain = audioCtx.createGain();
-
-            sirenOsc.type = 'sawtooth';
-            sirenOsc.frequency.setValueAtTime(600, audioCtx.currentTime);
-            sirenOsc.frequency.exponentialRampToValueAtTime(1200, audioCtx.currentTime + 0.4);
-
-            sirenGain.gain.setValueAtTime(0.15, audioCtx.currentTime);
-
-            sirenOsc.connect(sirenGain);
-            sirenGain.connect(audioCtx.destination);
-            sirenOsc.start();
-            sirenActive = true;
-
-            // Wobble pitch
-            let high = true;
-            sirenOsc.timer = setInterval(() => {
-                if (!sirenOsc) return;
-                const target = high ? 650 : 1100;
-                sirenOsc.frequency.exponentialRampToValueAtTime(target, audioCtx.currentTime + 0.3);
-                high = !high;
-            }, 350);
-        }
-
-        function stopSiren() {
-            if (!sirenActive) return;
-            if (sirenOsc) {
-                clearInterval(sirenOsc.timer);
-                sirenOsc.stop();
-                sirenOsc.disconnect();
-                sirenOsc = null;
+        function updateSkeletonGeometry(landmarks3D, isFall) {
+            if (!landmarks3D || landmarks3D.length < 33) {
+                hasPoseData = false;
+                document.getElementById("standbyWatermark").style.display = "flex";
+                for (let j of jointMeshes) j.visible = false;
+                for (let b of boneMeshes) b.mesh.visible = false;
+                return;
             }
-            sirenActive = false;
-        }
 
-        function toggleAudioAlarm() {
-            sirenMuted = !sirenMuted;
-            const btn = document.getElementById("audioToggleBtn");
-            if (sirenMuted) {
-                btn.innerText = "🔇 Siren: MUTED";
-                btn.style.color = "#ef4444";
-                stopSiren();
-            } else {
-                btn.innerText = "🔊 Siren: ON";
-                btn.style.color = "";
+            hasPoseData = true;
+            document.getElementById("standbyWatermark").style.display = "none";
+            isEmergencyFall = isFall;
+
+            // Coordinate conversion: MediaPipe metric (hip-centered) -> Three.js
+            // MP: X right, Y down, Z depth toward camera
+            // Three.js: X = -MP.x (mirrored for self-viewing natural symmetry), Y = -MP.y (upward), Z = -MP.z
+            for (let i = 0; i < 33; i++) {
+                const lm = landmarks3D[i];
+                if (lm) {
+                    targetPositions[i].set(-lm[0], -lm[1], -lm[2]);
+                }
             }
+
+            // Virtual Neck (#33): Midpoint of Left Shoulder (11) and Right Shoulder (12)
+            targetPositions[33].lerpVectors(targetPositions[11], targetPositions[12], 0.5);
+
+            // Virtual Pelvis (#34): Midpoint of Left Hip (23) and Right Hip (24)
+            targetPositions[34].lerpVectors(targetPositions[23], targetPositions[24], 0.5);
         }
 
-        // Live Telemetry Poller
+        function animate() {
+            requestAnimationFrame(animate);
+
+            controls.update();
+
+            // Camera orientation readout
+            if (controls) {
+                const az = Math.round(controls.getAzimuthalAngle() * (180 / Math.PI));
+                const el = Math.round(controls.getPolarAngle() * (180 / Math.PI));
+                document.getElementById("camAz").innerText = az;
+                document.getElementById("camEl").innerText = el;
+            }
+
+            if (hasPoseData) {
+                const fallMaterial = isEmergencyFall ? MATERIALS.fall : null;
+
+                // 1. Smoothly interpolate (Lerp) joint positions for buttery 60 FPS animation
+                for (let i = 0; i < 35; i++) {
+                    currentPositions[i].lerp(targetPositions[i], 0.35);
+                    const jMesh = jointMeshes[i];
+                    jMesh.position.copy(currentPositions[i]);
+                    jMesh.visible = true;
+
+                    if (fallMaterial) jMesh.material = fallMaterial;
+                    else {
+                        // Reset material
+                        if ([11, 13, 15, 17, 19, 21, 23, 25, 27, 29, 31].includes(i)) jMesh.material = MATERIALS.left;
+                        else if ([12, 14, 16, 18, 20, 22, 24, 26, 28, 30, 32].includes(i)) jMesh.material = MATERIALS.right;
+                        else if ([0, 2, 5, 7, 8].includes(i)) jMesh.material = MATERIALS.head;
+                        else jMesh.material = MATERIALS.spine;
+                    }
+                }
+
+                // 2. Position and orient volumetric cylindrical bone segments
+                const upVec = new THREE.Vector3(0, 1, 0);
+                const dir = new THREE.Vector3();
+
+                for (let k = 0; k < boneMeshes.length; k++) {
+                    const b = boneMeshes[k];
+                    const pA = currentPositions[b.from];
+                    const pB = currentPositions[b.to];
+
+                    const dist = pA.distanceTo(pB);
+                    if (dist > 0.001) {
+                        // Midpoint
+                        b.mesh.position.lerpVectors(pA, pB, 0.5);
+
+                        // Scale cylinder height to bone distance, radius to bone type
+                        b.mesh.scale.set(b.radius, dist, b.radius);
+
+                        // Align cylinder orientation with vector between joints
+                        dir.subVectors(pB, pA).normalize();
+                        b.mesh.quaternion.setFromUnitVectors(upVec, dir);
+
+                        b.mesh.material = fallMaterial || (MATERIALS[b.type] || MATERIALS.torso);
+                        b.mesh.visible = true;
+                    } else {
+                        b.mesh.visible = false;
+                    }
+                }
+            }
+
+            renderer.render(scene, camera);
+        }
+
+        function onWindowResize() {
+            const container = document.getElementById("threeContainer");
+            if (!container || !renderer || !camera) return;
+            const w = container.clientWidth;
+            const h = container.clientHeight;
+            camera.aspect = w / h;
+            camera.updateProjectionMatrix();
+            renderer.setSize(w, h);
+        }
+
+        // Camera Preset Positions
+        function resetThreeCamera() {
+            setThreeView('front');
+        }
+
+        function setThreeView(view) {
+            if (!camera || !controls) return;
+            controls.target.set(0, 0, 0);
+            if (view === 'front') {
+                camera.position.set(0, 0.2, 2.4);
+            } else if (view === 'side') {
+                camera.position.set(2.4, 0.2, 0);
+            } else if (view === 'top') {
+                camera.position.set(0, 2.7, 0.05);
+            } else if (view === 'iso') {
+                camera.position.set(1.8, 1.4, 1.8);
+            }
+            controls.update();
+        }
+
+        // ─────────────────────────────────────────────────────────────
+        // Telemetry Poller & WebSocket Client
+        // ─────────────────────────────────────────────────────────────
         let currentFocusId = null;
+        let ws = null;
+        let isCameraOnly = true;
 
-        async function pollTelemetry() {
+        function toggleStreamMode() {
+            isCameraOnly = !isCameraOnly;
+            const img = document.getElementById("videoStream");
+            const btn = document.getElementById("streamModeBtn");
+            if (isCameraOnly) {
+                img.src = "/video_feed?mode=camera";
+                btn.innerText = "Mode: Camera Only";
+            } else {
+                img.src = "/video_feed?mode=combined";
+                btn.innerText = "Mode: Classic Dual";
+            }
+        }
+
+        function connectWebSocket() {
+            const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            const wsUrl = `${protocol}//${window.location.host}/ws/telemetry`;
+
+            try {
+                ws = new WebSocket(wsUrl);
+
+                ws.onopen = () => {
+                    document.getElementById("commStatusTag").innerText = "WS REAL-TIME";
+                };
+
+                ws.onmessage = (event) => {
+                    try {
+                        const data = JSON.parse(event.data);
+                        handleTelemetryUpdate(data);
+                    } catch (e) {}
+                };
+
+                ws.onclose = () => {
+                    document.getElementById("commStatusTag").innerText = "HTTP POLLING";
+                    setTimeout(connectWebSocket, 3000); // Auto-reconnect
+                };
+
+                ws.onerror = () => {
+                    ws.close();
+                };
+            } catch (err) {
+                document.getElementById("commStatusTag").innerText = "HTTP POLLING";
+            }
+        }
+
+        async function pollTelemetryFallback() {
+            if (ws && ws.readyState === WebSocket.OPEN) return;
             try {
                 const res = await fetch('/api/telemetry');
-                if (!res.ok) return;
-                const data = await res.json();
-                updateUI(data);
-            } catch (err) {
-                console.error("Telemetry error:", err);
-            }
+                if (res.ok) {
+                    const data = await res.json();
+                    handleTelemetryUpdate(data);
+                }
+            } catch (e) {}
         }
 
-        function updateUI(data) {
+        function handleTelemetryUpdate(data) {
+            // Update 3D Skeleton in Three.js
+            const lms = data.focus_world_landmarks;
+            const isFall = Boolean(data.fall_active);
+            updateSkeletonGeometry(lms, isFall);
+
+            // Update 3D Focus tag
+            const focusBadge = document.getElementById("threeFocusBadge");
+            if (data.focus_person_id !== null && data.focus_person_id !== undefined) {
+                focusBadge.innerText = `FOCUS: PERSON #${data.focus_person_id}`;
+                focusBadge.style.color = "#38bdf8";
+            } else {
+                focusBadge.innerText = "FOCUS: AUTO PRIORITY";
+                focusBadge.style.color = "#94a3b8";
+            }
+
             // Metrics
             document.getElementById('metricFps').innerText = data.fps ? data.fps.toFixed(1) : "0.0";
             document.getElementById('metricPersons').innerText = data.active_persons || 0;
@@ -743,7 +1242,7 @@
             // Person List Drawer
             const personList = document.getElementById('personListContainer');
             if (persons.length === 0) {
-                personList.innerHTML = `<div style="text-align: center; color: var(--text-muted); font-size: 0.8rem; padding: 20px;">No persons currently detected.</div>`;
+                personList.innerHTML = `<div style="text-align: center; color: var(--text-muted); font-size: 0.78rem; padding: 20px;">No persons currently detected.</div>`;
             } else {
                 personList.innerHTML = persons.map(p => {
                     const isFoc = (currentFocusId === p.id);
@@ -806,7 +1305,7 @@
                 const logs = await res.json();
                 const container = document.getElementById('incidentListContainer');
                 if (logs.length === 0) {
-                    container.innerHTML = `<div style="text-align: center; color: var(--text-muted); font-size: 0.8rem; padding: 15px;">No incidents recorded yet.</div>`;
+                    container.innerHTML = `<div style="text-align: center; color: var(--text-muted); font-size: 0.76rem; padding: 15px;">No incidents recorded yet.</div>`;
                     return;
                 }
                 container.innerHTML = logs.slice(-10).reverse().map(l => {
@@ -816,7 +1315,7 @@
                                 <span style="color:#ffffff;">P${l.Person_ID}</span> | 
                                 <span style="color:var(--text-dim);">${l.Timestamp.split(' ')[1] || l.Timestamp}</span>
                             </div>
-                            <span class="incident-sev sev-${l.Severity}">${l.Severity} (${l.Fall_Score})</span>
+                            <span class="person-status-pill sev-${l.Severity}">${l.Severity} (${l.Fall_Score})</span>
                         </div>
                     `;
                 }).join('');
@@ -825,9 +1324,76 @@
             }
         }
 
-        // Initialize polling and incident log on load
-        setInterval(pollTelemetry, 250);
-        loadIncidents();
+        // Web Audio Siren Generator
+        let audioCtx = null;
+        let sirenOsc = null;
+        let sirenGain = null;
+        let sirenActive = false;
+        let sirenMuted = false;
+
+        function initAudio() {
+            if (!audioCtx) {
+                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            }
+        }
+
+        function playSiren() {
+            if (sirenMuted) return;
+            initAudio();
+            if (sirenActive) return;
+
+            sirenOsc = audioCtx.createOscillator();
+            sirenGain = audioCtx.createGain();
+            sirenOsc.type = 'sawtooth';
+            sirenOsc.frequency.setValueAtTime(600, audioCtx.currentTime);
+            sirenOsc.frequency.exponentialRampToValueAtTime(1200, audioCtx.currentTime + 0.4);
+            sirenGain.gain.setValueAtTime(0.15, audioCtx.currentTime);
+
+            sirenOsc.connect(sirenGain);
+            sirenGain.connect(audioCtx.destination);
+            sirenOsc.start();
+            sirenActive = true;
+
+            let high = true;
+            sirenOsc.timer = setInterval(() => {
+                if (!sirenOsc) return;
+                const target = high ? 650 : 1100;
+                sirenOsc.frequency.exponentialRampToValueAtTime(target, audioCtx.currentTime + 0.3);
+                high = !high;
+            }, 350);
+        }
+
+        function stopSiren() {
+            if (!sirenActive) return;
+            if (sirenOsc) {
+                clearInterval(sirenOsc.timer);
+                sirenOsc.stop();
+                sirenOsc.disconnect();
+                sirenOsc = null;
+            }
+            sirenActive = false;
+        }
+
+        function toggleAudioAlarm() {
+            sirenMuted = !sirenMuted;
+            const btn = document.getElementById("audioToggleBtn");
+            if (sirenMuted) {
+                btn.innerText = "🔇 Siren: MUTED";
+                btn.style.color = "#ef4444";
+                stopSiren();
+            } else {
+                btn.innerText = "🔊 Siren: ON";
+                btn.style.color = "";
+            }
+        }
+
+        // Initialize Three.js scene, WebSocket, and Fallback poller
+        window.addEventListener('DOMContentLoaded', () => {
+            initThreeScene();
+            connectWebSocket();
+            setInterval(pollTelemetryFallback, 300);
+            loadIncidents();
+        });
     </script>
 </body>
 </html>

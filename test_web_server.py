@@ -38,13 +38,23 @@ class TestWebServer(unittest.TestCase):
         self.assertIn("/video_feed", response.text)
 
     def test_telemetry_endpoint(self):
-        """Verify that GET /api/telemetry returns valid JSON metrics."""
+        """Verify that GET /api/telemetry returns valid JSON metrics including 3D landmarks."""
         response = self.client.get("/api/telemetry")
         self.assertEqual(response.status_code, 200)
         data = response.json()
         self.assertIn("active_persons", data)
         self.assertIn("fall_active", data)
         self.assertIn("fps", data)
+        self.assertIn("focus_world_landmarks", data)
+        self.assertIn("persons", data)
+
+    def test_websocket_telemetry(self):
+        """Verify that /ws/telemetry streams real-time JSON updates for Three.js."""
+        with self.client.websocket_connect("/ws/telemetry") as ws:
+            data = ws.receive_json()
+            self.assertIn("active_persons", data)
+            self.assertIn("fall_active", data)
+            self.assertIn("focus_world_landmarks", data)
 
     def test_focus_endpoint(self):
         """Verify that POST /api/focus successfully sets focus person ID."""
