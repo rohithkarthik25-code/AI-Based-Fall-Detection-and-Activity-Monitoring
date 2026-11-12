@@ -9,8 +9,24 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import List, Optional
 
+import os
 import torch
 from ultralytics import YOLO
+
+
+def _find_model(path: str) -> str:
+    if os.path.exists(path):
+        return path
+    candidates = [
+        os.path.join("models", os.path.basename(path)),
+        os.path.join(os.path.dirname(__file__), "..", "..", "models", os.path.basename(path)),
+        os.path.join(os.path.dirname(__file__), "models", os.path.basename(path)),
+        os.path.join(os.path.dirname(__file__), "..", "..", os.path.basename(path)),
+    ]
+    for c in candidates:
+        if os.path.exists(c):
+            return os.path.abspath(c)
+    return path
 
 
 @dataclass(frozen=True)
@@ -36,7 +52,7 @@ class YOLODetector:
         imgsz: int = 480,
         device: Optional[str] = "cpu",
     ) -> None:
-        self.model = YOLO(model_path)
+        self.model = YOLO(_find_model(model_path))
         self.person_class_id = person_class_id
         self.confidence = confidence
         self.tracker = tracker

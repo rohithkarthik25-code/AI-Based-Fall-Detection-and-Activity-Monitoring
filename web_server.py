@@ -9,8 +9,17 @@ import argparse
 import asyncio
 import csv
 import os
+import sys
+from pathlib import Path
 from contextlib import asynccontextmanager
 from typing import Any, Dict, Optional
+
+# Add src and subpackages to sys.path
+_ROOT = Path(__file__).resolve().parent
+_SRC = _ROOT / "src"
+for _p in [_ROOT, _SRC, _SRC / "core", _SRC / "web", _SRC / "alerts", _SRC / "visualization", _SRC / "utils"]:
+    if str(_p) not in sys.path:
+        sys.path.insert(0, str(_p))
 
 import uvicorn
 from fastapi import FastAPI, HTTPException, Request, WebSocket, WebSocketDisconnect

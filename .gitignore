@@ -28,7 +28,7 @@ tempCodeRunnerFile.py
 # Runtime logs and event records
 fall_events.csv
 fall_logs/
-alerts/
+/alerts/
 
 # Jupyter
 .ipynb_checkpoints/

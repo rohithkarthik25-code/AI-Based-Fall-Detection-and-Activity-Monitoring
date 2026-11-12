@@ -4,6 +4,7 @@ Layer: Pose Estimation
 Optimized for low-latency crop processing and robust boundary clamping.
 """
 
+import os
 from dataclasses import dataclass
 from typing import Optional, List, Tuple
 
@@ -11,6 +12,21 @@ import cv2
 import mediapipe as mp
 from mediapipe.tasks.python import vision as mp_vision
 from mediapipe.tasks.python.core.base_options import BaseOptions
+
+
+def _find_model(path: str) -> str:
+    if os.path.exists(path):
+        return path
+    candidates = [
+        os.path.join("models", os.path.basename(path)),
+        os.path.join(os.path.dirname(__file__), "..", "..", "models", os.path.basename(path)),
+        os.path.join(os.path.dirname(__file__), "models", os.path.basename(path)),
+        os.path.join(os.path.dirname(__file__), "..", "..", os.path.basename(path)),
+    ]
+    for c in candidates:
+        if os.path.exists(c):
+            return os.path.abspath(c)
+    return path
 
 
 @dataclass
@@ -25,7 +41,7 @@ class PoseAnalysis:
 class PoseEstimator:
     def __init__(self, model_path: str = "pose_landmarker.task") -> None:
         options = mp_vision.PoseLandmarkerOptions(
-            base_options=BaseOptions(model_asset_path=model_path),
+            base_options=BaseOptions(model_asset_path=_find_model(model_path)),
             running_mode=mp_vision.RunningMode.IMAGE,
         )
         self.landmarker = mp_vision.PoseLandmarker.create_from_options(options)

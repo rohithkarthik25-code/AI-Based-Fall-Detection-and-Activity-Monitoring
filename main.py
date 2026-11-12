@@ -10,7 +10,15 @@ Examples:
 
 import argparse
 import os
+import sys
+from pathlib import Path
 
+# Add src and subpackages to sys.path
+_ROOT = Path(__file__).resolve().parent
+_SRC = _ROOT / "src"
+for _p in [_ROOT, _SRC, _SRC / "core", _SRC / "web", _SRC / "alerts", _SRC / "visualization", _SRC / "utils"]:
+    if str(_p) not in sys.path:
+        sys.path.insert(0, str(_p))
 
 from fall_detector import FallDetector
 
