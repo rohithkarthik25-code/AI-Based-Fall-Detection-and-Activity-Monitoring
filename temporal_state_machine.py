@@ -79,6 +79,6 @@ class TemporalStateMachine:
 
         return StateTransition(
             confirmed_fall=confirmed,
-            reset_fall=state["normal_frames"] >= self.reset_frames,
+            reset_fall=bool(standard_reset or geometry_reset),
             active_fall=state["fall_detected"],
-    )
+        )

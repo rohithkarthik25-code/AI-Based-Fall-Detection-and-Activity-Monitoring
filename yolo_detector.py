@@ -44,6 +44,11 @@ class YOLODetector:
         self.device = device
 
     def detect(self, frame, conf: float | None = None) -> List[TrackedBox]:
+        if frame is None or not hasattr(frame, "shape") or getattr(frame, "size", 0) == 0:
+            return []
+        if frame.ndim != 3 or frame.shape[0] < 16 or frame.shape[1] < 16:
+            return []
+
         threshold = conf if conf is not None else self.confidence   
         
         with torch.inference_mode():

@@ -40,9 +40,14 @@ class FallLogger:
 
         self.logged_events.add(minute_key)
 
-        filename = f"fall_{now.strftime('%Y%m%d_%H%M%S')}_person{person_id}.png"
-        screenshot_path = os.path.join(self.screenshot_dir, filename)
-        cv2.imwrite(screenshot_path, frame)
+        screenshot_path = ""
+        if frame is not None and getattr(frame, "size", 0) > 0:
+            filename = f"fall_{now.strftime('%Y%m%d_%H%M%S')}_person{person_id}.png"
+            screenshot_path = os.path.join(self.screenshot_dir, filename)
+            try:
+                cv2.imwrite(screenshot_path, frame)
+            except Exception as e:
+                print(f"[FallLogger] Warning: Failed to save screenshot: {e}")
 
         with open(self.log_file, "a", newline="", encoding="utf-8") as f:
             writer = csv.writer(f)

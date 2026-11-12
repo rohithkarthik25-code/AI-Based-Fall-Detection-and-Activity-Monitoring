@@ -262,11 +262,17 @@ class FallDetector:
 
             # ── 12. Alarm reset when person recovers ──
             if prev_fall_detected and not state["fall_detected"]:
-                self.alarm.reset()
                 self.alert_dispatcher.dispatch_recovery_alert(
                     person_id=person_id,
                     duration=state.get("fall_duration", 0.0),
                 )
+                other_active_falls = any(
+                    p[2].get("fall_detected", False)
+                    for p in tracked
+                    if p[0] != person_id
+                )
+                if not other_active_falls:
+                    self.alarm.reset()
 
             if state["fall_detected"]:
                 active_fall_count += 1
@@ -326,7 +332,10 @@ class FallDetector:
             if self.dashboard.fall_lost_frames > self.dashboard.FALL_LOST_TOLERANCE:
                 self.dashboard.fall_active = False
                 self.dashboard.fall_lost_frames = 0
+                self.alarm.reset()
         elif len(tracked) > 0 and active_fall_count == 0:
+            if self.dashboard.fall_active:
+                self.alarm.reset()
             self.dashboard.fall_active = False
             self.dashboard.fall_lost_frames = 0
 

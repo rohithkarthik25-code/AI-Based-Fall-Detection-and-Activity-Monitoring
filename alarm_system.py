@@ -64,7 +64,10 @@ def _beep(freq_hz, duration_ms, stop_event):
             if stop_event.is_set():
                 return
             step = min(chunk_ms, duration_ms - elapsed)
-            _winsound.Beep(freq_hz, step)
+            try:
+                _winsound.Beep(freq_hz, step)
+            except Exception:
+                time.sleep(step / 1000.0)
             elapsed += step
     else:
         deadline = time.time() + duration_ms / 1000

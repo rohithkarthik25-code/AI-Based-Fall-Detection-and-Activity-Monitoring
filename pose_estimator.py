@@ -31,7 +31,7 @@ class PoseEstimator:
         self.landmarker = mp_vision.PoseLandmarker.create_from_options(options)
 
     def estimate(self, frame, box: List[int] | Tuple[int, int, int, int]) -> PoseAnalysis:
-        x1, y1, x2, y2 = box
+        x1, y1, x2, y2 = int(round(box[0])), int(round(box[1])), int(round(box[2])), int(round(box[3]))
 
         # Boundary clamping within frame dimensions
         fh, fw = frame.shape[:2]

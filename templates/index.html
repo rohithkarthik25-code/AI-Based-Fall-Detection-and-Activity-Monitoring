@@ -1179,6 +1179,29 @@
                 const headY = this.currentPositions[0].y;
                 this.billboard.position.set(0, headY + 0.32, 0);
             }
+
+            dispose() {
+                this.scene.remove(this.group);
+                for (let j of this.jointMeshes) {
+                    this.group.remove(j);
+                }
+                for (let b of this.boneMeshes) {
+                    this.group.remove(b.mesh);
+                }
+                this.group.remove(this.ringMesh);
+                this.group.remove(this.billboard);
+
+                if (this.billboard.material.map) {
+                    this.billboard.material.map.dispose();
+                }
+                this.billboard.material.dispose();
+                this.ringMesh.geometry.dispose();
+
+                // Dispose avatar materials
+                Object.values(this.materials).forEach(mat => {
+                    if (mat && typeof mat.dispose === "function") mat.dispose();
+                });
+            }
         }
 
         // ─────────────────────────────────────────────────────────────
@@ -1267,7 +1290,20 @@
                 }
             }
 
+            cleanupStaleAvatars(now) {
+                for (const [id, avatar] of this.avatars.entries()) {
+                    if (now - avatar.lastSeen > 25000) { // Prune if disappeared >25s
+                        avatar.dispose();
+                        this.avatars.delete(id);
+                    }
+                }
+            }
+
             animate(now) {
+                if (!this.lastCleanup || now - this.lastCleanup > 5000) {
+                    this.cleanupStaleAvatars(now);
+                    this.lastCleanup = now;
+                }
                 for (const [id, avatar] of this.avatars.entries()) {
                     avatar.animate(now, this.upVec, this.dirVec);
                 }
@@ -1385,8 +1421,8 @@
         function onWindowResize() {
             const container = document.getElementById("threeContainer");
             if (!container || !renderer || !camera) return;
-            const w = container.clientWidth;
-            const h = container.clientHeight;
+            const w = container.clientWidth || 400;
+            const h = Math.max(1, container.clientHeight || 300);
             camera.aspect = w / h;
             camera.updateProjectionMatrix();
             renderer.setSize(w, h);
@@ -1669,6 +1705,9 @@
             if (!audioCtx) {
                 audioCtx = new (window.AudioContext || window.webkitAudioContext)();
             }
+            if (audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
         }
 
         function playSiren() {
@@ -1720,6 +1759,11 @@
                 btn.style.color = "";
             }
         }
+
+        // Unlock Web Audio context on user first gesture
+        window.addEventListener('click', () => {
+            initAudio();
+        }, { once: true });
 
         // Initialize Three.js scene, WebSocket, and fast fallback poller (50ms)
         window.addEventListener('DOMContentLoaded', () => {
