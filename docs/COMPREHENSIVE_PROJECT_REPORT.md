@@ -6,12 +6,8 @@
 ### Project Identification & Metadata
 
 * **Project Title:** AI-Based Fall Detection and Activity Monitoring Using Pose Estimation with Interactive 3D Skeleton Visualization
-* **Institution:** Ghani Khan Choudhury Institute of Engineering & Technology (GKCIET), CFTI under Ministry of Education, Govt. of India
-* **Department:** Department of Computer Science & Technology
-* **Academic Year:** 2025–2026
-* **Project Team:** Nabyendu Adhikary (10009453), Sagar Halder (10009450), Prasenjit Mandal (10009437)
-* **Project Supervisor:** Dr. Ajit Kumar Singh Yadav, Head of the Department
-* **Core Technology Stack:** Python 3.10+, YOLOv8 Nano, ByteTrack, Google MediaPipe Pose, OpenCV, NumPy, SciPy, Pygame
+* **Architecture:** Edge-Compute Computer Vision Pipeline (CPU-First Optimization)
+* **Core Technology Stack:** Python 3.10+, YOLOv8 Nano, ByteTrack, Google MediaPipe Pose, Three.js WebGL, FastAPI, OpenCV, NumPy, SciPy
 
 ---
 
@@ -261,28 +257,19 @@ Evaluated on the **UR Fall Detection Dataset (URFD)** (30 fall sequences and 30 
 ```
 ICG Project/
 ├── main.py                     # Entrypoint with CLI switches
-├── fall_detector.py            # End-to-end dual-panel orchestrator
-├── activity_monitor.py         # Posture classifier & health duration analytics
-├── visualizer_3d.py            # Interactive 3D skeleton visualizer (orbit controls)
-├── dashboard.py                 # HUD overlay, activity badges, factor panels
-├── yolo_detector.py            # YOLOv8 Nano + ByteTrack detection wrapper
-├── person_tracker.py           # Per-person state manager & track inheritance
-├── pose_estimator.py           # MediaPipe Pose Landmarker (2D + 3D metric)
-├── feature_extractor.py        # 20-signal biomechanical feature extractor
-├── weighted_scoring.py         # 14-signal fall scoring & severity classifier
-├── temporal_state_machine.py   # Confirmation window & dual-path reset
-├── alarm_system.py             # Two-phase audio escalation engine
-├── fall_logger.py              # CSV incident logger & screenshot persistence
-├── test_activity_monitor.py    # Unit tests: activity recognition
-├── test_visualizer_3d.py        # Unit tests: 3D projection & orbit controls
-├── test_integration_step3.py    # Integration tests: end-to-end pipeline
-├── test_edge_cases.py          # Extreme edge cases & singularity tests
-├── yolov8n.pt                   # YOLOv8 Nano weights
-├── pose_landmarker.task         # MediaPipe Pose model asset
-├── README.md                   # Updated repository documentation
-└── docs/
-    ├── report.pdf              # Academic diploma project report
-    └── COMPREHENSIVE_PROJECT_REPORT.md # Full project technical report
+├── web_server.py               # FastAPI Three.js WebGL web server
+├── src/
+│   ├── core/                   # YOLO, Pose, Features, Scoring, State Machine, Pipeline
+│   ├── web/                    # FastAPI app, MJPEG stream, WebSocket
+│   ├── alerts/                 # Audio alarm and CSV fall logger
+│   ├── visualization/          # 3D visualizer, HUD dashboard
+│   └── utils/                  # Coordinate transforms, math helpers
+├── tests/                      # 77 automated unit and integration tests
+├── models/                     # YOLOv8 and MediaPipe model assets
+├── templates/                  # Three.js WebGL frontend dashboard
+├── static/                     # Web styles and Three.js client scripts
+├── docs/                       # Project documentation & technical reports
+└── fall_logs/                  # Incident logs and snapshot captures
 ```
 
 ---
@@ -292,5 +279,5 @@ ICG Project/
 By systematically building upon the existing modular foundation, the project was transformed into:
 > **AI-Based Fall Detection and Activity Monitoring Using Pose Estimation with Interactive 3D Skeleton Visualization**
 
-It successfully fulfills all criteria of an advanced diploma final year project: rigorous mathematical modeling, real-time computer vision engineering, ethical healthcare relevance, interactive 3D visualization, and comprehensive unit testing.
+It successfully fulfills all criteria of an advanced computer vision and biomechanical analysis system: rigorous mathematical modeling, real-time edge processing, proactive healthcare safety monitoring, interactive Three.js 3D WebGL visualization, and comprehensive automated test validation.
 

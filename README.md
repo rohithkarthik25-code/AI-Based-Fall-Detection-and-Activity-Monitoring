@@ -3,19 +3,13 @@
 **YOLOv8 + MediaPipe Pose Estimation with Biomechanical Feature Scoring, Real-Time Activity Recognition, Severity Classification, Smart Alerting & Interactive 3D Kinematic Visualization**
 
 ![Python](https://img.shields.io/badge/python-3.10%2B-blue)
-![License](https://img.shields.io/badge/license-MIT-green)
 ![YOLOv8](https://img.shields.io/badge/YOLOv8-Ultralytics-orange)
 ![MediaPipe](https://img.shields.io/badge/MediaPipe-Pose%20Landmarker-red)
 ![OpenCV](https://img.shields.io/badge/OpenCV-4.x-yellow)
+![Three.js](https://img.shields.io/badge/Three.js-WebGL-black)
 ![Status](https://img.shields.io/badge/status-active-brightgreen)
 
-A comprehensive real-time, CPU-only computer vision system engineered for elderly safety, independent-living monitoring, and healthcare ambient intelligence. It ingests an RGB camera stream, tracks multiple subjects in frame, extracts 33 metric 3D skeleton keypoints, continuously classifies daily postures and activities, scores 20 biomechanical signals per person to confirm falls through a temporal state machine, triggers smart two-phase audio alerts with automated incident logging, and renders a **dual-panel live feed with an interactive 3D skeleton viewport**.
-
-Built as a Diploma Final Year Project at **Ghani Khan Choudhury Institute of Engineering & Technology** by Nabyendu Adhikary, Sagar Halder, and Prasenjit Mandal, under the guidance of Dr. Ajit Kumar Singh Yadav.
-
-<p align="center">
-  <img src="assets/demo_strip.png" alt="Fall detection and activity monitoring demo" width="100%">
-</p>
+A comprehensive real-time, CPU-optimized computer vision system engineered for elderly safety, independent-living monitoring, and healthcare ambient intelligence. It ingests an RGB camera stream, tracks multiple subjects in frame, extracts 33 metric 3D skeleton keypoints, continuously classifies daily postures and activities, scores 20 biomechanical signals per person to confirm falls through a temporal state machine, triggers smart two-phase audio alerts with automated incident logging, and renders a **dual-panel live feed with an interactive Three.js 3D skeleton viewport**.
 
 ---
 
@@ -60,22 +54,29 @@ Built as a Diploma Final Year Project at **Ghani Khan Choudhury Institute of Eng
 
 ## 🏗️ System Architecture
 
-<p align="center">
-  <img src="assets/pipeline_architecture.png" alt="End-to-end system pipeline diagram" width="380">
-</p>
+```text
+[Input Stream] ──> [YOLOv8 + ByteTrack] ──> [MediaPipe Pose] ──> [Biomechanical Features]
+                                                                        │
+┌───────────────────────────┬───────────────────────────────────────────┴────────────────────────┐
+▼                           ▼                                                                    ▼
+[Activity Classifier]       [Fall Probability & State Machine]                   [Interactive 3D WebGL / HUD]
+  - Standing / Sitting        - 14-Factor Weighted Biomechanical Score             - Three.js 3D Viewport
+  - Walking / Bending         - 8-Frame Temporal Confirmation                      - Live Camera HUD Overlay
+  - Lying / Fallen            - Escalating Alarm & CSV Fall Logger                 - Metric Ground Grid
+```
 
-| Stage | Module | Responsibility |
+| Stage | Module Location | Responsibility |
 |---|---|---|
-| **Detection & Tracking** | `yolo_detector.py`, `person_tracker.py` | Detect people, assign persistent ByteTrack IDs, maintain per-person states |
-| **Pose Estimation** | `pose_estimator.py` | Extract 33-point 2D pixel coordinates and metric 3D world landmarks |
-| **Feature Extraction** | `feature_extractor.py` | Compute 20 biomechanical signals (angles, velocities, collapses, tilts) |
-| **Fall Scoring** | `weighted_scoring.py` | Compute multi-factor weighted fall probability and severity grading |
-| **Temporal State Machine** | `temporal_state_machine.py` | Temporal confirmation window and dual-path geometry reset |
-| **Activity Monitoring** | `activity_monitor.py` | 3D/2D joint angle analysis, ADL classification, and duration analytics |
-| **3D Visualization** | `visualizer_3d.py` | 3D perspective projection, mouse-orbit camera, and depth-sorted skeleton |
-| **HUD & Dashboard** | `dashboard.py` | Combined HUD overlay, activity badges, signal factor panels, and fall banners |
-| **Alerting & Logging** | `alarm_system.py`, `fall_logger.py` | Two-phase escalating audio alarm, CSV event logging, and snapshot capture |
-| **Pipeline Orchestrator** | `fall_detector.py`, `main.py` | Synchronous dual-panel pipeline wiring, CLI options, and event handling |
+| **Detection & Tracking** | `src/core/yolo_detector.py`, `src/core/person_tracker.py` | Detect people, assign persistent ByteTrack IDs, maintain per-person states |
+| **Pose Estimation** | `src/core/pose_estimator.py` | Extract 33-point 2D pixel coordinates and metric 3D world landmarks |
+| **Feature Extraction** | `src/core/feature_extractor.py` | Compute 20 biomechanical signals (angles, velocities, collapses, tilts) |
+| **Fall Scoring** | `src/core/weighted_scoring.py` | Compute multi-factor weighted fall probability and severity grading |
+| **Temporal State Machine** | `src/core/temporal_state_machine.py` | Temporal confirmation window and dual-path geometry reset |
+| **Activity Monitoring** | `src/core/activity_monitor.py` | 3D/2D joint angle analysis, ADL classification, and duration analytics |
+| **3D Visualization** | `src/visualization/visualizer_3d.py`, `static/js/viewer3d.js` | 3D perspective projection, Three.js WebGL orbit camera, metric coordinate space |
+| **HUD & Dashboard** | `src/visualization/dashboard.py`, `templates/index.html` | Combined HUD overlay, activity badges, signal factor panels, and responsive UI |
+| **Alerting & Logging** | `src/alerts/alarm_system.py`, `src/alerts/fall_logger.py` | Two-phase escalating audio alarm, CSV event logging, and snapshot capture |
+| **Pipeline Orchestrators**| `src/core/fall_detector.py`, `main.py`, `web_server.py` | Synchronous dual-panel pipeline wiring, FastAPI WebGL server, and CLI launcher |
 
 ---
 
@@ -107,30 +108,36 @@ The system prioritizes sensitivity over precision by design — in health and sa
 ## 📦 Project Structure
 
 ```
-ICG-Project/
-├── main.py                    # Application entrypoint (CLI / GUI launcher)
-├── fall_detector.py           # Pipeline orchestrator (wires 2D + 3D + Activity)
-├── activity_monitor.py        # Posture recognition & continuous ADL duration tracker
-├── visualizer_3d.py           # Interactive 3D skeleton visualizer & orbit controls
-├── dashboard.py                # HUD overlay, activity badges & factor panel
-├── yolo_detector.py           # YOLOv8 + ByteTrack person detection
-├── person_tracker.py          # Per-person state store, track inheritance & NMS
-├── pose_estimator.py          # MediaPipe Pose Landmarker wrapper (2D + 3D metric)
-├── feature_extractor.py       # 20 biomechanical signal computations
-├── weighted_scoring.py        # 14-signal weighted fall scoring + severity
-├── temporal_state_machine.py  # Temporal confirmation & reset state machine
-├── alarm_system.py            # Two-phase audio alarm escalation
-├── fall_logger.py             # CSV incident logging & screenshot persistence
-├── test_activity_monitor.py   # Unit tests for posture recognition
-├── test_visualizer_3d.py       # Unit tests for 3D projection & orbit controls
-├── test_integration_step3.py   # End-to-end pipeline integration tests
-├── test_edge_cases.py         # Stress and singularity edge case test suite
-├── yolov8n.pt                  # YOLOv8 Nano weights (COCO-pretrained)
-├── pose_landmarker.task        # MediaPipe Pose Landmarker model
-├── assets/                     # Demo visuals and diagrams
-├── docs/
-│   └── report.pdf              # Full diploma project report
-└── fall_logs/ · fall_events.csv # Generated at runtime on confirmed falls
+AI-Based-Fall-Detection/
+├── main.py                     # CLI & OpenCV dual-panel desktop launcher
+├── web_server.py               # FastAPI Three.js WebGL web server
+├── src/
+│   ├── core/                   # Pipeline core logic
+│   │   ├── fall_detector.py        # Central multi-threaded pipeline orchestrator
+│   │   ├── yolo_detector.py        # YOLOv8 person detection wrapper
+│   │   ├── person_tracker.py       # ByteTrack & persistent tracking state manager
+│   │   ├── pose_estimator.py       # MediaPipe Pose Landmarker (2D & 3D metric)
+│   │   ├── feature_extractor.py    # 20 biomechanical signal computations
+│   │   ├── weighted_scoring.py     # 14-signal fall scoring & severity classifier
+│   │   ├── temporal_state_machine.py # Multi-frame confirmation & geometry reset
+│   │   └── activity_monitor.py     # ADL posture classification & duration tracker
+│   ├── web/                    # Web streaming and API handlers
+│   │   └── app.py                  # FastAPI routes, MJPEG stream, WebSocket
+│   ├── alerts/                 # Incident management & alert system
+│   │   ├── alarm_system.py         # Two-phase escalating audio alarm
+│   │   └── fall_logger.py          # CSV incident logger & screenshot persistence
+│   ├── visualization/          # 2D & 3D rendering engines
+│   │   ├── dashboard.py            # HUD overlay, activity badges & factor panel
+│   │   └── visualizer_3d.py        # 3D skeleton visualizer & orbit controls
+│   └── utils/                  # Mathematical and coordinate utilities
+│       ├── camera_geometry.py      # Camera intrinsics and 3D projections
+│       └── skeleton_math.py        # Joint angle and vector computations
+├── tests/                      # Automated test suite (77 unit & integration tests)
+├── models/                     # YOLOv8n and MediaPipe model assets
+├── templates/                  # Three.js WebGL browser dashboard (index.html)
+├── static/                     # Web styles and Three.js client scripts
+├── docs/                       # Comprehensive technical reports & architecture
+└── fall_logs/                  # Runtime event CSV logs and incident screenshots
 ```
 
 ---
@@ -141,8 +148,8 @@ ICG-Project/
 
 ```bash
 # Clone the repository
-git clone https://github.com/Nabyendu-the-noob/real-time-fall-detection.git
-cd real-time-fall-detection
+git clone https://github.com/rohithkarthik25-code/AI-Based-Fall-Detection-and-Activity-Monitoring.git
+cd AI-Based-Fall-Detection-and-Activity-Monitoring
 
 # Activate existing virtual environment
 # Windows:
@@ -156,8 +163,17 @@ pip install -r requirements.txt
 
 ### 2. Execution
 
+#### A. WebGL Dashboard (Browser Interface with Three.js 3D Viewport)
 ```bash
-# Run with pre-recorded video (Default: full dual-panel with 3D skeleton)
+# Start the web server (defaults to 127.0.0.1:8000)
+python web_server.py --source 0
+
+# Open in browser: http://localhost:8000
+```
+
+#### B. Desktop Dual-Panel GUI (OpenCV Window)
+```bash
+# Run with pre-recorded video
 python main.py --source output_fall_detected_weighted.mp4
 
 # Run with live webcam
@@ -172,8 +188,8 @@ python main.py --source input.mp4 --no-3d
 
 ### 3. Interactive 3D Viewport Controls
 
-When the application window is running:
-* **Rotate in 3D:** Click and drag with the **Left Mouse Button** anywhere inside the right-hand 3D viewport.
+When the application window or web dashboard is running:
+* **Rotate in 3D:** Click and drag with the **Left Mouse Button** anywhere inside the 3D viewport.
 * **Zoom:** Scroll the **Mouse Wheel** or hold **Right Mouse Button** and drag up/down.
 * **Reset Camera:** **Double-Click** anywhere on the 3D viewport or press **`r`**.
 * **Switch Views:** Press **`f`** (Front), **`s`** (Side), **`t`** (Top), or **`i`** (Isometric).
@@ -186,36 +202,19 @@ When the application window is running:
 The project includes an automated test suite covering all modules, math operations, and edge cases:
 
 ```bash
-python -m unittest discover -p "test_*.py"
+python -m unittest discover -s tests -p "test_*.py"
 ```
 
 **Results:**
 ```text
-Ran 30 tests in 4.702s
+Ran 77 tests in 7.996s
 
 OK
 ```
-Tests validate 3D rotation matrix orthogonality, perspective projection, extreme zoom limits, `NaN`/`Inf` handling, posture classification, debounce windows, and end-to-end video processing.
+Tests validate 3D rotation matrix orthogonality, perspective projection, extreme zoom limits, `NaN`/`Inf` handling, posture classification, debounce windows, multi-person tracking states, and end-to-end video processing.
 
 ---
 
-## 📄 Citation
-
-```bibtex
-@article{Adhikary2026FallActivity3D,
-  title={AI-Based Fall Detection and Activity Monitoring Using Pose Estimation with Interactive 3D Skeleton Visualization},
-  author={Adhikary, Nabyendu and Halder, Sagar and Mandal, Prasenjit},
-  advisor={Dr. Ajit Kumar Singh Yadav},
-  journal={Diploma Final Year Project Report},
-  institution={Ghani Khan Choudhury Institute of Engineering & Technology},
-  year={2026}
-}
-```
-
 ## 🛠️ Tech Stack
 
-Python 3.10+ · OpenCV 4.x · [Ultralytics YOLOv8](https://github.com/ultralytics/ultralytics) · ByteTrack · [MediaPipe Pose Landmarker](https://ai.google.dev/edge/mediapipe/solutions/vision/pose_landmarker) · NumPy · SciPy · Pygame
-
-## 📜 License
-
-Released under the [MIT License](LICENSE).
+Python 3.10+ · OpenCV 4.x · [Ultralytics YOLOv8](https://github.com/ultralytics/ultralytics) · ByteTrack · [MediaPipe Pose Landmarker](https://ai.google.dev/edge/mediapipe/solutions/vision/pose_landmarker) · Three.js WebGL · FastAPI · NumPy · SciPy · Pygame
