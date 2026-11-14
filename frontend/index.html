@@ -224,6 +224,11 @@
             color: #e2e8f0;
         }
 
+        .header-actions {
+            display: flex;
+            gap: 8px;
+        }
+
         /* ── 3D Viewport ── */
         #viewport-3d {
             width: 100%;
@@ -245,7 +250,7 @@
             background: rgba(15, 23, 42, 0.85);
             border: 1px solid var(--border-dim);
             color: var(--text-dim);
-            padding: 5px 10px;
+            padding: 5px 12px;
             border-radius: 6px;
             font-size: 0.75rem;
             font-family: 'JetBrains Mono', monospace;
@@ -429,7 +434,8 @@
         </div>
         <div class="badge-cloud">
             <div class="chip" id="chip-status"><span class="dot-green"></span> Supabase Connected</div>
-            <div class="chip">AI Engine: <span id="camera-status" style="color: #10b981;">READY</span></div>
+            <div class="chip">Telegram Alerts: <span style="color: #10b981;">ACTIVE</span></div>
+            <div class="chip">AI Vision: <span id="camera-status" style="color: #10b981;">STANDBY</span></div>
         </div>
     </header>
 
@@ -437,7 +443,7 @@
     <div id="emergency-banner">
         <div>
             <strong id="emergency-title">🚨 FALL DETECTED!</strong>
-            <span id="emergency-desc" style="margin-left: 12px; font-size: 0.9rem;">Person confirmed fall. Emergency alert triggered.</span>
+            <span id="emergency-desc" style="margin-left: 12px; font-size: 0.9rem;">Person confirmed fall. Telegram alert dispatched.</span>
         </div>
         <button class="btn-resolve" onclick="resolveCurrentFall()">Acknowledge & Resolve</button>
     </div>
@@ -487,14 +493,14 @@
                     </p>
                     <button class="btn-primary" onclick="toggleWebcam()">🚀 Start Live AI Monitoring</button>
                     <div style="margin-top: 16px;">
-                        <button class="btn-preset" onclick="simulateFallTest()">Simulate Test Fall Alert</button>
+                        <button class="btn-preset" style="color: #f87171;" onclick="simulateFallTest()">Simulate Test Fall & Telegram Alert</button>
                     </div>
                 </div>
 
                 <video id="webcam-video" playsinline></video>
                 <canvas id="webcam-canvas"></canvas>
 
-                <div class="hud-badge" id="hud-overlay-activity">STANDING (98%)</div>
+                <div class="hud-badge" id="hud-overlay-activity">STANDING</div>
                 <div class="hud-score-badge" id="hud-overlay-score">FALL RISK: 0%</div>
             </div>
         </div>
@@ -519,7 +525,10 @@
         <div class="card" style="grid-column: 1 / -1;">
             <div class="card-header">
                 <div class="card-title">📋 Cloud Incident History & Snapshot Ledger (Supabase)</div>
-                <button class="btn-preset" onclick="loadFallHistory()">Refresh</button>
+                <div class="header-actions">
+                    <button class="btn-preset" style="color: #38bdf8;" onclick="exportCSVLogs()">📥 Export CSV Logs</button>
+                    <button class="btn-preset" onclick="loadFallHistory()">Refresh</button>
+                </div>
             </div>
             <div class="table-container">
                 <table>
@@ -683,6 +692,10 @@
         const SUPABASE_URL = "https://qbzuwqanxnkpeuioiiao.supabase.co";
         const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFienV3cWFueG5rcGV1aW9paWFvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTQ2MjYxMzMsImV4cCI6MjExMDIwMjEzM30.cC9AZlgWMe3doYp2DtxjYRUGdDVn5L7YmTHpiKjRP0Q";
         
+        // Direct Telegram Credentials (fallback)
+        const TELEGRAM_BOT_TOKEN = "9062818901:AAGIXsLlOJ-6V70_Wp_kTIAbIPSSD4-PFao";
+        const TELEGRAM_CHAT_ID = "6666395760";
+
         let sbClient = null;
         try {
             sbClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
@@ -692,6 +705,7 @@
         }
 
         let activeFallEvent = null;
+        let cachedFallEvents = [];
 
         async function loadFallHistory() {
             if (!sbClient) return;
@@ -700,22 +714,24 @@
                     .from('fall_events')
                     .select('*')
                     .order('created_at', { ascending: false })
-                    .limit(20);
+                    .limit(25);
 
                 const tbody = document.getElementById('incident-tbody');
                 if (error) {
-                    tbody.innerHTML = `<tr><td colspan="8" style="text-align: center; color: #ef4444;">Error connecting to Supabase: ${error.message}</td></tr>`;
+                    tbody.innerHTML = `<tr><td colspan="8" style="text-align: center; color: #ef4444;">Error: ${error.message}</td></tr>`;
                     return;
                 }
 
+                cachedFallEvents = data || [];
+
                 if (!data || data.length === 0) {
-                    tbody.innerHTML = '<tr><td colspan="8" style="text-align: center; color: var(--text-muted);">No fall incidents recorded yet. System secure.</td></tr>';
+                    tbody.innerHTML = '<tr><td colspan="8" style="text-align: center; color: var(--text-muted);">No fall incidents recorded yet. System normal.</td></tr>';
                     return;
                 }
 
                 tbody.innerHTML = data.map(row => {
                     const snapshotHtml = row.snapshot_url 
-                        ? `<img class="snapshot-thumb" src="${row.snapshot_url}" onclick="openLightbox('${row.snapshot_url}')" title="Click to inspect snapshot">`
+                        ? `<img class="snapshot-thumb" src="${row.snapshot_url}" onclick="openLightbox('${row.snapshot_url}')" title="Click to view snapshot">`
                         : '<span style="color: var(--text-muted);">None</span>';
                     
                     const statusBadge = row.resolved 
@@ -732,8 +748,8 @@
                         <td>${timeStr}</td>
                         <td>#${row.person_id}</td>
                         <td><span class="badge-severity sev-${row.severity}">${row.severity}</span></td>
-                        <td>${(row.fall_score * 100).toFixed(0)}%</td>
-                        <td>${row.duration_down ? row.duration_down + 's' : '0s'}</td>
+                        <td>${(Number(row.fall_score) * 100).toFixed(0)}%</td>
+                        <td>${row.duration_down ? Number(row.duration_down).toFixed(1) + 's' : '0s'}</td>
                         <td>${snapshotHtml}</td>
                         <td>${statusBadge}</td>
                         <td>${actionHtml}</td>
@@ -766,6 +782,37 @@
             }
         }
 
+        // Export all logs as CSV file
+        function exportCSVLogs() {
+            if (!cachedFallEvents || cachedFallEvents.length === 0) {
+                alert("No fall logs available to export.");
+                return;
+            }
+
+            const headers = ["Timestamp", "Person_ID", "Severity", "Fall_Score", "Duration_sec", "Snapshot_URL", "Resolved", "Notes"];
+            const rows = cachedFallEvents.map(e => [
+                new Date(e.created_at).toISOString(),
+                e.person_id,
+                e.severity,
+                e.fall_score,
+                e.duration_down || 0,
+                `"${e.snapshot_url || ''}"`,
+                e.resolved ? "TRUE" : "FALSE",
+                `"${(e.notes || '').replace(/"/g, '""')}"`
+            ]);
+
+            const csvContent = [headers.join(","), ...rows.map(r => r.join(","))].join("\n");
+            const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = `fall_events_${Date.now()}.csv`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
+
         if (sbClient) {
             sbClient
                 .channel('realtime_fall_events')
@@ -773,7 +820,7 @@
                     const rec = payload.new;
                     activeFallEvent = rec;
                     document.getElementById('emergency-title').textContent = `🚨 ${rec.severity} FALL DETECTED!`;
-                    document.getElementById('emergency-desc').textContent = `Person #${rec.person_id} fell (Score: ${(rec.fall_score * 100).toFixed(0)}%).`;
+                    document.getElementById('emergency-desc').textContent = `Person #${rec.person_id} fell (Score: ${(Number(rec.fall_score) * 100).toFixed(0)}%). Telegram alert dispatched.`;
                     document.getElementById('emergency-banner').style.display = 'flex';
                     playEmergencyTone();
                     loadFallHistory();
@@ -807,16 +854,15 @@
         let poseModel = null;
         let webcamRunning = false;
 
-        // Temporal state machine & posture tracking state
+        // Fall debounce and counters
         let fallConfirmationCounter = 0;
-        const FALL_CONFIRMATION_FRAMES = 8;
+        const FALL_CONFIRMATION_FRAMES = 4; // Responsive ~150ms window
         let fallConfirmed = false;
-        let fallStartTime = null;
-        let lastLoggedMinute = null;
+        let lastFallTimestamp = 0;
+        const FALL_COOLDOWN_MS = 6000; // 6s cooldown between events
 
         let standingSec = 0;
         let sittingSec = 0;
-        let lastTimerTick = Date.now();
 
         setInterval(() => {
             if (!webcamRunning) return;
@@ -842,14 +888,47 @@
             return Math.acos(cosTheta) * (180 / Math.PI);
         }
 
-        async function triggerConfirmedFall(fallScore, severity) {
-            playEmergencyTone();
-            const now = new Date();
-            const minuteKey = now.toISOString().slice(0, 16);
-            if (lastLoggedMinute === minuteKey) return;
-            lastLoggedMinute = minuteKey;
+        // Direct Telegram dispatch fallback from client
+        async function sendDirectTelegramAlert(severity, score, snapshotUrl) {
+            const timeStr = new Date().toLocaleTimeString();
+            const text = `🚨 <b>EMERGENCY: FALL DETECTED!</b>\n━━━━━━━━━━━━━━━━━━━\n👤 <b>Person:</b> #1\n⚠️ <b>Severity:</b> ${severity}\n📊 <b>Confidence Score:</b> ${(score * 100).toFixed(0)}%\n🕒 <b>Time:</b> ${timeStr}\n🌐 <b>Source:</b> Live WebAI Vision Dashboard\n━━━━━━━━━━━━━━━━━━━\n<i>Immediate caregiver attention required!</i>`;
+            
+            try {
+                if (snapshotUrl) {
+                    await fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendPhoto`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            chat_id: TELEGRAM_CHAT_ID,
+                            photo: snapshotUrl,
+                            caption: text,
+                            parse_mode: 'HTML'
+                        })
+                    });
+                } else {
+                    await fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            chat_id: TELEGRAM_CHAT_ID,
+                            text: text,
+                            parse_mode: 'HTML'
+                        })
+                    });
+                }
+            } catch (err) {
+                console.log("Direct Telegram fallback notification:", err);
+            }
+        }
 
-            // Capture camera frame snapshot as JPEG
+        async function triggerConfirmedFall(fallScore, severity, customNotes = "In-Browser WebAI Live") {
+            const now = Date.now();
+            if (now - lastFallTimestamp < FALL_COOLDOWN_MS) return;
+            lastFallTimestamp = now;
+
+            playEmergencyTone();
+
+            // 1. Capture snapshot as JPEG
             const canvas = document.getElementById('webcam-canvas');
             let snapshotUrl = null;
 
@@ -857,7 +936,7 @@
                 try {
                     const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg', 0.85));
                     if (blob) {
-                        const filename = `browser_fall_${Date.now()}.jpg`;
+                        const filename = `web_fall_${Date.now()}.jpg`;
                         const { data: uploadData, error: uploadErr } = await sbClient.storage
                             .from('fall-snapshots')
                             .upload(filename, blob, { contentType: 'image/jpeg', upsert: true });
@@ -870,20 +949,54 @@
                         }
                     }
                 } catch (e) {
-                    console.log("Snapshot upload warning:", e);
+                    console.log("Snapshot upload info:", e);
                 }
             }
 
+            // 2. Insert incident into Supabase Database
             if (sbClient) {
-                await sbClient.from('fall_events').insert({
-                    person_id: 1,
-                    severity: severity,
-                    fall_score: roundNumber(fallScore, 2),
-                    duration_down: 2.0,
-                    snapshot_url: snapshotUrl,
-                    notes: 'Detected live by in-browser WebAI vision'
-                });
+                try {
+                    const { data: insertedData, error: insertError } = await sbClient
+                        .from('fall_events')
+                        .insert({
+                            person_id: 1,
+                            severity: severity,
+                            fall_score: roundNumber(fallScore, 2),
+                            duration_down: 2.0,
+                            snapshot_url: snapshotUrl,
+                            notes: customNotes
+                        })
+                        .select();
+
+                    if (!insertError && insertedData && insertedData[0]) {
+                        activeFallEvent = insertedData[0];
+                    }
+                } catch (e) {
+                    console.error("Database insert error:", e);
+                }
+
+                // 3. Trigger Supabase Edge Function notify-fall
+                try {
+                    fetch("https://qbzuwqanxnkpeuioiiao.supabase.co/functions/v1/notify-fall", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({
+                            person_id: 1,
+                            severity: severity,
+                            fall_score: roundNumber(fallScore, 2),
+                            duration_down: 2.0,
+                            snapshot_url: snapshotUrl,
+                            notes: customNotes
+                        })
+                    }).catch(() => {});
+                } catch (_) {}
             }
+
+            // 4. Guaranteed direct Telegram message
+            sendDirectTelegramAlert(severity, fallScore, snapshotUrl);
+
+            // 5. Update local table immediately
+            loadFallHistory();
         }
 
         function roundNumber(num, dec) {
@@ -1003,33 +1116,42 @@
             const boxH = Math.max(0.01, maxY - minY);
             const aspectRatio = boxW / boxH;
 
-            // ── 2. Weighted Fall Scoring Formula ──
+            // ── 2. Sensitive & Calibrated Biomechanical Scoring ──
             let fallProbability = 0.0;
-            if (torsoAngle > 45) {
-                fallProbability += 0.40 * Math.min(1.0, (torsoAngle - 45) / 35.0);
+            if (torsoAngle > 35) {
+                fallProbability += 0.45 * Math.min(1.0, (torsoAngle - 35) / 30.0);
             }
-            if (aspectRatio > 0.85) {
-                fallProbability += 0.35 * Math.min(1.0, (aspectRatio - 0.85) / 0.6);
+            if (aspectRatio > 0.75) {
+                fallProbability += 0.35 * Math.min(1.0, (aspectRatio - 0.75) / 0.50);
             }
-            if (midShY > 0.65) { // Torso lowered near floor
-                fallProbability += 0.25;
+            if (midShY > 0.48) {
+                fallProbability += 0.20 * Math.min(1.0, (midShY - 0.48) / 0.30);
             }
+
+            // Direct override: lying down flat
+            if (torsoAngle > 55 && aspectRatio > 0.85) {
+                fallProbability = Math.max(fallProbability, 0.78);
+            }
+            if (torsoAngle > 68) {
+                fallProbability = Math.max(fallProbability, 0.90);
+            }
+
             fallProbability = Math.min(1.0, Math.max(0.0, fallProbability));
 
             // ── 3. Posture Classification ──
             let posture = "Standing";
             let postureColor = "#38bdf8";
 
-            if (fallProbability >= 0.65 || (torsoAngle > 58 && aspectRatio > 0.95)) {
+            if (fallProbability >= 0.50 || (torsoAngle > 55 && aspectRatio > 0.85)) {
                 posture = "FALLEN";
                 postureColor = "#ef4444";
-            } else if (torsoAngle >= 55 && aspectRatio >= 0.85) {
+            } else if (torsoAngle >= 50 && aspectRatio >= 0.75) {
                 posture = "Lying Down";
                 postureColor = "#8b5cf6";
-            } else if (torsoAngle >= 35 && avgKneeAngle >= 135) {
+            } else if (torsoAngle >= 32 && avgKneeAngle >= 135) {
                 posture = "Bending";
                 postureColor = "#f59e0b";
-            } else if (avgKneeAngle < 135 && torsoAngle < 40) {
+            } else if (avgKneeAngle < 135 && torsoAngle < 38) {
                 posture = "Sitting";
                 postureColor = "#10b981";
             } else {
@@ -1038,15 +1160,15 @@
             }
 
             // ── 4. Temporal State Machine for Fall Confirmation ──
-            if (fallProbability >= 0.65) {
+            if (fallProbability >= 0.50) {
                 fallConfirmationCounter++;
                 if (fallConfirmationCounter >= FALL_CONFIRMATION_FRAMES && !fallConfirmed) {
                     fallConfirmed = true;
-                    const sev = fallProbability > 0.85 ? 'SEVERE' : (fallProbability > 0.72 ? 'MODERATE' : 'MILD');
+                    const sev = fallProbability > 0.82 ? 'SEVERE' : (fallProbability > 0.65 ? 'MODERATE' : 'MILD');
                     triggerConfirmedFall(fallProbability, sev);
                 }
             } else {
-                if (torsoAngle < 35 && avgKneeAngle > 140) { // Person stood back up
+                if (torsoAngle < 30 && avgKneeAngle > 140) { // Person stood back up
                     fallConfirmationCounter = 0;
                     fallConfirmed = false;
                 }
@@ -1056,7 +1178,7 @@
             document.getElementById('hud-posture').textContent = posture;
             document.getElementById('hud-posture').style.color = postureColor;
             document.getElementById('hud-fall-score').textContent = (fallProbability * 100).toFixed(0) + '%';
-            document.getElementById('hud-fall-score').style.color = fallProbability > 0.5 ? '#ef4444' : '#10b981';
+            document.getElementById('hud-fall-score').style.color = fallProbability > 0.4 ? '#ef4444' : '#10b981';
             document.getElementById('hud-torso-angle').textContent = torsoAngle.toFixed(0) + '°';
             document.getElementById('hud-knee-angle').textContent = avgKneeAngle.toFixed(0) + '°';
 
@@ -1068,17 +1190,16 @@
 
             const hudScore = document.getElementById('hud-overlay-score');
             hudScore.textContent = `FALL RISK: ${(fallProbability * 100).toFixed(0)}%`;
-            hudScore.style.color = fallProbability > 0.5 ? '#ef4444' : '#10b981';
+            hudScore.style.color = fallProbability > 0.4 ? '#ef4444' : '#10b981';
 
             // ── 6. Update Interactive 3D Viewport ──
-            update3DSkeleton(results.poseLandmarks, fallConfirmed || fallProbability >= 0.65);
+            update3DSkeleton(results.poseLandmarks, fallConfirmed || fallProbability >= 0.50);
 
             // ── 7. Draw 2D Augmented Skeleton on Camera Canvas ──
             ctx.save();
             ctx.lineWidth = 3;
-            ctx.strokeStyle = (fallConfirmed || fallProbability >= 0.65) ? '#ef4444' : '#06b6d4';
+            ctx.strokeStyle = (fallConfirmed || fallProbability >= 0.50) ? '#ef4444' : '#06b6d4';
             
-            // Transform 2D coordinates with horizontal mirroring
             function tx(x) { return (1.0 - x) * canvas.width; }
             function ty(y) { return y * canvas.height; }
 
@@ -1092,7 +1213,7 @@
                 }
             });
 
-            ctx.fillStyle = (fallConfirmed || fallProbability >= 0.65) ? '#f87171' : '#38bdf8';
+            ctx.fillStyle = (fallConfirmed || fallProbability >= 0.50) ? '#f87171' : '#38bdf8';
             lm.forEach((pt) => {
                 ctx.beginPath();
                 ctx.arc(tx(pt.x), ty(pt.y), 4, 0, 2 * Math.PI);
@@ -1102,16 +1223,7 @@
         }
 
         async function simulateFallTest() {
-            playEmergencyTone();
-            if (sbClient) {
-                await sbClient.from('fall_events').insert({
-                    person_id: 1,
-                    severity: 'SEVERE',
-                    fall_score: 0.94,
-                    duration_down: 2.5,
-                    notes: 'Simulated fall alert triggered from web dashboard'
-                });
-            }
+            triggerConfirmedFall(0.95, 'SEVERE', 'Test Fall from Website');
         }
 
         function openLightbox(url) {
