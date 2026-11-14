@@ -216,6 +216,8 @@
             align-items: center;
             justify-content: space-between;
             background: rgba(14, 18, 29, 0.5);
+            flex-wrap: wrap;
+            gap: 10px;
         }
 
         .card-title {
@@ -229,7 +231,34 @@
 
         .header-actions {
             display: flex;
-            gap: 8px;
+            gap: 6px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        .btn-preset {
+            background: rgba(15, 23, 42, 0.85);
+            border: 1px solid var(--border-dim);
+            color: var(--text-dim);
+            padding: 5px 12px;
+            border-radius: 6px;
+            font-size: 0.75rem;
+            font-family: 'JetBrains Mono', monospace;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+        }
+        .btn-preset:hover {
+            color: #fff;
+            border-color: var(--accent-cyan);
+        }
+        .btn-preset.active {
+            background: linear-gradient(135deg, rgba(14, 165, 233, 0.25), rgba(99, 102, 241, 0.25));
+            border-color: var(--accent-cyan);
+            color: #38bdf8;
+            font-weight: 600;
         }
 
         /* ── 3D Viewport ── */
@@ -247,22 +276,6 @@
             display: flex;
             gap: 6px;
             z-index: 10;
-        }
-
-        .btn-preset {
-            background: rgba(15, 23, 42, 0.85);
-            border: 1px solid var(--border-dim);
-            color: var(--text-dim);
-            padding: 5px 12px;
-            border-radius: 6px;
-            font-size: 0.75rem;
-            font-family: 'JetBrains Mono', monospace;
-            cursor: pointer;
-            transition: all 0.2s;
-        }
-        .btn-preset:hover {
-            color: #fff;
-            border-color: var(--accent-cyan);
         }
 
         /* ── Video Stream Box (Zero-Lag GPU Accelerated) ── */
@@ -284,7 +297,6 @@
             width: 100%;
             height: 100%;
             object-fit: contain;
-            transform: scaleX(-1);
             display: none;
         }
 
@@ -295,8 +307,8 @@
 
         .camera-placeholder {
             text-align: center;
-            padding: 32px;
-            max-width: 440px;
+            padding: 32px 24px;
+            max-width: 480px;
             z-index: 5;
         }
 
@@ -304,19 +316,87 @@
             background: linear-gradient(135deg, #0ea5e9, #6366f1);
             color: white;
             border: none;
-            padding: 12px 26px;
+            padding: 12px 24px;
             border-radius: 9px;
             font-weight: 700;
-            font-size: 1.0rem;
+            font-size: 0.95rem;
             cursor: pointer;
-            margin-top: 16px;
+            margin-top: 14px;
             box-shadow: 0 4px 18px rgba(14, 165, 233, 0.4);
             transition: all 0.2s ease;
             letter-spacing: 0.3px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            width: 100%;
         }
         .btn-primary:hover {
             transform: translateY(-2px);
             box-shadow: 0 8px 24px rgba(14, 165, 233, 0.6);
+        }
+
+        .btn-secondary {
+            background: rgba(255, 255, 255, 0.06);
+            color: #e2e8f0;
+            border: 1px solid var(--border-dim);
+            padding: 9px 16px;
+            border-radius: 8px;
+            font-weight: 600;
+            font-size: 0.82rem;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+        }
+        .btn-secondary:hover {
+            background: rgba(255, 255, 255, 0.12);
+            border-color: var(--accent-cyan);
+            color: #fff;
+        }
+
+        /* ── Video Overlay Control Bar ── */
+        .video-controls-bar {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: linear-gradient(0deg, rgba(6, 8, 14, 0.96) 0%, rgba(6, 8, 14, 0.75) 75%, transparent 100%);
+            padding: 12px 16px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            z-index: 15;
+            backdrop-filter: blur(8px);
+        }
+
+        .video-seek-bar {
+            flex: 1;
+            accent-color: var(--accent-cyan);
+            height: 5px;
+            cursor: pointer;
+        }
+
+        .btn-control {
+            background: rgba(255, 255, 255, 0.08);
+            border: 1px solid var(--border-dim);
+            color: #e2e8f0;
+            font-size: 0.75rem;
+            padding: 5px 10px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-family: 'JetBrains Mono', monospace;
+            transition: all 0.15s;
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+        }
+        .btn-control:hover {
+            background: rgba(255, 255, 255, 0.18);
+            border-color: var(--accent-cyan);
+            color: #fff;
         }
 
         /* ── HUD Badge Overlays ── */
@@ -439,7 +519,7 @@
         <div class="badge-cloud">
             <div class="chip" id="chip-status"><span class="dot-green"></span> Supabase Connected</div>
             <div class="chip">Telegram: <span style="color: #10b981;">CONNECTED</span></div>
-            <div class="chip">Camera: <span id="hud-fps" style="color: #38bdf8;">-- FPS</span></div>
+            <div class="chip">Throughput: <span id="hud-fps" style="color: #38bdf8;">-- FPS</span></div>
         </div>
     </header>
 
@@ -487,17 +567,31 @@
         <div class="card">
             <div class="card-header">
                 <div class="card-title">📹 AI Vision Stream (Zero Lag)</div>
-                <button class="btn-preset" id="btn-toggle-cam" onclick="toggleWebcam()">Start Camera</button>
+                <div class="header-actions">
+                    <button class="btn-preset active" id="tab-btn-stored" onclick="startStoredVideo()">▶ Demo Fall Video</button>
+                    <button class="btn-preset" id="tab-btn-webcam" onclick="startWebcam()">📷 Live Camera</button>
+                    <button class="btn-preset" id="tab-btn-upload" onclick="document.getElementById('video-file-input').click()">📁 Upload</button>
+                    <input type="file" id="video-file-input" accept="video/mp4,video/webm,video/ogg,video/avi" style="display: none;" onchange="handleFileUpload(event)">
+                </div>
             </div>
             <div class="camera-box">
                 <div class="camera-placeholder" id="camera-placeholder">
-                    <p style="color: var(--text-dim); font-size: 1.05rem; font-weight: 600;">Direct In-Browser AI Vision</p>
-                    <p style="color: var(--text-muted); font-size: 0.82rem; margin-top: 8px; line-height: 1.5;">
-                        Runs Google MediaPipe Pose, 3D kinematic extraction, posture classification, and fall detection directly inside your browser. No local terminal or Python server required!
+                    <p style="color: #f1f5f9; font-size: 1.15rem; font-weight: 700;">AI Vision & Kinematics Testing Lab</p>
+                    <p style="color: var(--text-muted); font-size: 0.84rem; margin-top: 8px; line-height: 1.5;">
+                        Test with the pre-recorded fall video dataset (<code style="color: #38bdf8;">output_fall_detected_weighted.mp4</code>), use your live camera, or upload a custom video file!
                     </p>
-                    <button class="btn-primary" onclick="toggleWebcam()">🚀 Start Live AI Monitoring</button>
-                    <div style="margin-top: 16px;">
-                        <button class="btn-preset" style="color: #f87171;" onclick="simulateFallTest()">Simulate Test Fall & Telegram Alert</button>
+                    
+                    <button class="btn-primary" onclick="startStoredVideo()">
+                        ▶ Run Stored Test Video (output_fall_detected_weighted.mp4)
+                    </button>
+
+                    <div style="display: flex; gap: 8px; justify-content: center; margin-top: 12px;">
+                        <button class="btn-secondary" onclick="startWebcam()">📷 Use Live Camera</button>
+                        <button class="btn-secondary" onclick="document.getElementById('video-file-input').click()">📁 Upload Custom Video</button>
+                    </div>
+
+                    <div style="margin-top: 14px;">
+                        <button class="btn-preset" style="color: #f87171;" onclick="simulateFallTest()">🚨 Test Siren & Telegram Alert</button>
                     </div>
                 </div>
 
@@ -506,6 +600,16 @@
 
                 <div class="hud-badge" id="hud-overlay-activity">STANDING</div>
                 <div class="hud-score-badge" id="hud-overlay-score">FALL RISK: 0%</div>
+
+                <!-- Video Controls Bar -->
+                <div class="video-controls-bar" id="video-controls-bar" style="display: none;">
+                    <button class="btn-control" id="btn-play-pause" onclick="togglePlayPause()">⏸ Pause</button>
+                    <button class="btn-control" onclick="restartVideo()">⏮ Restart</button>
+                    <input type="range" class="video-seek-bar" id="video-seek-bar" min="0" max="100" value="0" oninput="onSeekInput(event)" onchange="onSeekChange(event)">
+                    <span id="video-time-display" style="font-family: 'JetBrains Mono', monospace; font-size: 0.75rem; color: #94a3b8; min-width: 80px;">0:00 / 0:00</span>
+                    <button class="btn-control" id="btn-loop-toggle" onclick="toggleLoop()">🔁 Loop: ON</button>
+                    <button class="btn-control" style="color: #f87171;" onclick="stopCurrentSource()">⏹ Stop</button>
+                </div>
             </div>
         </div>
 
@@ -708,6 +812,8 @@
         loadDefaultStandingAvatar();
 
         // ── 2. Accurate Physical 3D Skeleton Positioning ──
+        let currentSourceType = 'none'; // 'none' | 'webcam' | 'stored' | 'upload'
+
         function update3DTargetPositions(wlm, lm, isFallen = false, isSitting = false) {
             if (!wlm || wlm.length === 0) return;
 
@@ -715,7 +821,6 @@
             const currentBoneMat = isFallen ? boneMatFall : (isSitting ? boneMatSit : boneMatNormal);
 
             // Anchor lowest foot point to ground level (Y = 0.05)
-            // MediaPipe World Landmarks: Y is down (+Y is ground, -Y is head), in meters
             const ankleY1 = wlm[27] ? wlm[27].y : 0.8;
             const ankleY2 = wlm[28] ? wlm[28].y : 0.8;
             const lowestY = Math.max(ankleY1, ankleY2, 0.4);
@@ -723,12 +828,9 @@
             for (let i = 0; i < JOINT_COUNT; i++) {
                 const pt = wlm[i];
                 if (pt) {
-                    // X is right (+), Three.js right is (+)
-                    const posX = -pt.x;
-                    // In world landmarks, pt.y = lowestY is foot level -> Y = 0.05
-                    // Shoulders / head (-pt.y) naturally rise to ~1.4 - 1.7m
+                    // Mirrored for webcam, un-mirrored for pre-recorded video
+                    const posX = (currentSourceType === 'webcam') ? -pt.x : pt.x;
                     const posY = -(pt.y - lowestY) + 0.05;
-                    // Forward depth towards camera is negative Z in MediaPipe -> positive Z in Three.js
                     const posZ = -pt.z;
 
                     targetPositions[i].set(posX, Math.max(0.02, posY), posZ);
@@ -903,10 +1005,10 @@
         // ── 5. Robust Biomechanical Calculation & Smooth Posture Tracking ──
         let cameraStream = null;
         let poseModel = null;
-        let webcamRunning = false;
         let isProcessingFrame = false;
+        let isLooping = true;
+        let isUserSeeking = false;
 
-        // Posture smoothing buffer (removes flickering between sitting & standing)
         const postureHistory = [];
         const POSTURE_BUFFER_SIZE = 7;
 
@@ -920,7 +1022,7 @@
         let sittingSec = 0;
 
         setInterval(() => {
-            if (!webcamRunning) return;
+            if (currentSourceType === 'none') return;
             const currentPosture = document.getElementById('hud-posture').textContent;
             if (currentPosture === 'Standing' || currentPosture === 'Walking') {
                 standingSec++;
@@ -945,7 +1047,8 @@
 
         async function sendDirectTelegramAlert(severity, score, snapshotUrl) {
             const timeStr = new Date().toLocaleTimeString();
-            const text = `🚨 <b>EMERGENCY: FALL DETECTED!</b>\n━━━━━━━━━━━━━━━━━━━\n👤 <b>Person:</b> #1\n⚠️ <b>Severity:</b> ${severity}\n📊 <b>Confidence Score:</b> ${(score * 100).toFixed(0)}%\n🕒 <b>Time:</b> ${timeStr}\n🌐 <b>Source:</b> Live WebAI Vision Dashboard\n━━━━━━━━━━━━━━━━━━━\n<i>Immediate caregiver attention required!</i>`;
+            const sourceDesc = (currentSourceType === 'stored') ? 'Demo Video (output_fall_detected_weighted.mp4)' : ((currentSourceType === 'webcam') ? 'Live Webcam' : 'Uploaded Video');
+            const text = `🚨 <b>EMERGENCY: FALL DETECTED!</b>\n━━━━━━━━━━━━━━━━━━━\n👤 <b>Person:</b> #1\n⚠️ <b>Severity:</b> ${severity}\n📊 <b>Confidence Score:</b> ${(score * 100).toFixed(0)}%\n🕒 <b>Time:</b> ${timeStr}\n🌐 <b>Source:</b> ${sourceDesc}\n━━━━━━━━━━━━━━━━━━━\n<i>Immediate caregiver attention required!</i>`;
             
             try {
                 if (snapshotUrl) {
@@ -982,16 +1085,16 @@
 
             playEmergencyTone();
 
-            // Capture frame from video directly onto an offscreen canvas for snapshot
+            // Capture frame from video directly onto offscreen canvas for snapshot
             let snapshotUrl = null;
             const video = document.getElementById('webcam-video');
             if (video && sbClient) {
                 try {
                     const snapCanvas = document.createElement('canvas');
-                    snapCanvas.width = 640;
-                    snapCanvas.height = 480;
+                    snapCanvas.width = video.videoWidth || 640;
+                    snapCanvas.height = video.videoHeight || 480;
                     const snapCtx = snapCanvas.getContext('2d');
-                    snapCtx.drawImage(video, 0, 0, 640, 480);
+                    snapCtx.drawImage(video, 0, 0, snapCanvas.width, snapCanvas.height);
 
                     const blob = await new Promise(resolve => snapCanvas.toBlob(resolve, 'image/jpeg', 0.85));
                     if (blob) {
@@ -1012,6 +1115,8 @@
                 }
             }
 
+            const notesText = (currentSourceType === 'stored') ? 'Stored Test Video (output_fall_detected_weighted.mp4)' : customNotes;
+
             // Insert into Supabase
             if (sbClient) {
                 try {
@@ -1023,7 +1128,7 @@
                             fall_score: roundNumber(fallScore, 2),
                             duration_down: 2.0,
                             snapshot_url: snapshotUrl,
-                            notes: customNotes
+                            notes: notesText
                         })
                         .select();
 
@@ -1045,7 +1150,7 @@
                             fall_score: roundNumber(fallScore, 2),
                             duration_down: 2.0,
                             snapshot_url: snapshotUrl,
-                            notes: customNotes
+                            notes: notesText
                         })
                     }).catch(() => {});
                 } catch (_) {}
@@ -1062,22 +1167,44 @@
             return Math.round(num * Math.pow(10, dec)) / Math.pow(10, dec);
         }
 
+        function formatTime(seconds) {
+            if (isNaN(seconds)) return "0:00";
+            const mins = Math.floor(seconds / 60);
+            const secs = Math.floor(seconds % 60);
+            return `${mins}:${secs < 10 ? '0' : ''}${secs}`;
+        }
+
         // ── 6. Zero-Lag Frame Processing Loop ──
         let fpsCounter = 0;
         let lastFpsUpdate = performance.now();
 
+        function initPoseModel() {
+            if (!poseModel) {
+                poseModel = new Pose({
+                    locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${file}`
+                });
+                poseModel.setOptions({
+                    modelComplexity: 1,
+                    smoothLandmarks: true,
+                    minDetectionConfidence: 0.45,
+                    minTrackingConfidence: 0.45
+                });
+                poseModel.onResults(onPoseResults);
+            }
+        }
+
         function processVideoFrame() {
-            if (!webcamRunning) return;
+            if (currentSourceType === 'none') return;
 
             const video = document.getElementById('webcam-video');
-            if (!isProcessingFrame && video.readyState >= 2 && video.videoWidth > 0) {
+            if (!isProcessingFrame && video.readyState >= 2 && video.videoWidth > 0 && !video.paused && !video.ended) {
                 isProcessingFrame = true;
                 poseModel.send({ image: video })
                     .catch(e => console.warn("Pose frame skipped:", e))
                     .finally(() => { isProcessingFrame = false; });
             }
 
-            // Calculate live camera FPS
+            // Calculate live throughput FPS
             fpsCounter++;
             const now = performance.now();
             if (now - lastFpsUpdate >= 1000) {
@@ -1089,32 +1216,113 @@
             requestAnimationFrame(processVideoFrame);
         }
 
-        async function toggleWebcam() {
+        // ── 7. Input Source Controllers (Stored Video / Webcam / Custom Upload) ──
+        function updateTabHighlight(activeTabId) {
+            ['tab-btn-stored', 'tab-btn-webcam', 'tab-btn-upload'].forEach(id => {
+                const el = document.getElementById(id);
+                if (el) {
+                    if (id === activeTabId) el.classList.add('active');
+                    else el.classList.remove('active');
+                }
+            });
+        }
+
+        function stopCurrentSource() {
+            if (cameraStream) {
+                cameraStream.getTracks().forEach(t => t.stop());
+                cameraStream = null;
+            }
             const video = document.getElementById('webcam-video');
             const canvas = document.getElementById('webcam-canvas');
             const placeholder = document.getElementById('camera-placeholder');
-            const btn = document.getElementById('btn-toggle-cam');
-            const hudBadge = document.getElementById('hud-overlay-activity');
-            const hudScore = document.getElementById('hud-overlay-score');
+            const controlsBar = document.getElementById('video-controls-bar');
 
-            if (webcamRunning) {
-                if (cameraStream) {
-                    cameraStream.getTracks().forEach(t => t.stop());
+            video.pause();
+            video.srcObject = null;
+            video.removeAttribute('src');
+
+            currentSourceType = 'none';
+            video.style.display = 'none';
+            canvas.style.display = 'none';
+            controlsBar.style.display = 'none';
+            document.getElementById('hud-overlay-activity').style.display = 'none';
+            document.getElementById('hud-overlay-score').style.display = 'none';
+            placeholder.style.display = 'block';
+
+            document.getElementById('hud-fps').textContent = '-- FPS';
+            loadDefaultStandingAvatar();
+            updateTabHighlight(null);
+        }
+
+        async function startStoredVideo() {
+            stopCurrentSource();
+            updateTabHighlight('tab-btn-stored');
+            currentSourceType = 'stored';
+
+            const video = document.getElementById('webcam-video');
+            const canvas = document.getElementById('webcam-canvas');
+            const placeholder = document.getElementById('camera-placeholder');
+            const controlsBar = document.getElementById('video-controls-bar');
+
+            // Un-mirrored view for pre-recorded test video
+            video.style.transform = 'scaleX(1)';
+            canvas.style.transform = 'scaleX(1)';
+
+            video.crossOrigin = "anonymous";
+            video.loop = isLooping;
+            video.muted = true;
+            video.playsInline = true;
+
+            // Primary relative URL, automatic fallback to Supabase CDN URL
+            const primaryUrl = "output_fall_detected_weighted.mp4";
+            const fallbackUrl = "https://qbzuwqanxnkpeuioiiao.supabase.co/storage/v1/object/public/fall-snapshots/demo_fall_video.mp4";
+
+            video.src = primaryUrl;
+            video.onerror = () => {
+                if (video.src !== fallbackUrl) {
+                    console.log("Local video path fallback to Supabase CDN:", fallbackUrl);
+                    video.src = fallbackUrl;
                 }
-                webcamRunning = false;
-                video.style.display = 'none';
-                canvas.style.display = 'none';
-                hudBadge.style.display = 'none';
-                hudScore.style.display = 'none';
-                placeholder.style.display = 'block';
-                btn.textContent = 'Start Camera';
-                document.getElementById('hud-fps').textContent = '-- FPS';
-                loadDefaultStandingAvatar();
-                return;
-            }
+            };
+
+            placeholder.style.display = 'none';
+            video.style.display = 'block';
+            canvas.style.display = 'block';
+            document.getElementById('hud-overlay-activity').style.display = 'block';
+            document.getElementById('hud-overlay-score').style.display = 'block';
+            controlsBar.style.display = 'flex';
+            document.getElementById('btn-play-pause').textContent = '⏸ Pause';
+
+            video.onloadeddata = async () => {
+                initPoseModel();
+                await video.play();
+                requestAnimationFrame(processVideoFrame);
+            };
+
+            video.ontimeupdate = () => {
+                if (!isUserSeeking && video.duration) {
+                    const pct = (video.currentTime / video.duration) * 100;
+                    document.getElementById('video-seek-bar').value = pct;
+                    document.getElementById('video-time-display').textContent = `${formatTime(video.currentTime)} / ${formatTime(video.duration)}`;
+                }
+            };
+        }
+
+        async function startWebcam() {
+            stopCurrentSource();
+            updateTabHighlight('tab-btn-webcam');
+            currentSourceType = 'webcam';
+
+            const video = document.getElementById('webcam-video');
+            const canvas = document.getElementById('webcam-canvas');
+            const placeholder = document.getElementById('camera-placeholder');
+            const controlsBar = document.getElementById('video-controls-bar');
+
+            // Mirrored view for webcam
+            video.style.transform = 'scaleX(-1)';
+            canvas.style.transform = 'scaleX(-1)';
 
             try {
-                btn.textContent = 'Starting...';
                 cameraStream = await navigator.mediaDevices.getUserMedia({
                     video: { width: { ideal: 640 }, height: { ideal: 480 }, frameRate: { ideal: 30 } }
                 });
@@ -1124,33 +1332,109 @@
                 placeholder.style.display = 'none';
                 video.style.display = 'block';
                 canvas.style.display = 'block';
-                hudBadge.style.display = 'block';
-                hudScore.style.display = 'block';
-                btn.textContent = 'Stop Camera';
-                webcamRunning = true;
+                document.getElementById('hud-overlay-activity').style.display = 'block';
+                document.getElementById('hud-overlay-score').style.display = 'block';
+                controlsBar.style.display = 'none'; // No scrubber needed for live webcam
 
-                if (!poseModel) {
-                    poseModel = new Pose({
-                        locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${file}`
-                    });
-                    poseModel.setOptions({
-                        modelComplexity: 1,
-                        smoothLandmarks: true,
-                        minDetectionConfidence: 0.5,
-                        minTrackingConfidence: 0.5
-                    });
-                    poseModel.onResults(onPoseResults);
-                }
-
-                // Launch non-blocking zero-lag frame pump
+                initPoseModel();
                 requestAnimationFrame(processVideoFrame);
             } catch (err) {
-                btn.textContent = 'Start Camera';
+                stopCurrentSource();
                 alert("Camera permission denied or camera unavailable: " + err.message);
             }
         }
 
-        // ── 7. Robust Biomechanical Classification & Sitting vs Standing Logic ──
+        function handleFileUpload(event) {
+            const file = event.target.files && event.target.files[0];
+            if (!file) return;
+
+            stopCurrentSource();
+            updateTabHighlight('tab-btn-upload');
+            currentSourceType = 'upload';
+
+            const video = document.getElementById('webcam-video');
+            const canvas = document.getElementById('webcam-canvas');
+            const placeholder = document.getElementById('camera-placeholder');
+            const controlsBar = document.getElementById('video-controls-bar');
+
+            video.style.transform = 'scaleX(1)';
+            canvas.style.transform = 'scaleX(1)';
+
+            const objectUrl = URL.createObjectURL(file);
+            video.src = objectUrl;
+            video.loop = isLooping;
+            video.muted = true;
+            video.playsInline = true;
+
+            placeholder.style.display = 'none';
+            video.style.display = 'block';
+            canvas.style.display = 'block';
+            document.getElementById('hud-overlay-activity').style.display = 'block';
+            document.getElementById('hud-overlay-score').style.display = 'block';
+            controlsBar.style.display = 'flex';
+            document.getElementById('btn-play-pause').textContent = '⏸ Pause';
+
+            video.onloadeddata = async () => {
+                initPoseModel();
+                await video.play();
+                requestAnimationFrame(processVideoFrame);
+            };
+
+            video.ontimeupdate = () => {
+                if (!isUserSeeking && video.duration) {
+                    const pct = (video.currentTime / video.duration) * 100;
+                    document.getElementById('video-seek-bar').value = pct;
+                    document.getElementById('video-time-display').textContent = `${formatTime(video.currentTime)} / ${formatTime(video.duration)}`;
+                }
+            };
+        }
+
+        // ── Video Playback Controls ──
+        function togglePlayPause() {
+            const video = document.getElementById('webcam-video');
+            const btn = document.getElementById('btn-play-pause');
+            if (video.paused) {
+                video.play();
+                btn.textContent = '⏸ Pause';
+            } else {
+                video.pause();
+                btn.textContent = '▶ Play';
+            }
+        }
+
+        function restartVideo() {
+            const video = document.getElementById('webcam-video');
+            video.currentTime = 0;
+            video.play();
+            document.getElementById('btn-play-pause').textContent = '⏸ Pause';
+        }
+
+        function onSeekInput(e) {
+            isUserSeeking = true;
+            const video = document.getElementById('webcam-video');
+            if (video.duration) {
+                const targetTime = (e.target.value / 100) * video.duration;
+                document.getElementById('video-time-display').textContent = `${formatTime(targetTime)} / ${formatTime(video.duration)}`;
+            }
+        }
+
+        function onSeekChange(e) {
+            const video = document.getElementById('webcam-video');
+            if (video.duration) {
+                video.currentTime = (e.target.value / 100) * video.duration;
+            }
+            isUserSeeking = false;
+        }
+
+        function toggleLoop() {
+            const video = document.getElementById('webcam-video');
+            const btn = document.getElementById('btn-loop-toggle');
+            isLooping = !isLooping;
+            video.loop = isLooping;
+            btn.textContent = isLooping ? '🔁 Loop: ON' : '➡ Loop: OFF';
+        }
+
+        // ── 8. Robust Biomechanical Classification & Sitting vs Standing Logic ──
         function onPoseResults(results) {
             const canvas = document.getElementById('webcam-canvas');
             const video = document.getElementById('webcam-video');
@@ -1167,7 +1451,7 @@
             const lm = results.poseLandmarks;
             const wlm = results.poseWorldLandmarks || lm;
 
-            // ── Key Joints (2D & 3D) ──
+            // Key Joints (2D & 3D)
             const lSh = lm[11], rSh = lm[12];
             const lHip = lm[23], rHip = lm[24];
             const lKnee = lm[25], rKnee = lm[26];
@@ -1184,8 +1468,6 @@
             const torsoAngle = Math.abs(Math.atan2(dx, dy) * (180 / Math.PI));
 
             // 2. 3D World Hip Flexion (Shoulder -> Hip -> Knee in meters)
-            // In standing: Spine goes up, thigh goes down -> angle is 165°–180°
-            // In sitting: Spine goes up, thigh goes forward -> angle is 80°–125°
             const wlSh = { x: (wlm[11].x + wlm[12].x)/2, y: (wlm[11].y + wlm[12].y)/2, z: (wlm[11].z + wlm[12].z)/2 };
             const wlHip = { x: (wlm[23].x + wlm[24].x)/2, y: (wlm[23].y + wlm[24].y)/2, z: (wlm[23].z + wlm[24].z)/2 };
             const wlKnee = { x: (wlm[25].x + wlm[26].x)/2, y: (wlm[25].y + wlm[26].y)/2, z: (wlm[25].z + wlm[26].z)/2 };
@@ -1252,20 +1534,13 @@
                 rawPosture = "Lying Down";
                 postureColor = "#8b5cf6";
             } else if (torsoAngle >= 32 && hipFlex3D < 140 && kneeAngle3D >= 140) {
-                // Torso leaning forward at waist with straight legs
                 rawPosture = "Bending";
                 postureColor = "#f59e0b";
             } else if (
-                // Sitting Criteria:
-                // 1. 3D Hip flexion is flexed (< 135°) with upright torso
                 (hipFlex3D < 135 && torsoAngle < 35) ||
-                // 2. 3D Knee angle is bent (< 135°) with upright torso
                 (kneeAngle3D < 135 && torsoAngle < 35) ||
-                // 3. 2D Thigh is foreshortened (horizontal) relative to torso
                 (thighToTorsoRatio < 0.52 && torsoAngle < 35) ||
-                // 4. Knees projected forward towards camera in 3D world space
                 (kneeForwardDepth > 0.14 && torsoAngle < 35) ||
-                // 5. Desk seated with lower legs occluded
                 isDeskSeated
             ) {
                 rawPosture = "Sitting";
@@ -1275,7 +1550,7 @@
                 postureColor = "#38bdf8";
             }
 
-            // ── Posture Smoothing (Temporal Majority Vote) ──
+            // Temporal Majority Vote
             postureHistory.push(rawPosture);
             if (postureHistory.length > POSTURE_BUFFER_SIZE) postureHistory.shift();
 
@@ -1296,7 +1571,7 @@
             else if (smoothedPosture === 'Bending') postureColor = '#f59e0b';
             else if (smoothedPosture === 'Lying Down') postureColor = '#8b5cf6';
 
-            // ── Fall State Machine ──
+            // Fall State Machine
             if (fallProbability >= 0.50) {
                 fallConfirmationCounter++;
                 if (fallConfirmationCounter >= FALL_CONFIRMATION_FRAMES && !fallConfirmed) {
@@ -1311,7 +1586,7 @@
                 }
             }
 
-            // ── Update HUD Analytics Ribbon ──
+            // Update Analytics Ribbon
             document.getElementById('hud-posture').textContent = smoothedPosture;
             document.getElementById('hud-posture').style.color = postureColor;
             document.getElementById('hud-fall-score').textContent = (fallProbability * 100).toFixed(0) + '%';
@@ -1319,7 +1594,7 @@
             document.getElementById('hud-torso-angle').textContent = torsoAngle.toFixed(0) + '°';
             document.getElementById('hud-joint-angle').textContent = `${hipFlex3D.toFixed(0)}° / ${kneeAngle3D.toFixed(0)}°`;
 
-            // HUD Overlays on Camera Box
+            // Overlays on Camera Box
             const hudBadge = document.getElementById('hud-overlay-activity');
             hudBadge.textContent = `${smoothedPosture.toUpperCase()}`;
             hudBadge.style.color = postureColor;
@@ -1329,10 +1604,10 @@
             hudScore.textContent = `FALL RISK: ${(fallProbability * 100).toFixed(0)}%`;
             hudScore.style.color = fallProbability > 0.4 ? '#ef4444' : '#10b981';
 
-            // ── Update 3D Metric Skeleton Viewport Targets ──
+            // Update 3D Metric Skeleton Viewport Targets
             update3DTargetPositions(wlm, lm, fallConfirmed || fallProbability >= 0.50, smoothedPosture === 'Sitting');
 
-            // ── Draw 2D Overlay on Camera Canvas (GPU Mirrored with Video) ──
+            // Draw 2D Overlay on Camera Canvas
             ctx.save();
             ctx.lineWidth = 3;
             ctx.strokeStyle = (fallConfirmed || fallProbability >= 0.50) ? '#ef4444' : (smoothedPosture === 'Sitting' ? '#10b981' : '#06b6d4');
