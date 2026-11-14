@@ -1,0 +1,760 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Fall Detection & Biomechanical 3D Kinematics — Cloud Dashboard</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Outfit:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+    <!-- Three.js & OrbitControls -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+
+    <!-- Supabase JS Client -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+    <!-- MediaPipe Pose for In-Browser Webcam Mode -->
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose/pose.js" crossorigin="anonymous"></script>
+
+    <style>
+        :root {
+            --bg-base: #07090e;
+            --bg-surface: #0e121d;
+            --bg-elevated: #151a29;
+            --bg-card: rgba(21, 26, 41, 0.75);
+            --border-dim: #1e2638;
+            --border-glow: #2f3b57;
+            --text-main: #f8fafc;
+            --text-dim: #94a3b8;
+            --text-muted: #64748b;
+            --status-normal: #10b981;
+            --status-warning: #f59e0b;
+            --status-fall: #ef4444;
+            --accent-cyan: #06b6d4;
+            --accent-indigo: #6366f1;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            background-color: var(--bg-base);
+            color: var(--text-main);
+            font-family: 'Outfit', -apple-system, BlinkMacSystemFont, sans-serif;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        header {
+            background: linear-gradient(180deg, #121626 0%, #0a0d18 100%);
+            border-bottom: 1px solid var(--border-dim);
+            padding: 12px 28px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        .brand-container {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+        }
+
+        .brand-icon {
+            width: 38px;
+            height: 38px;
+            background: linear-gradient(135deg, #0ea5e9, #6366f1);
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 0 18px rgba(99, 102, 241, 0.45);
+        }
+
+        .brand-text h1 {
+            font-size: 1.05rem;
+            font-weight: 700;
+            color: #ffffff;
+        }
+
+        .brand-text p {
+            font-size: 0.75rem;
+            color: var(--text-dim);
+        }
+
+        .badge-cloud {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+        }
+
+        .chip {
+            font-size: 0.72rem;
+            padding: 4px 10px;
+            border-radius: 999px;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid var(--border-dim);
+            color: var(--text-dim);
+            font-family: 'JetBrains Mono', monospace;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .dot-green {
+            width: 7px;
+            height: 7px;
+            border-radius: 50%;
+            background: var(--status-normal);
+            box-shadow: 0 0 8px var(--status-normal);
+        }
+
+        /* ── Emergency Banner ── */
+        #emergency-banner {
+            display: none;
+            background: linear-gradient(90deg, rgba(239, 68, 68, 0.95), rgba(185, 28, 28, 0.95));
+            color: white;
+            padding: 14px 28px;
+            align-items: center;
+            justify-content: space-between;
+            box-shadow: 0 4px 20px rgba(239, 68, 68, 0.5);
+            animation: pulse-red 1.5s infinite;
+        }
+
+        @keyframes pulse-red {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.85; }
+        }
+
+        .btn-resolve {
+            background: white;
+            color: #b91c1c;
+            border: none;
+            padding: 6px 16px;
+            border-radius: 6px;
+            font-weight: 700;
+            font-size: 0.85rem;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+        .btn-resolve:hover { background: #f1f5f9; transform: scale(1.03); }
+
+        /* ── Dashboard Grid ── */
+        .dashboard-container {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            padding: 24px;
+            max-width: 1600px;
+            margin: 0 auto;
+            width: 100%;
+            flex: 1;
+        }
+
+        @media (max-width: 1080px) {
+            .dashboard-container { grid-template-columns: 1fr; }
+        }
+
+        .card {
+            background: var(--bg-card);
+            border: 1px solid var(--border-dim);
+            border-radius: 14px;
+            overflow: hidden;
+            backdrop-filter: blur(12px);
+            display: flex;
+            flex-direction: column;
+        }
+
+        .card-header {
+            padding: 14px 20px;
+            border-bottom: 1px solid var(--border-dim);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            background: rgba(14, 18, 29, 0.5);
+        }
+
+        .card-title {
+            font-size: 0.92rem;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            color: #e2e8f0;
+        }
+
+        /* ── 3D Viewport ── */
+        #viewport-3d {
+            width: 100%;
+            height: 480px;
+            background: radial-gradient(circle at center, #111522 0%, #07090e 100%);
+            position: relative;
+        }
+
+        .viewport-overlay {
+            position: absolute;
+            top: 12px;
+            left: 12px;
+            display: flex;
+            gap: 6px;
+            z-index: 10;
+        }
+
+        .btn-preset {
+            background: rgba(15, 23, 42, 0.85);
+            border: 1px solid var(--border-dim);
+            color: var(--text-dim);
+            padding: 5px 10px;
+            border-radius: 6px;
+            font-size: 0.75rem;
+            font-family: 'JetBrains Mono', monospace;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .btn-preset:hover {
+            color: #fff;
+            border-color: var(--accent-cyan);
+        }
+
+        /* ── In-Browser Camera & Controls ── */
+        .camera-box {
+            position: relative;
+            width: 100%;
+            height: 480px;
+            background: #000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+        }
+
+        #webcam-video {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            transform: scaleX(-1);
+            display: none;
+        }
+
+        #webcam-canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            transform: scaleX(-1);
+            pointer-events: none;
+        }
+
+        .camera-placeholder {
+            text-align: center;
+            padding: 24px;
+            max-width: 400px;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #0ea5e9, #6366f1);
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 8px;
+            font-weight: 600;
+            font-size: 0.9rem;
+            cursor: pointer;
+            margin-top: 14px;
+            box-shadow: 0 4px 14px rgba(14, 165, 233, 0.35);
+            transition: all 0.2s ease;
+        }
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(14, 165, 233, 0.5);
+        }
+
+        /* ── Event Table ── */
+        .table-container {
+            max-height: 280px;
+            overflow-y: auto;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.82rem;
+            text-align: left;
+        }
+
+        th {
+            background: rgba(14, 18, 29, 0.8);
+            padding: 10px 16px;
+            color: var(--text-dim);
+            font-weight: 600;
+            position: sticky;
+            top: 0;
+            border-bottom: 1px solid var(--border-dim);
+        }
+
+        td {
+            padding: 10px 16px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+            color: #cbd5e1;
+        }
+
+        .badge-severity {
+            display: inline-block;
+            padding: 3px 8px;
+            border-radius: 4px;
+            font-weight: 700;
+            font-size: 0.72rem;
+            font-family: 'JetBrains Mono', monospace;
+        }
+        .sev-MILD { background: rgba(245, 158, 11, 0.15); color: #f59e0b; border: 1px solid rgba(245, 158, 11, 0.3); }
+        .sev-MODERATE { background: rgba(249, 115, 22, 0.18); color: #f97316; border: 1px solid rgba(249, 115, 22, 0.35); }
+        .sev-SEVERE { background: rgba(239, 68, 68, 0.2); color: #ef4444; border: 1px solid rgba(239, 68, 68, 0.4); }
+
+        .snapshot-thumb {
+            width: 48px;
+            height: 32px;
+            object-fit: cover;
+            border-radius: 4px;
+            border: 1px solid var(--border-dim);
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+        .snapshot-thumb:hover { transform: scale(1.15); border-color: var(--accent-cyan); }
+
+        /* ── Lightbox Modal ── */
+        #lightbox {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0, 0, 0, 0.85);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+        }
+        #lightbox img {
+            max-width: 90%;
+            max-height: 85%;
+            border-radius: 10px;
+            box-shadow: 0 0 30px rgba(0, 0, 0, 0.8);
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Header Navigation -->
+    <header>
+        <div class="brand-container">
+            <div class="brand-icon">
+                <svg viewBox="0 0 24 24" fill="white"><path d="M12 2a3 3 0 100 6 3 3 0 000-6zm3 8H9a3 3 0 00-3 3v4h2v5h3v-5h2v5h3v-5h2v-4a3 3 0 00-3-3z"/></svg>
+            </div>
+            <div class="brand-text">
+                <h1>AI Fall Detection & 3D Kinematics</h1>
+                <p>Cloud Assisted Living Platform • Vercel & Supabase</p>
+            </div>
+        </div>
+        <div class="badge-cloud">
+            <div class="chip" id="chip-status"><span class="dot-green"></span> Supabase Connected</div>
+            <div class="chip">Edge: <span id="camera-status" style="color: #10b981;">ONLINE</span></div>
+        </div>
+    </header>
+
+    <!-- Emergency Fall Alert Banner -->
+    <div id="emergency-banner">
+        <div>
+            <strong id="emergency-title">🚨 FALL DETECTED!</strong>
+            <span id="emergency-desc" style="margin-left: 12px; font-size: 0.9rem;">Person #1 confirmed fall. Action required.</span>
+        </div>
+        <button class="btn-resolve" onclick="resolveCurrentFall()">Acknowledge & Resolve</button>
+    </div>
+
+    <!-- Main Grid -->
+    <div class="dashboard-container">
+        
+        <!-- Left Column: Camera Feed & Testing Mode -->
+        <div class="card">
+            <div class="card-header">
+                <div class="card-title">📹 Video Vision Stream (Live & In-Browser)</div>
+                <button class="btn-preset" id="btn-toggle-cam" onclick="toggleWebcam()">Start Browser Camera</button>
+            </div>
+            <div class="camera-box">
+                <div class="camera-placeholder" id="camera-placeholder">
+                    <p style="color: var(--text-dim); font-size: 0.9rem;">Edge camera telemetry active via Supabase Realtime.</p>
+                    <p style="color: var(--text-muted); font-size: 0.78rem; margin-top: 6px;">You can also test directly in your browser using your webcam:</p>
+                    <button class="btn-primary" onclick="toggleWebcam()">Launch Browser Webcam</button>
+                    <div style="margin-top: 14px;">
+                        <button class="btn-preset" onclick="simulateFallTest()">Simulate Test Fall Alert</button>
+                    </div>
+                </div>
+                <video id="webcam-video" playsinline></video>
+                <canvas id="webcam-canvas"></canvas>
+            </div>
+        </div>
+
+        <!-- Right Column: Interactive 3D Skeleton Viewport -->
+        <div class="card">
+            <div class="card-header">
+                <div class="card-title">🌐 Interactive 3D Metric Skeleton Viewport</div>
+                <span class="chip" id="3d-status">Three.js WebGL</span>
+            </div>
+            <div id="viewport-3d">
+                <div class="viewport-overlay">
+                    <button class="btn-preset" onclick="setCameraPreset('front')">Front (F)</button>
+                    <button class="btn-preset" onclick="setCameraPreset('side')">Side (S)</button>
+                    <button class="btn-preset" onclick="setCameraPreset('top')">Top (T)</button>
+                    <button class="btn-preset" onclick="setCameraPreset('iso')">Isometric (R)</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Bottom Full-Width: Recent Fall Incidents & Cloud Logs -->
+        <div class="card" style="grid-column: 1 / -1;">
+            <div class="card-header">
+                <div class="card-title">📋 Incident History & Snapshot Ledger (Supabase Cloud)</div>
+                <button class="btn-preset" onclick="loadFallHistory()">Refresh</button>
+            </div>
+            <div class="table-container">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Time (UTC)</th>
+                            <th>Person ID</th>
+                            <th>Severity</th>
+                            <th>Confidence</th>
+                            <th>Duration</th>
+                            <th>Snapshot</th>
+                            <th>Status</th>
+                            <th>Action</th>
+                        </tr>
+                    </thead>
+                    <tbody id="incident-tbody">
+                        <tr><td colspan="8" style="text-align: center; color: var(--text-muted);">Loading incidents from Supabase...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- Lightbox for Snapshot Photos -->
+    <div id="lightbox" onclick="closeLightbox()">
+        <img id="lightbox-img" src="" alt="Incident Snapshot">
+    </div>
+
+    <script>
+        // ── 1. Supabase Initialization ──
+        const SUPABASE_URL = "https://qbzuwqanxnkpeuioiiao.supabase.co";
+        const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFienV3cWFueG5rcGV1aW9paWFvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTQ2MjYxMzMsImV4cCI6MjExMDIwMjEzM30.cC9AZlgWMe3doYp2DtxjYRUGdDVn5L7YmTHpiKjRP0Q";
+        const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+        let activeFallEvent = null;
+
+        // ── 2. Three.js 3D Viewport Setup ──
+        const container = document.getElementById('viewport-3d');
+        const scene = new THREE.Scene();
+        scene.fog = new THREE.FogExp2(0x07090e, 0.15);
+
+        const camera = new THREE.PerspectiveCamera(50, container.clientWidth / container.clientHeight, 0.1, 100);
+        camera.position.set(0, 1.3, 2.8);
+
+        const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+        renderer.setSize(container.clientWidth, container.clientHeight);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        container.appendChild(renderer.domElement);
+
+        const controls = new THREE.OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true;
+        controls.dampingFactor = 0.05;
+        controls.target.set(0, 0.8, 0);
+
+        // Lighting & Ground Plane
+        scene.add(new THREE.AmbientLight(0xffffff, 0.8));
+        const dirLight = new THREE.DirectionalLight(0xffffff, 0.6);
+        dirLight.position.set(2, 4, 3);
+        scene.add(dirLight);
+
+        const gridHelper = new THREE.GridHelper(3.5, 14, 0x06b6d4, 0x1e2638);
+        gridHelper.position.y = 0;
+        scene.add(gridHelper);
+
+        // Skeleton Joints & Bones
+        const JOINT_COUNT = 33;
+        const joints = [];
+        const jointGeo = new THREE.SphereGeometry(0.024, 16, 16);
+        const jointMatNormal = new THREE.MeshStandardMaterial({ color: 0x06b6d4, roughness: 0.3 });
+        const jointMatFall = new THREE.MeshStandardMaterial({ color: 0xef4444, emissive: 0x991b1b, roughness: 0.2 });
+
+        for (let i = 0; i < JOINT_COUNT; i++) {
+            const m = new THREE.Mesh(jointGeo, jointMatNormal);
+            m.visible = false;
+            scene.add(m);
+            joints.push(m);
+        }
+
+        const BONE_CONNECTIONS = [
+            [11, 12], [11, 13], [13, 15], [12, 14], [14, 16], // Upper body
+            [11, 23], [12, 24], [23, 24],                     // Torso
+            [23, 25], [25, 27], [24, 26], [26, 28]            // Lower body
+        ];
+        const boneLines = [];
+        const boneMatNormal = new THREE.LineBasicMaterial({ color: 0x38bdf8, linewidth: 2 });
+        const boneMatFall = new THREE.LineBasicMaterial({ color: 0xef4444, linewidth: 3 });
+
+        for (const _ of BONE_CONNECTIONS) {
+            const geo = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(), new THREE.Vector3()]);
+            const line = new THREE.Line(geo, boneMatNormal);
+            line.visible = false;
+            scene.add(line);
+            boneLines.push(line);
+        }
+
+        // View Presets
+        function setCameraPreset(view) {
+            if (view === 'front') { camera.position.set(0, 1.0, 2.8); controls.target.set(0, 0.8, 0); }
+            else if (view === 'side') { camera.position.set(2.8, 1.0, 0); controls.target.set(0, 0.8, 0); }
+            else if (view === 'top') { camera.position.set(0, 3.2, 0.01); controls.target.set(0, 0.8, 0); }
+            else if (view === 'iso') { camera.position.set(1.8, 1.6, 2.2); controls.target.set(0, 0.8, 0); }
+            controls.update();
+        }
+
+        window.addEventListener('resize', () => {
+            camera.aspect = container.clientWidth / container.clientHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(container.clientWidth, container.clientHeight);
+        });
+
+        function animate() {
+            requestAnimationFrame(animate);
+            controls.update();
+            renderer.render(scene, camera);
+        }
+        animate();
+
+        // ── 3. Update 3D Skeleton from Landmarks ──
+        function update3DSkeleton(landmarks, isFallen = false) {
+            if (!landmarks || landmarks.length === 0) return;
+            const currentJointMat = isFallen ? jointMatFall : jointMatNormal;
+            const currentBoneMat = isFallen ? boneMatFall : boneMatNormal;
+
+            landmarks.forEach((pt, idx) => {
+                if (idx < JOINT_COUNT) {
+                    joints[idx].position.set(pt.x, -pt.y + 1.2, -pt.z);
+                    joints[idx].material = currentJointMat;
+                    joints[idx].visible = true;
+                }
+            });
+
+            BONE_CONNECTIONS.forEach(([a, b], idx) => {
+                if (landmarks[a] && landmarks[b]) {
+                    const pA = joints[a].position;
+                    const pB = joints[b].position;
+                    boneLines[idx].geometry.setFromPoints([pA, pB]);
+                    boneLines[idx].material = currentBoneMat;
+                    boneLines[idx].visible = true;
+                }
+            });
+        }
+
+        // ── 4. Supabase Realtime & Table Feeds ──
+        async function loadFallHistory() {
+            const { data, error } = await supabase
+                .from('fall_events')
+                .select('*')
+                .order('created_at', { ascending: false })
+                .limit(20);
+
+            if (error) {
+                console.error("Error loading falls:", error);
+                return;
+            }
+
+            const tbody = document.getElementById('incident-tbody');
+            if (!data || data.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="8" style="text-align: center; color: var(--text-muted);">No fall incidents recorded yet. System secure.</td></tr>';
+                return;
+            }
+
+            tbody.innerHTML = data.map(row => {
+                const snapshotHtml = row.snapshot_url 
+                    ? `<img class="snapshot-thumb" src="${row.snapshot_url}" onclick="openLightbox('${row.snapshot_url}')" title="Click to inspect snapshot">`
+                    : '<span style="color: var(--text-muted);">None</span>';
+                
+                const statusBadge = row.resolved 
+                    ? '<span style="color: #10b981; font-weight: 600;">✓ Resolved</span>' 
+                    : '<span style="color: #ef4444; font-weight: 700;">⚠ ACTIVE</span>';
+
+                const actionHtml = row.resolved 
+                    ? '-' 
+                    : `<button class="btn-preset" style="color: #38bdf8;" onclick="resolveFall('${row.id}')">Resolve</button>`;
+
+                return `<tr>
+                    <td>${new Date(row.created_at).toLocaleTimeString()}</td>
+                    <td>#${row.person_id}</td>
+                    <td><span class="badge-severity sev-${row.severity}">${row.severity}</span></td>
+                    <td>${(row.fall_score * 100).toFixed(0)}%</td>
+                    <td>${row.duration_down ? row.duration_down + 's' : '0s'}</td>
+                    <td>${snapshotHtml}</td>
+                    <td>${statusBadge}</td>
+                    <td>${actionHtml}</td>
+                </tr>`;
+            }).join('');
+        }
+
+        async function resolveFall(id) {
+            const { error } = await supabase
+                .from('fall_events')
+                .update({ resolved: true, resolved_at: new Date().toISOString() })
+                .eq('id', id);
+
+            if (!error) {
+                if (activeFallEvent && activeFallEvent.id === id) {
+                    document.getElementById('emergency-banner').style.display = 'none';
+                    activeFallEvent = null;
+                }
+                loadFallHistory();
+            }
+        }
+
+        function resolveCurrentFall() {
+            if (activeFallEvent) {
+                resolveFall(activeFallEvent.id);
+            }
+        }
+
+        // Subscribe to Realtime Inserts & Updates
+        supabase
+            .channel('realtime_fall_events')
+            .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'fall_events' }, payload => {
+                const rec = payload.new;
+                activeFallEvent = rec;
+                document.getElementById('emergency-title').textContent = `🚨 ${rec.severity} FALL DETECTED!`;
+                document.getElementById('emergency-desc').textContent = `Person #${rec.person_id} fell (Score: ${(rec.fall_score * 100).toFixed(0)}%).`;
+                document.getElementById('emergency-banner').style.display = 'flex';
+                playEmergencyTone();
+                loadFallHistory();
+            })
+            .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'fall_events' }, () => {
+                loadFallHistory();
+            })
+            .subscribe();
+
+        // ── 5. Audio Synthesizer (Escalating Emergency Tone) ──
+        function playEmergencyTone() {
+            try {
+                const ctx = new (window.AudioContext || window.webkitAudioContext)();
+                const osc = ctx.createOscillator();
+                const gain = ctx.createGain();
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(880, ctx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(440, ctx.currentTime + 0.35);
+                gain.gain.setValueAtTime(0.3, ctx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.35);
+                osc.connect(gain);
+                gain.connect(ctx.destination);
+                osc.start();
+                osc.stop(ctx.currentTime + 0.35);
+            } catch (_) {}
+        }
+
+        // ── 6. In-Browser Webcam Mode (MediaPipe) ──
+        let cameraStream = null;
+        let poseModel = null;
+        let webcamRunning = false;
+
+        async function toggleWebcam() {
+            const video = document.getElementById('webcam-video');
+            const canvas = document.getElementById('webcam-canvas');
+            const placeholder = document.getElementById('camera-placeholder');
+            const btn = document.getElementById('btn-toggle-cam');
+
+            if (webcamRunning) {
+                if (cameraStream) {
+                    cameraStream.getTracks().forEach(t => t.stop());
+                }
+                webcamRunning = false;
+                video.style.display = 'none';
+                canvas.style.display = 'none';
+                placeholder.style.display = 'block';
+                btn.textContent = 'Start Browser Camera';
+                return;
+            }
+
+            try {
+                cameraStream = await navigator.mediaDevices.getUserMedia({ video: { width: 640, height: 480 } });
+                video.srcObject = cameraStream;
+                await video.play();
+
+                placeholder.style.display = 'none';
+                video.style.display = 'block';
+                canvas.style.display = 'block';
+                btn.textContent = 'Stop Browser Camera';
+                webcamRunning = true;
+
+                if (!poseModel) {
+                    poseModel = new Pose({
+                        locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${file}`
+                    });
+                    poseModel.setOptions({
+                        modelComplexity: 1,
+                        smoothLandmarks: true,
+                        minDetectionConfidence: 0.5,
+                        minTrackingConfidence: 0.5
+                    });
+                    poseModel.onResults(onPoseResults);
+                }
+
+                async function step() {
+                    if (webcamRunning && video.readyState >= 2) {
+                        await poseModel.send({ image: video });
+                        requestAnimationFrame(step);
+                    }
+                }
+                step();
+            } catch (err) {
+                alert("Camera permission denied or camera unavailable: " + err.message);
+            }
+        }
+
+        function onPoseResults(results) {
+            const canvas = document.getElementById('webcam-canvas');
+            const ctx = canvas.getContext('2d');
+            canvas.width = results.image.width;
+            canvas.height = results.image.height;
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            if (results.poseLandmarks) {
+                update3DSkeleton(results.poseLandmarks, false);
+            }
+        }
+
+        async function simulateFallTest() {
+            playEmergencyTone();
+            await supabase.from('fall_events').insert({
+                person_id: 1,
+                severity: 'SEVERE',
+                fall_score: 0.94,
+                duration_down: 2.5,
+                notes: 'Test fall triggered from Vercel web dashboard'
+            });
+        }
+
+        function openLightbox(url) {
+            document.getElementById('lightbox-img').src = url;
+            document.getElementById('lightbox').style.display = 'flex';
+        }
+        function closeLightbox() {
+            document.getElementById('lightbox').style.display = 'none';
+        }
+
+        // Initialize table on page load
+        loadFallHistory();
+    </script>
+</body>
+</html>

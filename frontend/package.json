@@ -1,0 +1,11 @@
+{
+  "name": "ai-fall-detection-dashboard",
+  "version": "1.0.0",
+  "description": "Real-time AI Fall Detection and Biomechanical 3D Monitoring Dashboard hosted on Vercel with Supabase",
+  "scripts": {
+    "start": "npx serve ."
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.48.1"
+  }
+}

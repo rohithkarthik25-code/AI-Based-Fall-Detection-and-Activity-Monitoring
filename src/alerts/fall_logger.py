@@ -11,12 +11,28 @@ from datetime import datetime
 
 import cv2
 
+try:
+    from src.alerts.supabase_dispatcher import SupabaseDispatcher
+except ImportError:
+    SupabaseDispatcher = None
+
 
 class FallLogger:
-    def __init__(self, log_file: str = "fall_events.csv", screenshot_dir: str = "fall_logs") -> None:
+    def __init__(
+        self,
+        log_file: str = "fall_events.csv",
+        screenshot_dir: str = "fall_logs",
+        enable_supabase: bool = True
+    ) -> None:
         self.log_file = log_file
         self.screenshot_dir = screenshot_dir
         os.makedirs(self.screenshot_dir, exist_ok=True)
+        self.supabase_dispatcher = None
+        if enable_supabase and SupabaseDispatcher is not None:
+            try:
+                self.supabase_dispatcher = SupabaseDispatcher()
+            except Exception as e:
+                print(f"[FallLogger] Supabase dispatcher init warning: {e}")
 
         if not os.path.exists(self.log_file):
             with open(self.log_file, "w", newline="", encoding="utf-8") as f:
@@ -64,3 +80,15 @@ class FallLogger:
         if score is not None:
             msg += f" | score={score:.2f}"
         print(msg)
+
+        if self.supabase_dispatcher is not None:
+            try:
+                self.supabase_dispatcher.dispatch_fall(
+                    person_id=person_id,
+                    severity=severity,
+                    fall_score=0.0 if score is None else float(score),
+                    duration_down=float(duration),
+                    frame=frame
+                )
+            except Exception as e:
+                print(f"[FallLogger] Supabase dispatch error: {e}")
