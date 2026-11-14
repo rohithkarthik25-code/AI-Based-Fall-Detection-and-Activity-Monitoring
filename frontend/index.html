@@ -12,10 +12,10 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
 
-    <!-- Supabase JS Client (UMD bundle defines window.supabase) -->
+    <!-- Supabase JS Client -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
-    <!-- MediaPipe Pose for In-Browser Webcam Mode -->
+    <!-- Google MediaPipe Pose for In-Browser AI Vision -->
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose/pose.js" crossorigin="anonymous"></script>
 
@@ -145,12 +145,47 @@
         }
         .btn-resolve:hover { background: #f1f5f9; transform: scale(1.03); }
 
+        /* ── Analytics Bar ── */
+        .analytics-bar {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 14px;
+            padding: 16px 24px 0 24px;
+            max-width: 1600px;
+            margin: 0 auto;
+            width: 100%;
+        }
+
+        .stat-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border-dim);
+            border-radius: 10px;
+            padding: 12px 16px;
+            backdrop-filter: blur(10px);
+        }
+
+        .stat-label {
+            font-size: 0.74rem;
+            color: var(--text-dim);
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .stat-val {
+            font-size: 1.35rem;
+            font-weight: 700;
+            color: #ffffff;
+            margin-top: 4px;
+            font-family: 'JetBrains Mono', monospace;
+        }
+
         /* ── Dashboard Grid ── */
         .dashboard-container {
             display: grid;
             grid-template-columns: 1fr 1fr;
             gap: 20px;
-            padding: 24px;
+            padding: 20px 24px;
             max-width: 1600px;
             margin: 0 auto;
             width: 100%;
@@ -187,28 +222,6 @@
             align-items: center;
             gap: 8px;
             color: #e2e8f0;
-        }
-
-        .mode-tabs {
-            display: flex;
-            gap: 6px;
-        }
-
-        .mode-tab-btn {
-            background: rgba(255, 255, 255, 0.05);
-            border: 1px solid var(--border-dim);
-            color: var(--text-dim);
-            padding: 4px 10px;
-            border-radius: 6px;
-            font-size: 0.72rem;
-            cursor: pointer;
-            transition: all 0.2s;
-        }
-        .mode-tab-btn.active {
-            background: rgba(14, 165, 233, 0.2);
-            border-color: var(--accent-cyan);
-            color: #38bdf8;
-            font-weight: 600;
         }
 
         /* ── 3D Viewport ── */
@@ -270,21 +283,13 @@
             left: 0;
             width: 100%;
             height: 100%;
-            transform: scaleX(-1);
             pointer-events: none;
-            display: none;
-        }
-
-        #edge-mjpeg-img {
-            width: 100%;
-            height: 100%;
-            object-fit: contain;
             display: none;
         }
 
         .camera-placeholder {
             text-align: center;
-            padding: 24px;
+            padding: 32px;
             max-width: 440px;
         }
 
@@ -292,18 +297,50 @@
             background: linear-gradient(135deg, #0ea5e9, #6366f1);
             color: white;
             border: none;
-            padding: 10px 22px;
-            border-radius: 8px;
-            font-weight: 600;
-            font-size: 0.92rem;
+            padding: 12px 26px;
+            border-radius: 9px;
+            font-weight: 700;
+            font-size: 1.0rem;
             cursor: pointer;
-            margin-top: 14px;
-            box-shadow: 0 4px 14px rgba(14, 165, 233, 0.35);
+            margin-top: 16px;
+            box-shadow: 0 4px 18px rgba(14, 165, 233, 0.4);
             transition: all 0.2s ease;
+            letter-spacing: 0.3px;
         }
         .btn-primary:hover {
             transform: translateY(-2px);
-            box-shadow: 0 6px 20px rgba(14, 165, 233, 0.5);
+            box-shadow: 0 8px 24px rgba(14, 165, 233, 0.6);
+        }
+
+        /* ── HUD Badge Overlays ── */
+        .hud-badge {
+            position: absolute;
+            top: 14px;
+            left: 14px;
+            background: rgba(15, 23, 42, 0.85);
+            border: 1px solid var(--border-glow);
+            padding: 6px 12px;
+            border-radius: 6px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.82rem;
+            color: #38bdf8;
+            display: none;
+            z-index: 10;
+        }
+
+        .hud-score-badge {
+            position: absolute;
+            top: 14px;
+            right: 14px;
+            background: rgba(15, 23, 42, 0.85);
+            border: 1px solid var(--border-glow);
+            padding: 6px 12px;
+            border-radius: 6px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.82rem;
+            color: #f1f5f9;
+            display: none;
+            z-index: 10;
         }
 
         /* ── Event Table ── */
@@ -392,7 +429,7 @@
         </div>
         <div class="badge-cloud">
             <div class="chip" id="chip-status"><span class="dot-green"></span> Supabase Connected</div>
-            <div class="chip">Edge: <span id="camera-status" style="color: #10b981;">ONLINE</span></div>
+            <div class="chip">AI Engine: <span id="camera-status" style="color: #10b981;">READY</span></div>
         </div>
     </header>
 
@@ -400,9 +437,37 @@
     <div id="emergency-banner">
         <div>
             <strong id="emergency-title">🚨 FALL DETECTED!</strong>
-            <span id="emergency-desc" style="margin-left: 12px; font-size: 0.9rem;">Person confirmed fall. Action required.</span>
+            <span id="emergency-desc" style="margin-left: 12px; font-size: 0.9rem;">Person confirmed fall. Emergency alert triggered.</span>
         </div>
         <button class="btn-resolve" onclick="resolveCurrentFall()">Acknowledge & Resolve</button>
+    </div>
+
+    <!-- Real-Time Activity Analytics Ribbon -->
+    <div class="analytics-bar">
+        <div class="stat-card">
+            <div class="stat-label">Current Posture</div>
+            <div class="stat-val" id="hud-posture" style="color: #38bdf8;">Standing</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-label">Fall Probability</div>
+            <div class="stat-val" id="hud-fall-score">0%</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-label">Torso Angle</div>
+            <div class="stat-val" id="hud-torso-angle">0°</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-label">Avg Knee Angle</div>
+            <div class="stat-val" id="hud-knee-angle">175°</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-label">Standing Time</div>
+            <div class="stat-val" id="hud-stand-time">0s</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-label">Sitting Time</div>
+            <div class="stat-val" id="hud-sit-time">0s</div>
+        </div>
     </div>
 
     <!-- Main Grid -->
@@ -411,37 +476,26 @@
         <!-- Left Column: Video Vision Stream -->
         <div class="card">
             <div class="card-header">
-                <div class="card-title">📹 Video Vision Stream</div>
-                <div class="mode-tabs">
-                    <button class="mode-tab-btn active" id="tab-webcam" onclick="switchMode('webcam')">Browser Camera</button>
-                    <button class="mode-tab-btn" id="tab-edge" onclick="switchMode('edge')">Edge Stream</button>
-                </div>
+                <div class="card-title">📹 AI Video Stream & Biomechanical Overlay</div>
+                <button class="btn-preset" id="btn-toggle-cam" onclick="toggleWebcam()">Start Camera</button>
             </div>
             <div class="camera-box">
-                <!-- Browser Webcam Placeholder -->
                 <div class="camera-placeholder" id="camera-placeholder">
-                    <p style="color: var(--text-dim); font-size: 0.92rem; font-weight: 500;">In-Browser Live AI Pose Estimation</p>
-                    <p style="color: var(--text-muted); font-size: 0.78rem; margin-top: 6px;">Runs Google MediaPipe Pose directly in your browser. Click below to start:</p>
-                    <button class="btn-primary" id="btn-toggle-cam" onclick="toggleWebcam()">Launch Browser Webcam</button>
-                    <div style="margin-top: 14px;">
+                    <p style="color: var(--text-dim); font-size: 1.05rem; font-weight: 600;">Direct In-Browser AI Vision</p>
+                    <p style="color: var(--text-muted); font-size: 0.82rem; margin-top: 8px; line-height: 1.5;">
+                        Runs Google MediaPipe Pose, 3D kinematic extraction, posture classification, and fall detection directly inside your browser. No local terminal or Python server required!
+                    </p>
+                    <button class="btn-primary" onclick="toggleWebcam()">🚀 Start Live AI Monitoring</button>
+                    <div style="margin-top: 16px;">
                         <button class="btn-preset" onclick="simulateFallTest()">Simulate Test Fall Alert</button>
-                    </div>
-                </div>
-
-                <!-- Edge Camera Placeholder -->
-                <div class="camera-placeholder" id="edge-placeholder" style="display: none;">
-                    <p style="color: var(--text-dim); font-size: 0.92rem; font-weight: 500;">Local Python Edge Video Server</p>
-                    <p style="color: var(--text-muted); font-size: 0.78rem; margin-top: 6px;">Connects to <code>http://localhost:8000</code> or your CCTV stream URL:</p>
-                    <input type="text" id="edge-url-input" value="http://localhost:8000/video_feed" style="margin-top: 10px; width: 85%; padding: 6px 12px; border-radius: 6px; background: #07090e; border: 1px solid var(--border-dim); color: #fff; font-family: 'JetBrains Mono', monospace; font-size: 0.8rem; text-align: center;">
-                    <div style="margin-top: 12px; display: flex; gap: 8px; justify-content: center;">
-                        <button class="btn-preset" style="color: #38bdf8;" onclick="connectEdgeStream()">Connect Stream</button>
-                        <button class="btn-preset" onclick="window.open('http://localhost:8000', '_blank')">Open Localhost</button>
                     </div>
                 </div>
 
                 <video id="webcam-video" playsinline></video>
                 <canvas id="webcam-canvas"></canvas>
-                <img id="edge-mjpeg-img" alt="Edge Camera Stream">
+
+                <div class="hud-badge" id="hud-overlay-activity">STANDING (98%)</div>
+                <div class="hud-score-badge" id="hud-overlay-score">FALL RISK: 0%</div>
             </div>
         </div>
 
@@ -464,7 +518,7 @@
         <!-- Bottom Full-Width: Recent Fall Incidents & Cloud Logs -->
         <div class="card" style="grid-column: 1 / -1;">
             <div class="card-header">
-                <div class="card-title">📋 Incident History & Snapshot Ledger (Supabase Cloud)</div>
+                <div class="card-title">📋 Cloud Incident History & Snapshot Ledger (Supabase)</div>
                 <button class="btn-preset" onclick="loadFallHistory()">Refresh</button>
             </div>
             <div class="table-container">
@@ -520,7 +574,7 @@
         dirLight.position.set(2, 4, 3);
         scene.add(dirLight);
 
-        // Bright grid helper
+        // Bright reference ground grid
         const gridHelper = new THREE.GridHelper(4.0, 16, 0x06b6d4, 0x253048);
         gridHelper.position.y = 0;
         scene.add(gridHelper);
@@ -534,7 +588,7 @@
 
         for (let i = 0; i < JOINT_COUNT; i++) {
             const m = new THREE.Mesh(jointGeo, jointMatNormal);
-            m.visible = true; // visible by default
+            m.visible = true;
             scene.add(m);
             joints.push(m);
         }
@@ -556,10 +610,9 @@
             boneLines.push(line);
         }
 
-        // Standing neutral avatar landmarks on load
         function loadDefaultStandingAvatar() {
             const defaultLandmarks = [
-                {x: 0, y: 0.2, z: 0}, // Nose
+                {x: 0, y: 0.2, z: 0},
                 {x: 0, y: 0.2, z: 0}, {x: 0, y: 0.2, z: 0}, {x: 0, y: 0.2, z: 0}, {x: 0, y: 0.2, z: 0},
                 {x: 0, y: 0.2, z: 0}, {x: 0, y: 0.2, z: 0}, {x: 0, y: 0.2, z: 0}, {x: 0, y: 0.2, z: 0},
                 {x: 0, y: 0.2, z: 0}, {x: 0, y: 0.2, z: 0},
@@ -580,7 +633,6 @@
             update3DSkeleton(defaultLandmarks, false);
         }
 
-        // View Presets
         function setCameraPreset(view) {
             if (view === 'front') { camera.position.set(0, 1.0, 2.8); controls.target.set(0, 0.8, 0); }
             else if (view === 'side') { camera.position.set(2.8, 1.0, 0); controls.target.set(0, 0.8, 0); }
@@ -603,7 +655,6 @@
         animate();
         loadDefaultStandingAvatar();
 
-        // ── 2. Update 3D Skeleton ──
         function update3DSkeleton(landmarks, isFallen = false) {
             if (!landmarks || landmarks.length === 0) return;
             const currentJointMat = isFallen ? jointMatFall : jointMatNormal;
@@ -628,21 +679,20 @@
             });
         }
 
-        // ── 3. Supabase Client Initialization (Safe Name) ──
+        // ── 2. Supabase Client Setup ──
         const SUPABASE_URL = "https://qbzuwqanxnkpeuioiiao.supabase.co";
         const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFienV3cWFueG5rcGV1aW9paWFvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTQ2MjYxMzMsImV4cCI6MjExMDIwMjEzM30.cC9AZlgWMe3doYp2DtxjYRUGdDVn5L7YmTHpiKjRP0Q";
         
         let sbClient = null;
         try {
             sbClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-            console.log("Supabase client successfully initialized.");
-        } catch (err) {
-            console.error("Failed to initialize Supabase client:", err);
+            console.log("Supabase client initialized successfully.");
+        } catch (e) {
+            console.error("Supabase init error:", e);
         }
 
         let activeFallEvent = null;
 
-        // ── 4. Supabase Incident History & Realtime ──
         async function loadFallHistory() {
             if (!sbClient) return;
             try {
@@ -659,13 +709,13 @@
                 }
 
                 if (!data || data.length === 0) {
-                    tbody.innerHTML = '<tr><td colspan="8" style="text-align: center; color: var(--text-muted);">No fall incidents recorded yet. System normal.</td></tr>';
+                    tbody.innerHTML = '<tr><td colspan="8" style="text-align: center; color: var(--text-muted);">No fall incidents recorded yet. System secure.</td></tr>';
                     return;
                 }
 
                 tbody.innerHTML = data.map(row => {
                     const snapshotHtml = row.snapshot_url 
-                        ? `<img class="snapshot-thumb" src="${row.snapshot_url}" onclick="openLightbox('${row.snapshot_url}')" title="Click to view snapshot">`
+                        ? `<img class="snapshot-thumb" src="${row.snapshot_url}" onclick="openLightbox('${row.snapshot_url}')" title="Click to inspect snapshot">`
                         : '<span style="color: var(--text-muted);">None</span>';
                     
                     const statusBadge = row.resolved 
@@ -723,7 +773,7 @@
                     const rec = payload.new;
                     activeFallEvent = rec;
                     document.getElementById('emergency-title').textContent = `🚨 ${rec.severity} FALL DETECTED!`;
-                    document.getElementById('emergency-desc').textContent = `Person #${rec.person_id} confirmed fall (Score: ${(rec.fall_score * 100).toFixed(0)}%).`;
+                    document.getElementById('emergency-desc').textContent = `Person #${rec.person_id} fell (Score: ${(rec.fall_score * 100).toFixed(0)}%).`;
                     document.getElementById('emergency-banner').style.display = 'flex';
                     playEmergencyTone();
                     loadFallHistory();
@@ -734,7 +784,7 @@
                 .subscribe();
         }
 
-        // ── 5. Audio Synthesizer (Escalating Emergency Tone) ──
+        // ── 3. Audio Synthesizer ──
         function playEmergencyTone() {
             try {
                 const ctx = new (window.AudioContext || window.webkitAudioContext)();
@@ -752,60 +802,92 @@
             } catch (_) {}
         }
 
-        // ── 6. Stream Modes & In-Browser Camera ──
-        let currentMode = 'webcam';
+        // ── 4. Full In-Browser Biomechanical & Fall Detection Engine ──
         let cameraStream = null;
         let poseModel = null;
         let webcamRunning = false;
 
-        function switchMode(mode) {
-            currentMode = mode;
-            document.getElementById('tab-webcam').classList.toggle('active', mode === 'webcam');
-            document.getElementById('tab-edge').classList.toggle('active', mode === 'edge');
+        // Temporal state machine & posture tracking state
+        let fallConfirmationCounter = 0;
+        const FALL_CONFIRMATION_FRAMES = 8;
+        let fallConfirmed = false;
+        let fallStartTime = null;
+        let lastLoggedMinute = null;
 
-            if (mode === 'webcam') {
-                document.getElementById('edge-placeholder').style.display = 'none';
-                document.getElementById('edge-mjpeg-img').style.display = 'none';
-                if (!webcamRunning) {
-                    document.getElementById('camera-placeholder').style.display = 'block';
-                } else {
-                    document.getElementById('webcam-video').style.display = 'block';
-                    document.getElementById('webcam-canvas').style.display = 'block';
+        let standingSec = 0;
+        let sittingSec = 0;
+        let lastTimerTick = Date.now();
+
+        setInterval(() => {
+            if (!webcamRunning) return;
+            const currentPosture = document.getElementById('hud-posture').textContent;
+            if (currentPosture === 'Standing' || currentPosture === 'Walking') {
+                standingSec++;
+                document.getElementById('hud-stand-time').textContent = standingSec + 's';
+            } else if (currentPosture === 'Sitting') {
+                sittingSec++;
+                document.getElementById('hud-sit-time').textContent = sittingSec + 's';
+            }
+        }, 1000);
+
+        function compute3DAngle(pA, pB, pC) {
+            if (!pA || !pB || !pC) return 180;
+            const v1 = [pA.x - pB.x, pA.y - pB.y, (pA.z || 0) - (pB.z || 0)];
+            const v2 = [pC.x - pB.x, pC.y - pB.y, (pC.z || 0) - (pC.z || 0)];
+            const mag1 = Math.hypot(...v1);
+            const mag2 = Math.hypot(...v2);
+            if (mag1 < 1e-6 || mag2 < 1e-6) return 180;
+            const dot = v1[0]*v2[0] + v1[1]*v2[1] + v1[2]*v2[2];
+            const cosTheta = Math.max(-1.0, Math.min(1.0, dot / (mag1 * mag2)));
+            return Math.acos(cosTheta) * (180 / Math.PI);
+        }
+
+        async function triggerConfirmedFall(fallScore, severity) {
+            playEmergencyTone();
+            const now = new Date();
+            const minuteKey = now.toISOString().slice(0, 16);
+            if (lastLoggedMinute === minuteKey) return;
+            lastLoggedMinute = minuteKey;
+
+            // Capture camera frame snapshot as JPEG
+            const canvas = document.getElementById('webcam-canvas');
+            let snapshotUrl = null;
+
+            if (canvas && sbClient) {
+                try {
+                    const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg', 0.85));
+                    if (blob) {
+                        const filename = `browser_fall_${Date.now()}.jpg`;
+                        const { data: uploadData, error: uploadErr } = await sbClient.storage
+                            .from('fall-snapshots')
+                            .upload(filename, blob, { contentType: 'image/jpeg', upsert: true });
+
+                        if (!uploadErr) {
+                            const { data: publicUrlData } = sbClient.storage
+                                .from('fall-snapshots')
+                                .getPublicUrl(filename);
+                            snapshotUrl = publicUrlData?.publicUrl || null;
+                        }
+                    }
+                } catch (e) {
+                    console.log("Snapshot upload warning:", e);
                 }
-            } else {
-                if (webcamRunning) toggleWebcam();
-                document.getElementById('camera-placeholder').style.display = 'none';
-                document.getElementById('webcam-video').style.display = 'none';
-                document.getElementById('webcam-canvas').style.display = 'none';
-                document.getElementById('edge-placeholder').style.display = 'block';
+            }
+
+            if (sbClient) {
+                await sbClient.from('fall_events').insert({
+                    person_id: 1,
+                    severity: severity,
+                    fall_score: roundNumber(fallScore, 2),
+                    duration_down: 2.0,
+                    snapshot_url: snapshotUrl,
+                    notes: 'Detected live by in-browser WebAI vision'
+                });
             }
         }
 
-        function connectEdgeStream() {
-            const url = document.getElementById('edge-url-input').value.trim();
-            const img = document.getElementById('edge-mjpeg-img');
-            const placeholder = document.getElementById('edge-placeholder');
-
-            img.src = url;
-            placeholder.style.display = 'none';
-            img.style.display = 'block';
-
-            // Connect WebSocket for skeleton landmarks if available
-            try {
-                const wsUrl = url.replace('http://', 'ws://').replace('/video_feed', '/ws/skeleton');
-                const ws = new WebSocket(wsUrl);
-                ws.onmessage = (event) => {
-                    const data = JSON.parse(event.data);
-                    if (data.persons && data.persons.length > 0) {
-                        const p = data.persons[0];
-                        if (p.landmarks_3d) {
-                            update3DSkeleton(p.landmarks_3d, p.fall_detected);
-                        }
-                    }
-                };
-            } catch (e) {
-                console.log("Edge WebSocket info:", e);
-            }
+        function roundNumber(num, dec) {
+            return Math.round(num * Math.pow(10, dec)) / Math.pow(10, dec);
         }
 
         async function toggleWebcam() {
@@ -813,6 +895,8 @@
             const canvas = document.getElementById('webcam-canvas');
             const placeholder = document.getElementById('camera-placeholder');
             const btn = document.getElementById('btn-toggle-cam');
+            const hudBadge = document.getElementById('hud-overlay-activity');
+            const hudScore = document.getElementById('hud-overlay-score');
 
             if (webcamRunning) {
                 if (cameraStream) {
@@ -821,14 +905,17 @@
                 webcamRunning = false;
                 video.style.display = 'none';
                 canvas.style.display = 'none';
+                hudBadge.style.display = 'none';
+                hudScore.style.display = 'none';
                 placeholder.style.display = 'block';
-                btn.textContent = 'Launch Browser Webcam';
+                btn.textContent = 'Start Camera';
+                document.getElementById('camera-status').textContent = 'STANDBY';
                 loadDefaultStandingAvatar();
                 return;
             }
 
             try {
-                btn.textContent = 'Starting camera...';
+                btn.textContent = 'Starting...';
                 cameraStream = await navigator.mediaDevices.getUserMedia({ video: { width: 640, height: 480 } });
                 video.srcObject = cameraStream;
                 await video.play();
@@ -836,8 +923,11 @@
                 placeholder.style.display = 'none';
                 video.style.display = 'block';
                 canvas.style.display = 'block';
-                btn.textContent = 'Stop Browser Camera';
+                hudBadge.style.display = 'block';
+                hudScore.style.display = 'block';
+                btn.textContent = 'Stop Camera';
                 webcamRunning = true;
+                document.getElementById('camera-status').textContent = 'LIVE MONITORING';
 
                 if (!poseModel) {
                     poseModel = new Pose({
@@ -860,65 +950,155 @@
                 }
                 step();
             } catch (err) {
-                btn.textContent = 'Launch Browser Webcam';
+                btn.textContent = 'Start Camera';
                 alert("Camera permission denied or camera unavailable: " + err.message);
             }
         }
 
         function onPoseResults(results) {
             const canvas = document.getElementById('webcam-canvas');
+            const video = document.getElementById('webcam-video');
             const ctx = canvas.getContext('2d');
-            canvas.width = results.image.width;
-            canvas.height = results.image.height;
+            canvas.width = video.videoWidth || 640;
+            canvas.height = video.videoHeight || 480;
             ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-            if (results.poseLandmarks) {
-                // Biomechanical calculation for fall detection:
-                // Check torso inclination angle
-                const leftShoulder = results.poseLandmarks[11];
-                const rightShoulder = results.poseLandmarks[12];
-                const leftHip = results.poseLandmarks[23];
-                const rightHip = results.poseLandmarks[24];
+            // Draw mirroring camera frame onto canvas
+            ctx.save();
+            ctx.scale(-1, 1);
+            ctx.drawImage(video, -canvas.width, 0, canvas.width, canvas.height);
+            ctx.restore();
 
-                let isFallen = false;
-                if (leftShoulder && rightShoulder && leftHip && rightHip) {
-                    const midShoulderY = (leftShoulder.y + rightShoulder.y) / 2;
-                    const midHipY = (leftHip.y + rightHip.y) / 2;
-                    const midShoulderX = (leftShoulder.x + rightShoulder.x) / 2;
-                    const midHipX = (leftHip.x + rightHip.x) / 2;
+            if (!results.poseLandmarks) return;
 
-                    const dy = midHipY - midShoulderY;
-                    const dx = midHipX - midShoulderX;
-                    const torsoAngle = Math.abs(Math.atan2(dx, dy) * (180 / Math.PI));
+            const lm = results.poseLandmarks;
 
-                    if (torsoAngle > 55) {
-                        isFallen = true;
-                    }
-                }
+            // ── 1. Calculate Biomechanical Signals ──
+            const lSh = lm[11], rSh = lm[12];
+            const lHip = lm[23], rHip = lm[24];
+            const lKnee = lm[25], rKnee = lm[26];
+            const lAnk = lm[27], rAnk = lm[28];
 
-                update3DSkeleton(results.poseLandmarks, isFallen);
+            const midShX = (lSh.x + rSh.x) / 2;
+            const midShY = (lSh.y + rSh.y) / 2;
+            const midHipX = (lHip.x + rHip.x) / 2;
+            const midHipY = (lHip.y + rHip.y) / 2;
 
-                // Draw overlay skeleton on 2D camera feed
-                ctx.lineWidth = 3;
-                ctx.strokeStyle = isFallen ? '#ef4444' : '#06b6d4';
-                BONE_CONNECTIONS.forEach(([a, b]) => {
-                    const pA = results.poseLandmarks[a];
-                    const pB = results.poseLandmarks[b];
-                    if (pA && pB) {
-                        ctx.beginPath();
-                        ctx.moveTo(pA.x * canvas.width, pA.y * canvas.height);
-                        ctx.lineTo(pB.x * canvas.width, pB.y * canvas.height);
-                        ctx.stroke();
-                    }
-                });
+            // Torso Inclination Angle (degrees from vertical)
+            const dy = midHipY - midShY;
+            const dx = midHipX - midShX;
+            const torsoAngle = Math.abs(Math.atan2(dx, dy) * (180 / Math.PI));
 
-                ctx.fillStyle = isFallen ? '#f87171' : '#38bdf8';
-                results.poseLandmarks.forEach((pt) => {
-                    ctx.beginPath();
-                    ctx.arc(pt.x * canvas.width, pt.y * canvas.height, 4, 0, 2 * Math.PI);
-                    ctx.fill();
-                });
+            // Knee Angles
+            const lKneeAngle = compute3DAngle(lHip, lKnee, lAnk);
+            const rKneeAngle = compute3DAngle(rHip, rKnee, rAnk);
+            const avgKneeAngle = (lKneeAngle + rKneeAngle) / 2;
+
+            // Aspect ratio of bounding box
+            const xs = lm.map(p => p.x);
+            const ys = lm.map(p => p.y);
+            const minX = Math.min(...xs), maxX = Math.max(...xs);
+            const minY = Math.min(...ys), maxY = Math.max(...ys);
+            const boxW = Math.max(0.01, maxX - minX);
+            const boxH = Math.max(0.01, maxY - minY);
+            const aspectRatio = boxW / boxH;
+
+            // ── 2. Weighted Fall Scoring Formula ──
+            let fallProbability = 0.0;
+            if (torsoAngle > 45) {
+                fallProbability += 0.40 * Math.min(1.0, (torsoAngle - 45) / 35.0);
             }
+            if (aspectRatio > 0.85) {
+                fallProbability += 0.35 * Math.min(1.0, (aspectRatio - 0.85) / 0.6);
+            }
+            if (midShY > 0.65) { // Torso lowered near floor
+                fallProbability += 0.25;
+            }
+            fallProbability = Math.min(1.0, Math.max(0.0, fallProbability));
+
+            // ── 3. Posture Classification ──
+            let posture = "Standing";
+            let postureColor = "#38bdf8";
+
+            if (fallProbability >= 0.65 || (torsoAngle > 58 && aspectRatio > 0.95)) {
+                posture = "FALLEN";
+                postureColor = "#ef4444";
+            } else if (torsoAngle >= 55 && aspectRatio >= 0.85) {
+                posture = "Lying Down";
+                postureColor = "#8b5cf6";
+            } else if (torsoAngle >= 35 && avgKneeAngle >= 135) {
+                posture = "Bending";
+                postureColor = "#f59e0b";
+            } else if (avgKneeAngle < 135 && torsoAngle < 40) {
+                posture = "Sitting";
+                postureColor = "#10b981";
+            } else {
+                posture = "Standing";
+                postureColor = "#38bdf8";
+            }
+
+            // ── 4. Temporal State Machine for Fall Confirmation ──
+            if (fallProbability >= 0.65) {
+                fallConfirmationCounter++;
+                if (fallConfirmationCounter >= FALL_CONFIRMATION_FRAMES && !fallConfirmed) {
+                    fallConfirmed = true;
+                    const sev = fallProbability > 0.85 ? 'SEVERE' : (fallProbability > 0.72 ? 'MODERATE' : 'MILD');
+                    triggerConfirmedFall(fallProbability, sev);
+                }
+            } else {
+                if (torsoAngle < 35 && avgKneeAngle > 140) { // Person stood back up
+                    fallConfirmationCounter = 0;
+                    fallConfirmed = false;
+                }
+            }
+
+            // ── 5. Update HUD Analytics Ribbon ──
+            document.getElementById('hud-posture').textContent = posture;
+            document.getElementById('hud-posture').style.color = postureColor;
+            document.getElementById('hud-fall-score').textContent = (fallProbability * 100).toFixed(0) + '%';
+            document.getElementById('hud-fall-score').style.color = fallProbability > 0.5 ? '#ef4444' : '#10b981';
+            document.getElementById('hud-torso-angle').textContent = torsoAngle.toFixed(0) + '°';
+            document.getElementById('hud-knee-angle').textContent = avgKneeAngle.toFixed(0) + '°';
+
+            // HUD Overlays on Canvas
+            const hudBadge = document.getElementById('hud-overlay-activity');
+            hudBadge.textContent = `${posture.toUpperCase()}`;
+            hudBadge.style.color = postureColor;
+            hudBadge.style.borderColor = postureColor;
+
+            const hudScore = document.getElementById('hud-overlay-score');
+            hudScore.textContent = `FALL RISK: ${(fallProbability * 100).toFixed(0)}%`;
+            hudScore.style.color = fallProbability > 0.5 ? '#ef4444' : '#10b981';
+
+            // ── 6. Update Interactive 3D Viewport ──
+            update3DSkeleton(results.poseLandmarks, fallConfirmed || fallProbability >= 0.65);
+
+            // ── 7. Draw 2D Augmented Skeleton on Camera Canvas ──
+            ctx.save();
+            ctx.lineWidth = 3;
+            ctx.strokeStyle = (fallConfirmed || fallProbability >= 0.65) ? '#ef4444' : '#06b6d4';
+            
+            // Transform 2D coordinates with horizontal mirroring
+            function tx(x) { return (1.0 - x) * canvas.width; }
+            function ty(y) { return y * canvas.height; }
+
+            BONE_CONNECTIONS.forEach(([a, b]) => {
+                const pA = lm[a], pB = lm[b];
+                if (pA && pB) {
+                    ctx.beginPath();
+                    ctx.moveTo(tx(pA.x), ty(pA.y));
+                    ctx.lineTo(tx(pB.x), ty(pB.y));
+                    ctx.stroke();
+                }
+            });
+
+            ctx.fillStyle = (fallConfirmed || fallProbability >= 0.65) ? '#f87171' : '#38bdf8';
+            lm.forEach((pt) => {
+                ctx.beginPath();
+                ctx.arc(tx(pt.x), ty(pt.y), 4, 0, 2 * Math.PI);
+                ctx.fill();
+            });
+            ctx.restore();
         }
 
         async function simulateFallTest() {
@@ -929,7 +1109,7 @@
                     severity: 'SEVERE',
                     fall_score: 0.94,
                     duration_down: 2.5,
-                    notes: 'Test fall triggered from Vercel web dashboard'
+                    notes: 'Simulated fall alert triggered from web dashboard'
                 });
             }
         }
