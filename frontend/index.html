@@ -539,9 +539,340 @@
             border-radius: 10px;
             box-shadow: 0 0 30px rgba(0, 0, 0, 0.8);
         }
+
+        /* ── Feature 1.1: Verification & Recovery HUD Chips ── */
+        .hud-verification-badge {
+            position: absolute;
+            top: 50px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(245, 158, 11, 0.92);
+            color: #0b0f19;
+            font-weight: 700;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.74rem;
+            padding: 5px 14px;
+            border-radius: 999px;
+            z-index: 15;
+            box-shadow: 0 0 18px rgba(245, 158, 11, 0.7);
+            animation: pulse-amber 1s infinite alternate;
+            white-space: nowrap;
+            display: none;
+        }
+
+        @keyframes pulse-amber {
+            from { transform: translateX(-50%) scale(1); }
+            to { transform: translateX(-50%) scale(1.05); }
+        }
+
+        .hud-recovery-badge {
+            position: absolute;
+            top: 50px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(16, 185, 129, 0.95);
+            color: white;
+            font-weight: 700;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.74rem;
+            padding: 5px 16px;
+            border-radius: 999px;
+            z-index: 15;
+            box-shadow: 0 0 20px rgba(16, 185, 129, 0.7);
+            white-space: nowrap;
+            display: none;
+        }
+
+        /* ── Feature 2.2: Reassurance Banner ── */
+        #reassurance-banner {
+            display: none;
+            background: linear-gradient(90deg, rgba(16, 185, 129, 0.95), rgba(5, 150, 105, 0.95));
+            color: white;
+            padding: 12px 28px;
+            text-align: center;
+            font-weight: 600;
+            font-size: 0.88rem;
+            box-shadow: 0 4px 18px rgba(16, 185, 129, 0.4);
+            z-index: 98;
+        }
+
+        /* ── Feature 2.2: Emergency Countdown Modal ── */
+        .emergency-modal-backdrop {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(6, 8, 14, 0.88);
+            backdrop-filter: blur(10px);
+            z-index: 9999;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .emergency-modal-card {
+            background: #0f172a;
+            border: 2px solid #ef4444;
+            border-radius: 18px;
+            max-width: 520px;
+            width: 100%;
+            padding: 30px 26px;
+            text-align: center;
+            box-shadow: 0 0 50px rgba(239, 68, 68, 0.5), inset 0 0 30px rgba(239, 68, 68, 0.1);
+            animation: modal-glow 1.5s infinite alternate;
+        }
+
+        @keyframes modal-glow {
+            from { box-shadow: 0 0 30px rgba(239, 68, 68, 0.4); border-color: #ef4444; }
+            to { box-shadow: 0 0 65px rgba(239, 68, 68, 0.8); border-color: #f87171; }
+        }
+
+        .modal-pulse-header {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 14px;
+            margin-bottom: 16px;
+        }
+
+        .modal-alert-icon {
+            font-size: 2.2rem;
+            animation: bounce-icon 0.8s infinite alternate;
+        }
+
+        @keyframes bounce-icon {
+            from { transform: scale(1); }
+            to { transform: scale(1.2); }
+        }
+
+        .modal-title {
+            color: #ef4444;
+            font-size: 1.35rem;
+            font-weight: 800;
+            letter-spacing: 0.5px;
+        }
+
+        .modal-subtitle {
+            color: #94a3b8;
+            font-size: 0.82rem;
+            margin-top: 3px;
+        }
+
+        .countdown-circle-container {
+            margin: 18px 0 14px 0;
+        }
+
+        .countdown-digits {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 4rem;
+            font-weight: 900;
+            color: #f87171;
+            line-height: 1;
+            text-shadow: 0 0 25px rgba(239, 68, 68, 0.6);
+        }
+
+        .countdown-unit {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.72rem;
+            color: #cbd5e1;
+            letter-spacing: 2px;
+            margin-top: 6px;
+        }
+
+        .countdown-bar-wrapper {
+            background: rgba(255, 255, 255, 0.08);
+            border-radius: 999px;
+            height: 8px;
+            overflow: hidden;
+            margin: 14px 0 18px 0;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .countdown-bar-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #ef4444, #f59e0b);
+            transition: width 1s linear;
+        }
+
+        .modal-info-text {
+            color: #94a3b8;
+            font-size: 0.85rem;
+            line-height: 1.5;
+            margin-bottom: 22px;
+        }
+
+        .modal-btn-row {
+            display: flex;
+            gap: 12px;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+
+        .btn-im-ok {
+            background: linear-gradient(135deg, #10b981, #059669);
+            color: white;
+            border: none;
+            padding: 13px 26px;
+            border-radius: 12px;
+            font-weight: 700;
+            font-size: 1rem;
+            cursor: pointer;
+            box-shadow: 0 0 24px rgba(16, 185, 129, 0.45);
+            transition: all 0.2s ease;
+            flex: 1;
+            min-width: 200px;
+        }
+        .btn-im-ok:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 0 35px rgba(16, 185, 129, 0.7);
+            background: linear-gradient(135deg, #34d399, #10b981);
+        }
+
+        .btn-dispatch-now {
+            background: rgba(239, 68, 68, 0.15);
+            border: 1px solid #ef4444;
+            color: #f87171;
+            padding: 13px 18px;
+            border-radius: 12px;
+            font-weight: 700;
+            font-size: 0.88rem;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+        .btn-dispatch-now:hover {
+            background: #ef4444;
+            color: white;
+        }
+
+        /* ── Feature 3.1: ADL & Sedentary Analytics Styles ── */
+        .adl-tiles-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 14px;
+            margin-bottom: 16px;
+        }
+
+        .adl-tile {
+            background: rgba(15, 23, 42, 0.6);
+            border: 1px solid var(--border-dim);
+            border-radius: 10px;
+            padding: 14px 16px;
+            transition: all 0.2s;
+        }
+        .adl-tile:hover {
+            border-color: var(--accent-cyan);
+            background: rgba(15, 23, 42, 0.85);
+        }
+
+        .adl-tile-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+
+        .adl-icon { font-size: 1.35rem; }
+
+        .adl-badge {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.72rem;
+            padding: 2px 7px;
+            border-radius: 4px;
+            background: rgba(255, 255, 255, 0.06);
+            color: #94a3b8;
+            font-weight: 600;
+        }
+
+        .adl-val {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 1.25rem;
+            font-weight: 700;
+            color: #f8fafc;
+        }
+
+        .adl-label {
+            font-size: 0.74rem;
+            color: var(--text-muted);
+            margin-top: 3px;
+        }
+
+        .adl-health-metrics-row {
+            display: flex;
+            gap: 14px;
+            flex-wrap: wrap;
+        }
+
+        .adl-metric-box {
+            background: rgba(15, 23, 42, 0.45);
+            border: 1px solid var(--border-dim);
+            border-radius: 10px;
+            padding: 14px 16px;
+        }
+
+        .adl-split-track {
+            display: flex;
+            height: 10px;
+            border-radius: 999px;
+            overflow: hidden;
+            background: rgba(255, 255, 255, 0.08);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        .adl-split-fill-active {
+            background: linear-gradient(90deg, #10b981, #06b6d4);
+            height: 100%;
+            transition: width 0.4s ease;
+        }
+
+        .adl-split-fill-sedentary {
+            background: linear-gradient(90deg, #f59e0b, #ef4444);
+            height: 100%;
+            transition: width 0.4s ease;
+        }
+    </style>
+
     </style>
 </head>
 <body>
+
+    <!-- Feature 2.2: Reassurance Banner for Dismissals -->
+    <div id="reassurance-banner"></div>
+
+    <!-- Feature 2.2: 30-Second Emergency Dispatch Countdown Modal -->
+    <div id="emergency-modal" class="emergency-modal-backdrop">
+        <div class="emergency-modal-card">
+            <div class="modal-pulse-header">
+                <div class="modal-alert-icon">🚨</div>
+                <div>
+                    <h2 class="modal-title">EMERGENCY: FALL DETECTED!</h2>
+                    <p class="modal-subtitle">AI Inactivity Window Confirmed Subject on Ground</p>
+                </div>
+            </div>
+
+            <div class="countdown-circle-container">
+                <div class="countdown-digits" id="countdown-number">30</div>
+                <div class="countdown-unit">SECONDS UNTIL CAREGIVER DISPATCH</div>
+            </div>
+
+            <div class="countdown-bar-wrapper">
+                <div class="countdown-bar-fill" id="countdown-bar-fill" style="width: 100%;"></div>
+            </div>
+
+            <p class="modal-info-text">
+                Caregivers and emergency alert services will be notified in 30 seconds.<br>
+                If you are unhurt or this is a false alarm, click below or press <b>[Spacebar]</b>.
+            </p>
+
+            <div class="modal-btn-row">
+                <button class="btn-im-ok" onclick="cancelEmergencyAlert()">
+                    ✅ I AM OK — CANCEL ALERT
+                </button>
+                <button class="btn-dispatch-now" onclick="immediateEmergencyDispatch()">
+                    🚨 DISPATCH NOW
+                </button>
+            </div>
+        </div>
+    </div>
+
 
     <!-- Header Navigation -->
     <header>
@@ -633,7 +964,9 @@
                 <video id="webcam-video" playsinline muted autoplay></video>
                 <canvas id="webcam-canvas"></canvas>
 
-                <div class="source-tag" id="source-tag">No active source</div>
+                                <div class="source-tag" id="source-tag">No active source</div>
+                <div class="hud-verification-badge" id="hud-verification-chip">⚠️ VERIFYING POSTURE... (2.0s Inactivity Window)</div>
+                <div class="hud-recovery-badge" id="hud-recovery-chip">🛡️ RECOVERY DETECTED (False Alarm Prevented)</div>
                 <div class="hud-badge" id="hud-overlay-activity">STANDING</div>
                 <div class="hud-score-badge" id="hud-overlay-score">FALL RISK: 0%</div>
 
@@ -661,6 +994,87 @@
                     <button class="btn-preset" onclick="setCameraPreset('side')">Side (S)</button>
                     <button class="btn-preset" onclick="setCameraPreset('top')">Top (T)</button>
                     <button class="btn-preset" onclick="setCameraPreset('iso')">Isometric (R)</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Feature 3.1: Continuous ADL (Activities of Daily Living) & Sedentary Analytics Card -->
+        <div class="card" style="grid-column: 1 / -1;">
+            <div class="card-header">
+                <div class="card-title">🏃 Continuous ADL (Activities of Daily Living) & Sedentary Analytics</div>
+                <div class="header-actions">
+                    <span class="chip" id="sedentary-status-chip" style="color: #10b981; border-color: rgba(16, 185, 129, 0.3);">🟢 Active & Mobile</span>
+                    <button class="btn-preset" onclick="resetADLStats()">↺ Reset Today's Stats</button>
+                </div>
+            </div>
+            <div style="padding: 20px;">
+                <!-- 4 ADL Activity Tiles -->
+                <div class="adl-tiles-grid">
+                    <div class="adl-tile">
+                        <div class="adl-tile-header">
+                            <span class="adl-icon">🚶</span>
+                            <span class="adl-badge" id="adl-walk-pct">0%</span>
+                        </div>
+                        <div class="adl-val" id="adl-walk-time">0m 00s</div>
+                        <div class="adl-label">Walking / Active Movement</div>
+                    </div>
+                    <div class="adl-tile">
+                        <div class="adl-tile-header">
+                            <span class="adl-icon">🧍</span>
+                            <span class="adl-badge" id="adl-stand-pct">0%</span>
+                        </div>
+                        <div class="adl-val" id="adl-stand-time">0m 00s</div>
+                        <div class="adl-label">Upright Standing</div>
+                    </div>
+                    <div class="adl-tile">
+                        <div class="adl-tile-header">
+                            <span class="adl-icon">🪑</span>
+                            <span class="adl-badge" id="adl-sit-pct">0%</span>
+                        </div>
+                        <div class="adl-val" id="adl-sit-time">0m 00s</div>
+                        <div class="adl-label">Seated / Resting</div>
+                    </div>
+                    <div class="adl-tile">
+                        <div class="adl-tile-header">
+                            <span class="adl-icon">🛌</span>
+                            <span class="adl-badge" id="adl-lying-pct">0%</span>
+                        </div>
+                        <div class="adl-val" id="adl-lying-time">0m 00s</div>
+                        <div class="adl-label">Lying Down</div>
+                    </div>
+                </div>
+
+                <!-- Active vs. Sedentary Split & Inactivity Health Monitor -->
+                <div class="adl-health-metrics-row">
+                    <!-- Ratio Bar -->
+                    <div class="adl-metric-box" style="flex: 2;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                            <span style="font-size: 0.82rem; font-weight: 600; color: #cbd5e1;">Active vs Sedentary Ratio</span>
+                            <span style="font-family: 'JetBrains Mono', monospace; font-size: 0.78rem;" id="adl-ratio-text">100% Active / 0% Sedentary</span>
+                        </div>
+                        <div class="adl-split-track">
+                            <div class="adl-split-fill-active" id="adl-split-active" style="width: 100%;"></div>
+                            <div class="adl-split-fill-sedentary" id="adl-split-sedentary" style="width: 0%;"></div>
+                        </div>
+                        <div style="display: flex; justify-content: space-between; margin-top: 6px; font-size: 0.72rem; color: #64748b;">
+                            <span>Active (Walking + Standing)</span>
+                            <span>Sedentary (Sitting + Lying)</span>
+                        </div>
+                    </div>
+
+                    <!-- Inactivity Stretch -->
+                    <div class="adl-metric-box" style="flex: 1.2;">
+                        <div style="font-size: 0.78rem; color: #94a3b8;">Continuous Inactivity Duration</div>
+                        <div style="font-family: 'JetBrains Mono', monospace; font-size: 1.4rem; font-weight: 700; color: #f1f5f9; margin: 4px 0;" id="adl-inactive-duration">00:00</div>
+                        <div style="font-size: 0.72rem; color: #64748b;">Alert threshold: >45s (Demo) / >45m (Clinical)</div>
+                    </div>
+
+                    <!-- Posture Transitions Counter -->
+                    <div class="adl-metric-box" style="flex: 1;">
+                        <div style="font-size: 0.78rem; color: #94a3b8;">Sit ↔ Stand Transitions</div>
+                        <div style="font-family: 'JetBrains Mono', monospace; font-size: 1.4rem; font-weight: 700; color: #38bdf8; margin: 4px 0;" id="adl-transitions-count">0</div>
+                        <div style="font-size: 0.72rem; color: #10b981;" id="adl-mobility-index">Mobility: Optimal (96/100)</div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -848,7 +1262,8 @@
         loadDefaultStandingAvatar();
 
         // ── 2. Accurate Physical 3D Skeleton Positioning ──
-        let currentSourceType = 'none'; // 'none' | 'webcam' | 'upload'
+        let currentSourceType = 'none';
+            cancelEmergencyAlert(); // 'none' | 'webcam' | 'upload'
         let currentObjectUrl = null;
 
         function update3DTargetPositions(wlm, lm, isFallen = false, isSitting = false) {
@@ -1021,7 +1436,12 @@
                 .subscribe();
         }
 
-        // ── 4. Audio Synthesizer ──
+                // ── 4. Audio Synthesizer & Web Speech Engine ──
+        let sirenOscillator = null;
+        let sirenGain = null;
+        let sirenAudioCtx = null;
+        let sirenTimer = null;
+
         function playEmergencyTone() {
             try {
                 const ctx = new (window.AudioContext || window.webkitAudioContext)();
@@ -1039,7 +1459,55 @@
             } catch (_) {}
         }
 
-        // ── 5. Robust Biomechanical Calculation & Smooth Posture Tracking ──
+        function startEmergencyAudioSiren() {
+            stopEmergencyAudioSiren();
+            try {
+                sirenAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                let high = true;
+                playEmergencyTone();
+                sirenTimer = setInterval(() => {
+                    if (!sirenAudioCtx) return;
+                    try {
+                        const osc = sirenAudioCtx.createOscillator();
+                        const gain = sirenAudioCtx.createGain();
+                        osc.type = 'sawtooth';
+                        osc.frequency.setValueAtTime(high ? 960 : 640, sirenAudioCtx.currentTime);
+                        gain.gain.setValueAtTime(0.25, sirenAudioCtx.currentTime);
+                        gain.gain.exponentialRampToValueAtTime(0.01, sirenAudioCtx.currentTime + 0.4);
+                        osc.connect(gain);
+                        gain.connect(sirenAudioCtx.destination);
+                        osc.start();
+                        osc.stop(sirenAudioCtx.currentTime + 0.4);
+                        high = !high;
+                    } catch (_) {}
+                }, 500);
+            } catch (_) {}
+        }
+
+        function stopEmergencyAudioSiren() {
+            if (sirenTimer) {
+                clearInterval(sirenTimer);
+                sirenTimer = null;
+            }
+            if (sirenAudioCtx) {
+                try { sirenAudioCtx.close(); } catch (_) {}
+                sirenAudioCtx = null;
+            }
+        }
+
+        function speakAlert(text) {
+            try {
+                if ('speechSynthesis' in window) {
+                    window.speechSynthesis.cancel();
+                    const u = new SpeechSynthesisUtterance(text);
+                    u.rate = 1.0;
+                    u.pitch = 1.0;
+                    window.speechSynthesis.speak(u);
+                }
+            } catch (_) {}
+        }
+
+        // ── 5. Robust Biomechanical Calculation & State Engines ──
         let cameraStream = null;
         let poseModel = null;
         let isProcessingFrame = false;
@@ -1059,17 +1527,266 @@
         let standingSec = 0;
         let sittingSec = 0;
 
-        setInterval(() => {
-            if (currentSourceType === 'none') return;
-            const currentPosture = document.getElementById('hud-posture').textContent;
-            if (currentPosture === 'Standing' || currentPosture === 'Walking') {
-                standingSec++;
-                document.getElementById('hud-stand-time').textContent = standingSec + 's';
-            } else if (currentPosture === 'Sitting') {
-                sittingSec++;
-                document.getElementById('hud-sit-time').textContent = sittingSec + 's';
+        // ── Feature 1.1 State Machine: Post-Fall Inactivity & Recovery Verification ──
+        const FSM_IDLE = 'IDLE';
+        const FSM_VERIFYING = 'VERIFYING';
+        const FSM_FALL_CONFIRMED = 'FALL_CONFIRMED';
+
+        let fsmFallState = FSM_IDLE;
+        let fsmVerificationStartTime = 0;
+        const FSM_VERIFICATION_WINDOW_MS = 2000; // 2.0s Inactivity Window to prevent bending false-positives
+        let recoveryChipTimeout = null;
+
+        function triggerRecoveryDetected() {
+            fsmFallState = FSM_IDLE;
+            const vChip = document.getElementById('hud-verification-chip');
+            const rChip = document.getElementById('hud-recovery-chip');
+            if (vChip) vChip.style.display = 'none';
+            if (rChip) {
+                rChip.textContent = '🛡️ RECOVERY DETECTED — False Alarm Prevented (Bending / Shoelace)';
+                rChip.style.display = 'block';
+                if (recoveryChipTimeout) clearTimeout(recoveryChipTimeout);
+                recoveryChipTimeout = setTimeout(() => {
+                    rChip.style.display = 'none';
+                }, 3000);
             }
-        }, 1000);
+        }
+
+        // ── Feature 2.2: 30-Second Emergency Dispatch Countdown Engine ──
+        let emergencyCountdownTimer = null;
+        let emergencyRemainingSeconds = 30;
+        let pendingFallData = null;
+
+        function startEmergencyCountdown(score, severity, customNotes = "In-Browser WebAI Live") {
+            if (emergencyCountdownTimer) return;
+            if (fsmFallState === FSM_FALL_CONFIRMED && document.getElementById('emergency-modal').style.display === 'flex') return;
+
+            fsmFallState = FSM_FALL_CONFIRMED;
+            emergencyRemainingSeconds = 30;
+            pendingFallData = {
+                score: score,
+                severity: severity,
+                customNotes: customNotes,
+                time: Date.now()
+            };
+
+            const modal = document.getElementById('emergency-modal');
+            const countNum = document.getElementById('countdown-number');
+            const countFill = document.getElementById('countdown-bar-fill');
+
+            countNum.textContent = '30';
+            countFill.style.width = '100%';
+            modal.style.display = 'flex';
+
+            startEmergencyAudioSiren();
+            speakAlert("Warning: Fall detected! Emergency alert will be dispatched in 30 seconds. Press I am OK to cancel.");
+
+            emergencyCountdownTimer = setInterval(() => {
+                emergencyRemainingSeconds--;
+                countNum.textContent = emergencyRemainingSeconds;
+                countFill.style.width = `${(emergencyRemainingSeconds / 30) * 100}%`;
+
+                if (emergencyRemainingSeconds <= 0) {
+                    clearInterval(emergencyCountdownTimer);
+                    emergencyCountdownTimer = null;
+                    modal.style.display = 'none';
+                    stopEmergencyAudioSiren();
+                    dispatchConfirmedEmergency();
+                }
+            }, 1000);
+        }
+
+        function cancelEmergencyAlert() {
+            if (emergencyCountdownTimer) {
+                clearInterval(emergencyCountdownTimer);
+                emergencyCountdownTimer = null;
+            }
+            stopEmergencyAudioSiren();
+            document.getElementById('emergency-modal').style.display = 'none';
+            speakAlert("Emergency alert cancelled. Glad you are safe.");
+
+            showReassuranceBanner("✅ Emergency Alert Cancelled: Resident confirmed safe via 'I Am OK' (False Alarm Dismissed)");
+
+            if (sbClient && pendingFallData) {
+                sbClient.from('fall_events').insert({
+                    person_id: 1,
+                    severity: pendingFallData.severity,
+                    fall_score: roundNumber(pendingFallData.score, 2),
+                    duration_down: (Date.now() - pendingFallData.time) / 1000,
+                    status: 'CANCELLED_BY_RESIDENT',
+                    notes: 'Self-Dismissed: Resident pressed I Am OK'
+                }).then(() => loadFallHistory());
+            }
+
+            fsmFallState = FSM_IDLE;
+            fallConfirmationCounter = 0;
+            fallConfirmed = false;
+            const vChip = document.getElementById('hud-verification-chip');
+            if (vChip) vChip.style.display = 'none';
+        }
+
+        function immediateEmergencyDispatch() {
+            if (emergencyCountdownTimer) {
+                clearInterval(emergencyCountdownTimer);
+                emergencyCountdownTimer = null;
+            }
+            stopEmergencyAudioSiren();
+            document.getElementById('emergency-modal').style.display = 'none';
+            dispatchConfirmedEmergency();
+        }
+
+        async function dispatchConfirmedEmergency() {
+            const data = pendingFallData || { score: 0.95, severity: 'SEVERE', customNotes: 'Immediate Dispatch' };
+            await triggerConfirmedFall(data.score, data.severity, data.customNotes);
+        }
+
+        function showReassuranceBanner(msg) {
+            const banner = document.getElementById('reassurance-banner');
+            banner.textContent = msg;
+            banner.style.display = 'block';
+            setTimeout(() => { banner.style.display = 'none'; }, 6000);
+        }
+
+        // Accessibility shortcut: Spacebar or Escape dismisses false alarm
+        window.addEventListener('keydown', (e) => {
+            if (e.code === 'Space' || e.key === 'Escape') {
+                if (emergencyCountdownTimer) {
+                    e.preventDefault();
+                    cancelEmergencyAlert();
+                }
+            }
+        });
+
+        // ── Feature 3.1: Continuous ADL Activity & Sedentary State ──
+        const adlStats = {
+            walkingSec: 0,
+            standingSec: 0,
+            sittingSec: 0,
+            lyingSec: 0,
+            bendingSec: 0,
+            lastPosture: 'Standing',
+            transitions: 0,
+            continuousInactiveSec: 0
+        };
+
+        function updateADLAnalytics() {
+            if (currentSourceType === 'none') return;
+            const posture = document.getElementById('hud-posture').textContent;
+
+            // Track posture transitions
+            if (posture !== adlStats.lastPosture && posture !== 'Unknown' && posture !== 'FALLEN') {
+                if (
+                    (adlStats.lastPosture === 'Sitting' && (posture === 'Standing' || posture === 'Walking')) ||
+                    ((adlStats.lastPosture === 'Standing' || adlStats.lastPosture === 'Walking') && posture === 'Sitting')
+                ) {
+                    adlStats.transitions++;
+                }
+                adlStats.lastPosture = posture;
+            }
+
+            if (posture === 'Walking') {
+                adlStats.walkingSec++;
+                adlStats.continuousInactiveSec = 0;
+            } else if (posture === 'Standing') {
+                adlStats.standingSec++;
+                adlStats.continuousInactiveSec = 0;
+            } else if (posture === 'Sitting') {
+                adlStats.sittingSec++;
+                adlStats.continuousInactiveSec++;
+            } else if (posture === 'Lying Down') {
+                adlStats.lyingSec++;
+                adlStats.continuousInactiveSec++;
+            } else if (posture === 'Bending') {
+                adlStats.bendingSec++;
+                adlStats.continuousInactiveSec = 0;
+            }
+
+            // Sync with ribbon standing/sitting timers
+            standingSec = adlStats.standingSec + adlStats.walkingSec;
+            sittingSec = adlStats.sittingSec;
+            document.getElementById('hud-stand-time').textContent = standingSec + 's';
+            document.getElementById('hud-sit-time').textContent = sittingSec + 's';
+
+            // Calculate active vs sedentary split
+            const activeSec = adlStats.walkingSec + adlStats.standingSec + adlStats.bendingSec;
+            const sedentarySec = adlStats.sittingSec + adlStats.lyingSec;
+            const totalSec = Math.max(1, activeSec + sedentarySec);
+
+            const walkPct = Math.round((adlStats.walkingSec / totalSec) * 100);
+            const standPct = Math.round((adlStats.standingSec / totalSec) * 100);
+            const sitPct = Math.round((adlStats.sittingSec / totalSec) * 100);
+            const lyingPct = Math.round((adlStats.lyingSec / totalSec) * 100);
+
+            document.getElementById('adl-walk-time').textContent = formatMinsSecs(adlStats.walkingSec);
+            document.getElementById('adl-walk-pct').textContent = `${walkPct}%`;
+
+            document.getElementById('adl-stand-time').textContent = formatMinsSecs(adlStats.standingSec);
+            document.getElementById('adl-stand-pct').textContent = `${standPct}%`;
+
+            document.getElementById('adl-sit-time').textContent = formatMinsSecs(adlStats.sittingSec);
+            document.getElementById('adl-sit-pct').textContent = `${sitPct}%`;
+
+            document.getElementById('adl-lying-time').textContent = formatMinsSecs(adlStats.lyingSec);
+            document.getElementById('adl-lying-pct').textContent = `${lyingPct}%`;
+
+            // Continuous Inactivity timer
+            const inactMins = Math.floor(adlStats.continuousInactiveSec / 60);
+            const inactSecs = adlStats.continuousInactiveSec % 60;
+            document.getElementById('adl-inactive-duration').textContent =
+                `${inactMins < 10 ? '0' : ''}${inactMins}:${inactSecs < 10 ? '0' : ''}${inactSecs}`;
+
+            // Sedentary Alert threshold: 45s for demo, >45m for clinical
+            const chip = document.getElementById('sedentary-status-chip');
+            if (adlStats.continuousInactiveSec >= 45) {
+                chip.textContent = '⚠️ Sedentary: Time to Stand & Stretch!';
+                chip.style.color = '#ef4444';
+                chip.style.borderColor = 'rgba(239, 68, 68, 0.4)';
+                chip.style.background = 'rgba(239, 68, 68, 0.15)';
+            } else if (adlStats.continuousInactiveSec >= 25) {
+                chip.textContent = '🟡 Sedentary Period';
+                chip.style.color = '#f59e0b';
+                chip.style.borderColor = 'rgba(245, 158, 11, 0.4)';
+                chip.style.background = 'rgba(245, 158, 11, 0.12)';
+            } else {
+                chip.textContent = '🟢 Active & Mobile';
+                chip.style.color = '#10b981';
+                chip.style.borderColor = 'rgba(16, 185, 129, 0.3)';
+                chip.style.background = 'rgba(16, 185, 129, 0.1)';
+            }
+
+            // Posture transitions & mobility score
+            document.getElementById('adl-transitions-count').textContent = adlStats.transitions;
+            const activeRatio = activeSec / totalSec;
+            const mobilityScore = Math.min(100, Math.round(70 + (adlStats.transitions * 3) + (activeRatio * 20)));
+            const mobLabel = mobilityScore > 85 ? 'Optimal' : (mobilityScore > 65 ? 'Moderate' : 'Reduced');
+            document.getElementById('adl-mobility-index').textContent = `Mobility: ${mobLabel} (${mobilityScore}/100)`;
+
+            // Proportional split bar
+            const activePct = Math.round((activeSec / totalSec) * 100);
+            const sedPct = 100 - activePct;
+            document.getElementById('adl-split-active').style.width = `${activePct}%`;
+            document.getElementById('adl-split-sedentary').style.width = `${sedPct}%`;
+            document.getElementById('adl-ratio-text').textContent = `${activePct}% Active / ${sedPct}% Sedentary`;
+        }
+
+        function resetADLStats() {
+            adlStats.walkingSec = 0;
+            adlStats.standingSec = 0;
+            adlStats.sittingSec = 0;
+            adlStats.lyingSec = 0;
+            adlStats.bendingSec = 0;
+            adlStats.transitions = 0;
+            adlStats.continuousInactiveSec = 0;
+            updateADLAnalytics();
+        }
+
+        function formatMinsSecs(totalSec) {
+            const m = Math.floor(totalSec / 60);
+            const s = totalSec % 60;
+            return `${m}m ${s < 10 ? '0' : ''}${s}s`;
+        }
+
+        setInterval(updateADLAnalytics, 1000);
 
         function compute3DAngle(pA, pB, pC) {
             if (!pA || !pB || !pC) return 180;
@@ -1620,17 +2337,40 @@
             else if (smoothedPosture === 'Bending') postureColor = '#f59e0b';
             else if (smoothedPosture === 'Lying Down') postureColor = '#8b5cf6';
 
-            // Fall State Machine
-            if (fallProbability >= 0.50) {
-                fallConfirmationCounter++;
-                if (fallConfirmationCounter >= FALL_CONFIRMATION_FRAMES && !fallConfirmed) {
-                    fallConfirmed = true;
-                    const sev = fallProbability > 0.82 ? 'SEVERE' : (fallProbability > 0.65 ? 'MODERATE' : 'MILD');
-                    triggerConfirmedFall(fallProbability, sev);
+            // ── Feature 1.1: Post-Fall Inactivity & Recovery Verification Window ──
+            const isFallCandidate = (fallProbability >= 0.50) || (torsoAngle > 55 && aspectRatio > 0.85);
+
+            if (isFallCandidate) {
+                if (fsmFallState === FSM_IDLE) {
+                    fsmFallState = FSM_VERIFYING;
+                    fsmVerificationStartTime = performance.now();
+                    const vChip = document.getElementById('hud-verification-chip');
+                    if (vChip) {
+                        vChip.textContent = '⚠️ VERIFYING POSTURE... (2.0s Inactivity Window)';
+                        vChip.style.display = 'block';
+                    }
+                } else if (fsmFallState === FSM_VERIFYING) {
+                    const elapsed = performance.now() - fsmVerificationStartTime;
+                    const remaining = Math.max(0, ((FSM_VERIFICATION_WINDOW_MS - elapsed) / 1000)).toFixed(1);
+                    const vChip = document.getElementById('hud-verification-chip');
+                    if (vChip) {
+                        vChip.textContent = `⚠️ VERIFYING INACTIVITY... (${remaining}s remaining)`;
+                    }
+
+                    if (elapsed >= FSM_VERIFICATION_WINDOW_MS) {
+                        if (vChip) vChip.style.display = 'none';
+                        // Confirmed down for >= 2.0s: Launch 30s Emergency Countdown (Feature 2.2)
+                        const sev = fallProbability > 0.82 ? 'SEVERE' : (fallProbability > 0.65 ? 'MODERATE' : 'MILD');
+                        startEmergencyCountdown(fallProbability, sev);
+                    }
                 }
             } else {
-                if (torsoAngle < 30 && (hipFlex3D > 135 || kneeAngle3D > 140)) {
-                    fallConfirmationCounter = 0;
+                // Posture is NOT a fall candidate
+                if (fsmFallState === FSM_VERIFYING) {
+                    // Subject stood back up before 2.0s window expired -> Recovery / Bending!
+                    triggerRecoveryDetected();
+                } else if (fsmFallState === FSM_FALL_CONFIRMED && torsoAngle < 30 && (hipFlex3D > 135 || kneeAngle3D > 140)) {
+                    fsmFallState = FSM_IDLE;
                     fallConfirmed = false;
                 }
             }
@@ -1684,7 +2424,7 @@
         }
 
         async function simulateFallTest() {
-            triggerConfirmedFall(0.95, 'SEVERE', 'Test Fall Simulation');
+            startEmergencyCountdown(0.95, 'SEVERE', 'Test Fall Simulation');
         }
 
         function openLightbox(url) {
