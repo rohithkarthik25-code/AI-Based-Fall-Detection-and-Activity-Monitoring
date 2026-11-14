@@ -863,7 +863,7 @@
             </p>
 
             <div class="modal-btn-row">
-                <button class="btn-im-ok" onclick="cancelEmergencyAlert()">
+                <button class="btn-im-ok" onclick="dismissAlertByResident()">
                     ✅ I AM OK — CANCEL ALERT
                 </button>
                 <button class="btn-dispatch-now" onclick="immediateEmergencyDispatch()">
@@ -1262,9 +1262,9 @@
         loadDefaultStandingAvatar();
 
         // ── 2. Accurate Physical 3D Skeleton Positioning ──
-        let currentSourceType = 'none';
-            cancelEmergencyAlert(); // 'none' | 'webcam' | 'upload'
+        let currentSourceType = 'none'; // 'none' | 'webcam' | 'upload'
         let currentObjectUrl = null;
+        let rafId = null;
 
         function update3DTargetPositions(wlm, lm, isFallen = false, isSitting = false) {
             if (!wlm || wlm.length === 0) return;
@@ -1596,15 +1596,37 @@
             }, 1000);
         }
 
-        function cancelEmergencyAlert() {
+        function resetEmergencyState() {
             if (emergencyCountdownTimer) {
                 clearInterval(emergencyCountdownTimer);
                 emergencyCountdownTimer = null;
             }
             stopEmergencyAudioSiren();
-            document.getElementById('emergency-modal').style.display = 'none';
-            speakAlert("Emergency alert cancelled. Glad you are safe.");
+            const modal = document.getElementById('emergency-modal');
+            if (modal) modal.style.display = 'none';
 
+            fsmFallState = FSM_IDLE;
+            fallConfirmationCounter = 0;
+            fallConfirmed = false;
+            pendingFallData = null;
+            const vChip = document.getElementById('hud-verification-chip');
+            if (vChip) vChip.style.display = 'none';
+            const rChip = document.getElementById('hud-recovery-chip');
+            if (rChip) rChip.style.display = 'none';
+        }
+
+        function dismissAlertByResident() {
+            if (!emergencyCountdownTimer && fsmFallState !== FSM_FALL_CONFIRMED) return;
+
+            if (emergencyCountdownTimer) {
+                clearInterval(emergencyCountdownTimer);
+                emergencyCountdownTimer = null;
+            }
+            stopEmergencyAudioSiren();
+            const modal = document.getElementById('emergency-modal');
+            if (modal) modal.style.display = 'none';
+
+            speakAlert("Emergency alert cancelled. Glad you are safe.");
             showReassuranceBanner("✅ Emergency Alert Cancelled: Resident confirmed safe via 'I Am OK' (False Alarm Dismissed)");
 
             if (sbClient && pendingFallData) {
@@ -1623,6 +1645,11 @@
             fallConfirmed = false;
             const vChip = document.getElementById('hud-verification-chip');
             if (vChip) vChip.style.display = 'none';
+        }
+
+        // Backward compatibility
+        function cancelEmergencyAlert() {
+            dismissAlertByResident();
         }
 
         function immediateEmergencyDispatch() {
@@ -1652,7 +1679,7 @@
             if (e.code === 'Space' || e.key === 'Escape') {
                 if (emergencyCountdownTimer) {
                     e.preventDefault();
-                    cancelEmergencyAlert();
+                    dismissAlertByResident();
                 }
             }
         });
@@ -1952,7 +1979,7 @@
             if (currentSourceType === 'none') return;
 
             const video = document.getElementById('webcam-video');
-            if (!isProcessingFrame && video.readyState >= 2 && video.videoWidth > 0 && !video.paused && !video.ended) {
+            if (poseModel && !isProcessingFrame && video.readyState >= 2 && video.videoWidth > 0 && !video.paused && !video.ended) {
                 isProcessingFrame = true;
                 poseModel.send({ image: video })
                     .catch(e => console.warn("Pose frame skipped:", e))
@@ -1968,7 +1995,7 @@
                 lastFpsUpdate = now;
             }
 
-            requestAnimationFrame(processVideoFrame);
+            rafId = requestAnimationFrame(processVideoFrame);
         }
 
         // ── 7. Input Source Controllers (Video Upload & Live Webcam) ──
@@ -1983,6 +2010,10 @@
         }
 
         function stopCurrentSource() {
+            if (rafId) {
+                cancelAnimationFrame(rafId);
+                rafId = null;
+            }
             if (cameraStream) {
                 cameraStream.getTracks().forEach(t => t.stop());
                 cameraStream = null;
@@ -1991,13 +2022,15 @@
                 URL.revokeObjectURL(currentObjectUrl);
                 currentObjectUrl = null;
             }
+            resetEmergencyState();
+
             const video = document.getElementById('webcam-video');
             const canvas = document.getElementById('webcam-canvas');
             const placeholder = document.getElementById('camera-placeholder');
             const controlsBar = document.getElementById('video-controls-bar');
             const sourceTag = document.getElementById('source-tag');
 
-            video.pause();
+            try { video.pause(); } catch (_) {}
             video.srcObject = null;
             video.removeAttribute('src');
 
@@ -2019,7 +2052,18 @@
         async function startWebcam() {
             stopCurrentSource();
             updateTabHighlight('tab-btn-webcam');
-            currentSourceType = 'webcam';
+
+            const getMedia = (navigator.mediaDevices && navigator.mediaDevices.getUserMedia)
+                ? (c) => navigator.mediaDevices.getUserMedia(c)
+                : (navigator.getUserMedia || navigator.webkitGetUserMedia || navigator.mozGetUserMedia)
+                    ? (c) => new Promise((res, rej) => (navigator.getUserMedia || navigator.webkitGetUserMedia || navigator.mozGetUserMedia).call(navigator, c, res, rej))
+                    : null;
+
+            if (!getMedia) {
+                alert("Camera API requires a secure HTTPS connection (or localhost) or is not supported by your browser.");
+                updateTabHighlight(null);
+                return;
+            }
 
             const video = document.getElementById('webcam-video');
             const canvas = document.getElementById('webcam-canvas');
@@ -2032,27 +2076,51 @@
             canvas.style.transform = 'scaleX(-1)';
 
             try {
-                cameraStream = await navigator.mediaDevices.getUserMedia({
-                    video: { width: { ideal: 640 }, height: { ideal: 480 }, frameRate: { ideal: 30 } }
+                cameraStream = await getMedia({
+                    video: {
+                        width: { ideal: 640 },
+                        height: { ideal: 480 },
+                        facingMode: "user"
+                    },
+                    audio: false
                 });
+
+                currentSourceType = 'webcam';
                 video.srcObject = cameraStream;
-                await video.play();
+                video.muted = true;
+                video.defaultMuted = true;
+                video.setAttribute('muted', '');
+                video.setAttribute('playsinline', '');
+                video.playsInline = true;
+                video.autoplay = true;
+
+                try {
+                    await video.play();
+                } catch (playErr) {
+                    console.warn("Camera video play notice:", playErr);
+                }
 
                 placeholder.style.display = 'none';
                 video.style.display = 'block';
                 canvas.style.display = 'block';
                 document.getElementById('hud-overlay-activity').style.display = 'block';
                 document.getElementById('hud-overlay-score').style.display = 'block';
-                controlsBar.style.display = 'none'; // No timeline needed for live camera
+                controlsBar.style.display = 'none';
                 
                 sourceTag.textContent = '📷 Live Camera Stream';
                 sourceTag.style.display = 'block';
 
                 initPoseModel();
-                requestAnimationFrame(processVideoFrame);
+                if (rafId) cancelAnimationFrame(rafId);
+                rafId = requestAnimationFrame(processVideoFrame);
             } catch (err) {
                 stopCurrentSource();
-                alert("Camera permission denied or camera unavailable: " + err.message);
+                console.error("Camera getUserMedia error:", err);
+                const isDenied = err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError';
+                const msg = isDenied
+                    ? "Camera permission was denied. Please click the camera/lock icon in your browser address bar and choose 'Allow' camera access."
+                    : ("Could not access camera: " + err.message);
+                alert(msg);
             }
         }
 
@@ -2357,9 +2425,9 @@
                         vChip.textContent = `⚠️ VERIFYING INACTIVITY... (${remaining}s remaining)`;
                     }
 
-                    if (elapsed >= FSM_VERIFICATION_WINDOW_MS) {
+                    if (elapsed >= FSM_VERIFICATION_WINDOW_MS && fsmFallState === FSM_VERIFYING) {
+                        fsmFallState = FSM_FALL_CONFIRMED;
                         if (vChip) vChip.style.display = 'none';
-                        // Confirmed down for >= 2.0s: Launch 30s Emergency Countdown (Feature 2.2)
                         const sev = fallProbability > 0.82 ? 'SEVERE' : (fallProbability > 0.65 ? 'MODERATE' : 'MILD');
                         startEmergencyCountdown(fallProbability, sev);
                     }
