@@ -231,7 +231,7 @@
 
         .header-actions {
             display: flex;
-            gap: 6px;
+            gap: 8px;
             align-items: center;
             flex-wrap: wrap;
         }
@@ -240,15 +240,15 @@
             background: rgba(15, 23, 42, 0.85);
             border: 1px solid var(--border-dim);
             color: var(--text-dim);
-            padding: 5px 12px;
+            padding: 6px 14px;
             border-radius: 6px;
-            font-size: 0.75rem;
+            font-size: 0.78rem;
             font-family: 'JetBrains Mono', monospace;
             cursor: pointer;
             transition: all 0.2s;
             display: inline-flex;
             align-items: center;
-            gap: 5px;
+            gap: 6px;
         }
         .btn-preset:hover {
             color: #fff;
@@ -288,6 +288,8 @@
             align-items: center;
             justify-content: center;
             overflow: hidden;
+            border: 2px dashed transparent;
+            transition: border-color 0.2s;
         }
 
         #webcam-video, #webcam-canvas {
@@ -308,8 +310,23 @@
         .camera-placeholder {
             text-align: center;
             padding: 32px 24px;
-            max-width: 500px;
+            max-width: 480px;
             z-index: 5;
+        }
+
+        .upload-dropzone {
+            border: 2px dashed rgba(6, 182, 212, 0.35);
+            background: rgba(6, 182, 212, 0.04);
+            border-radius: 12px;
+            padding: 24px 20px;
+            margin-top: 14px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+        .upload-dropzone:hover {
+            border-color: var(--accent-cyan);
+            background: rgba(6, 182, 212, 0.08);
+            transform: translateY(-2px);
         }
 
         .btn-primary {
@@ -339,10 +356,10 @@
             background: rgba(255, 255, 255, 0.06);
             color: #e2e8f0;
             border: 1px solid var(--border-dim);
-            padding: 9px 16px;
+            padding: 10px 18px;
             border-radius: 8px;
             font-weight: 600;
-            font-size: 0.82rem;
+            font-size: 0.84rem;
             cursor: pointer;
             transition: all 0.2s ease;
             display: inline-flex;
@@ -396,6 +413,28 @@
             background: rgba(255, 255, 255, 0.18);
             border-color: var(--accent-cyan);
             color: #fff;
+        }
+
+        /* ── Source Info Tag ── */
+        .source-tag {
+            position: absolute;
+            top: 14px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(15, 23, 42, 0.85);
+            border: 1px solid var(--border-dim);
+            padding: 4px 12px;
+            border-radius: 999px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.72rem;
+            color: var(--text-dim);
+            display: none;
+            z-index: 10;
+            backdrop-filter: blur(6px);
+            white-space: nowrap;
+            max-width: 60%;
+            overflow: hidden;
+            text-overflow: ellipsis;
         }
 
         /* ── HUD Badge Overlays ── */
@@ -567,42 +606,34 @@
             <div class="card-header">
                 <div class="card-title">📹 AI Vision Stream (Zero Lag)</div>
                 <div class="header-actions">
-                    <button class="btn-preset active" id="tab-btn-stored-cam" onclick="startStoredVideo('camera')">▶ Demo Camera Feed</button>
-                    <button class="btn-preset" id="tab-btn-stored-comp" onclick="startStoredVideo('composite')">📺 Demo Composite</button>
+                    <button class="btn-preset active" id="tab-btn-upload" onclick="document.getElementById('video-file-input').click()">📁 Upload Video</button>
                     <button class="btn-preset" id="tab-btn-webcam" onclick="startWebcam()">📷 Live Camera</button>
-                    <button class="btn-preset" id="tab-btn-upload" onclick="document.getElementById('video-file-input').click()">📁 Upload</button>
-                    <input type="file" id="video-file-input" accept="video/mp4,video/webm,video/ogg,video/avi" style="display: none;" onchange="handleFileUpload(event)">
+                    <input type="file" id="video-file-input" accept="video/mp4,video/webm,video/ogg,video/avi,video/mov" style="display: none;" onchange="handleFileUpload(event)">
                 </div>
             </div>
-            <div class="camera-box">
+            <div class="camera-box" id="camera-box">
                 <div class="camera-placeholder" id="camera-placeholder">
-                    <p style="color: #f1f5f9; font-size: 1.15rem; font-weight: 700;">AI Vision & Kinematics Testing Lab</p>
+                    <p style="color: #f1f5f9; font-size: 1.15rem; font-weight: 700;">AI Biomechanical Vision Lab</p>
                     <p style="color: var(--text-muted); font-size: 0.84rem; margin-top: 8px; line-height: 1.5;">
-                        Test with the pre-recorded fall video dataset (<code style="color: #38bdf8;">output_fall_detected_weighted.mp4</code>), use your live camera, or upload a custom video file!
+                        Upload your recorded test video for instant deep-learning pose estimation and fall analysis, or launch live camera monitoring.
                     </p>
                     
-                    <div style="display: flex; flex-direction: column; gap: 8px; margin-top: 14px;">
-                        <button class="btn-primary" onclick="startStoredVideo('camera')">
-                            ▶ Play Stored Fall Video (Camera Feed — 640x480)
-                        </button>
-                        <button class="btn-secondary" onclick="startStoredVideo('composite')">
-                            📺 Play Full Stored Video (Composite Split View — 1088x480)
-                        </button>
+                    <div class="upload-dropzone" onclick="document.getElementById('video-file-input').click()">
+                        <div style="font-size: 2rem; margin-bottom: 6px;">📁</div>
+                        <p style="color: #38bdf8; font-weight: 600; font-size: 0.95rem;">Click to Upload or Drag & Drop Video File</p>
+                        <p style="color: var(--text-muted); font-size: 0.75rem; margin-top: 4px;">Supports MP4, WebM, AVI, MOV recordings</p>
                     </div>
 
-                    <div style="display: flex; gap: 8px; justify-content: center; margin-top: 12px;">
+                    <div style="display: flex; gap: 8px; justify-content: center; margin-top: 14px;">
                         <button class="btn-secondary" onclick="startWebcam()">📷 Use Live Camera</button>
-                        <button class="btn-secondary" onclick="document.getElementById('video-file-input').click()">📁 Upload Custom Video</button>
-                    </div>
-
-                    <div style="margin-top: 14px;">
-                        <button class="btn-preset" style="color: #f87171;" onclick="simulateFallTest()">🚨 Test Siren & Telegram Alert</button>
+                        <button class="btn-secondary" style="color: #f87171;" onclick="simulateFallTest()">🚨 Test Alarm & Telegram</button>
                     </div>
                 </div>
 
                 <video id="webcam-video" playsinline muted autoplay></video>
                 <canvas id="webcam-canvas"></canvas>
 
+                <div class="source-tag" id="source-tag">No active source</div>
                 <div class="hud-badge" id="hud-overlay-activity">STANDING</div>
                 <div class="hud-score-badge" id="hud-overlay-score">FALL RISK: 0%</div>
 
@@ -613,7 +644,7 @@
                     <input type="range" class="video-seek-bar" id="video-seek-bar" min="0" max="100" value="0" oninput="onSeekInput(event)" onchange="onSeekChange(event)">
                     <span id="video-time-display" style="font-family: 'JetBrains Mono', monospace; font-size: 0.75rem; color: #94a3b8; min-width: 80px;">0:00 / 0:00</span>
                     <button class="btn-control" id="btn-loop-toggle" onclick="toggleLoop()">🔁 Loop: ON</button>
-                    <button class="btn-control" style="color: #f87171;" onclick="stopCurrentSource()">⏹ Stop</button>
+                    <button class="btn-control" style="color: #f87171;" onclick="stopCurrentSource()">⏹ Close</button>
                 </div>
             </div>
         </div>
@@ -817,7 +848,8 @@
         loadDefaultStandingAvatar();
 
         // ── 2. Accurate Physical 3D Skeleton Positioning ──
-        let currentSourceType = 'none'; // 'none' | 'webcam' | 'stored' | 'upload'
+        let currentSourceType = 'none'; // 'none' | 'webcam' | 'upload'
+        let currentObjectUrl = null;
 
         function update3DTargetPositions(wlm, lm, isFallen = false, isSitting = false) {
             if (!wlm || wlm.length === 0) return;
@@ -833,7 +865,7 @@
             for (let i = 0; i < JOINT_COUNT; i++) {
                 const pt = wlm[i];
                 if (pt) {
-                    // Mirrored for webcam, un-mirrored for pre-recorded video
+                    // Mirrored for webcam, un-mirrored for uploaded test video
                     const posX = (currentSourceType === 'webcam') ? -pt.x : pt.x;
                     const posY = -(pt.y - lowestY) + 0.05;
                     const posZ = -pt.z;
@@ -1013,6 +1045,7 @@
         let isProcessingFrame = false;
         let isLooping = true;
         let isUserSeeking = false;
+        let activeFileName = '';
 
         const postureHistory = [];
         const POSTURE_BUFFER_SIZE = 7;
@@ -1052,7 +1085,7 @@
 
         async function sendDirectTelegramAlert(severity, score, snapshotUrl) {
             const timeStr = new Date().toLocaleTimeString();
-            const sourceDesc = (currentSourceType === 'stored') ? 'Demo Fall Video' : ((currentSourceType === 'webcam') ? 'Live Webcam' : 'Uploaded Video');
+            const sourceDesc = (currentSourceType === 'upload') ? `Uploaded Video (${activeFileName || 'Test'})` : 'Live Webcam';
             const text = `🚨 <b>EMERGENCY: FALL DETECTED!</b>\n━━━━━━━━━━━━━━━━━━━\n👤 <b>Person:</b> #1\n⚠️ <b>Severity:</b> ${severity}\n📊 <b>Confidence Score:</b> ${(score * 100).toFixed(0)}%\n🕒 <b>Time:</b> ${timeStr}\n🌐 <b>Source:</b> ${sourceDesc}\n━━━━━━━━━━━━━━━━━━━\n<i>Immediate caregiver attention required!</i>`;
             
             try {
@@ -1120,7 +1153,7 @@
                 }
             }
 
-            const notesText = (currentSourceType === 'stored') ? 'Stored Test Video (output_fall_detected_weighted.mp4)' : customNotes;
+            const notesText = (currentSourceType === 'upload') ? `Uploaded File: ${activeFileName || 'Test Video'}` : customNotes;
 
             // Insert into Supabase
             if (sbClient) {
@@ -1221,9 +1254,9 @@
             requestAnimationFrame(processVideoFrame);
         }
 
-        // ── 7. Input Source Controllers (Stored Video / Webcam / Custom Upload) ──
+        // ── 7. Input Source Controllers (Video Upload & Live Webcam) ──
         function updateTabHighlight(activeTabId) {
-            ['tab-btn-stored-cam', 'tab-btn-stored-comp', 'tab-btn-webcam', 'tab-btn-upload'].forEach(id => {
+            ['tab-btn-upload', 'tab-btn-webcam'].forEach(id => {
                 const el = document.getElementById(id);
                 if (el) {
                     if (id === activeTabId) el.classList.add('active');
@@ -1237,19 +1270,26 @@
                 cameraStream.getTracks().forEach(t => t.stop());
                 cameraStream = null;
             }
+            if (currentObjectUrl) {
+                URL.revokeObjectURL(currentObjectUrl);
+                currentObjectUrl = null;
+            }
             const video = document.getElementById('webcam-video');
             const canvas = document.getElementById('webcam-canvas');
             const placeholder = document.getElementById('camera-placeholder');
             const controlsBar = document.getElementById('video-controls-bar');
+            const sourceTag = document.getElementById('source-tag');
 
             video.pause();
             video.srcObject = null;
             video.removeAttribute('src');
 
             currentSourceType = 'none';
+            activeFileName = '';
             video.style.display = 'none';
             canvas.style.display = 'none';
             controlsBar.style.display = 'none';
+            sourceTag.style.display = 'none';
             document.getElementById('hud-overlay-activity').style.display = 'none';
             document.getElementById('hud-overlay-score').style.display = 'none';
             placeholder.style.display = 'block';
@@ -1259,22 +1299,61 @@
             updateTabHighlight(null);
         }
 
-        async function startStoredVideo(mode = 'camera') {
+        async function startWebcam() {
             stopCurrentSource();
-            currentSourceType = 'stored';
-
-            if (mode === 'camera') {
-                updateTabHighlight('tab-btn-stored-cam');
-            } else {
-                updateTabHighlight('tab-btn-stored-comp');
-            }
+            updateTabHighlight('tab-btn-webcam');
+            currentSourceType = 'webcam';
 
             const video = document.getElementById('webcam-video');
             const canvas = document.getElementById('webcam-canvas');
             const placeholder = document.getElementById('camera-placeholder');
             const controlsBar = document.getElementById('video-controls-bar');
+            const sourceTag = document.getElementById('source-tag');
 
-            // Un-mirrored view for pre-recorded test video
+            // Mirrored view for live selfie webcam
+            video.style.transform = 'scaleX(-1)';
+            canvas.style.transform = 'scaleX(-1)';
+
+            try {
+                cameraStream = await navigator.mediaDevices.getUserMedia({
+                    video: { width: { ideal: 640 }, height: { ideal: 480 }, frameRate: { ideal: 30 } }
+                });
+                video.srcObject = cameraStream;
+                await video.play();
+
+                placeholder.style.display = 'none';
+                video.style.display = 'block';
+                canvas.style.display = 'block';
+                document.getElementById('hud-overlay-activity').style.display = 'block';
+                document.getElementById('hud-overlay-score').style.display = 'block';
+                controlsBar.style.display = 'none'; // No timeline needed for live camera
+                
+                sourceTag.textContent = '📷 Live Camera Stream';
+                sourceTag.style.display = 'block';
+
+                initPoseModel();
+                requestAnimationFrame(processVideoFrame);
+            } catch (err) {
+                stopCurrentSource();
+                alert("Camera permission denied or camera unavailable: " + err.message);
+            }
+        }
+
+        function processUploadedFile(file) {
+            if (!file) return;
+
+            stopCurrentSource();
+            updateTabHighlight('tab-btn-upload');
+            currentSourceType = 'upload';
+            activeFileName = file.name;
+
+            const video = document.getElementById('webcam-video');
+            const canvas = document.getElementById('webcam-canvas');
+            const placeholder = document.getElementById('camera-placeholder');
+            const controlsBar = document.getElementById('video-controls-bar');
+            const sourceTag = document.getElementById('source-tag');
+
+            // Normal un-mirrored perspective for pre-recorded video files
             video.style.transform = 'scaleX(1)';
             canvas.style.transform = 'scaleX(1)';
 
@@ -1285,12 +1364,8 @@
             video.playsInline = true;
             video.loop = isLooping;
 
-            // Choose file based on mode
-            const videoFile = (mode === 'composite') 
-                ? 'output_fall_detected_weighted.mp4' 
-                : 'output_fall_detected_camera.mp4';
-
-            video.src = videoFile;
+            currentObjectUrl = URL.createObjectURL(file);
+            video.src = currentObjectUrl;
 
             placeholder.style.display = 'none';
             video.style.display = 'block';
@@ -1300,12 +1375,15 @@
             controlsBar.style.display = 'flex';
             document.getElementById('btn-play-pause').textContent = '⏸ Pause';
 
+            sourceTag.textContent = `🎬 File: ${file.name}`;
+            sourceTag.style.display = 'block';
+
             const onReady = async () => {
                 initPoseModel();
                 try {
                     await video.play();
-                } catch (err) {
-                    console.warn("Autoplay notice:", err);
+                } catch (e) {
+                    console.warn("Autoplay notice:", e);
                 }
                 requestAnimationFrame(processVideoFrame);
             };
@@ -1329,102 +1407,31 @@
             };
         }
 
-        async function startWebcam() {
-            stopCurrentSource();
-            updateTabHighlight('tab-btn-webcam');
-            currentSourceType = 'webcam';
-
-            const video = document.getElementById('webcam-video');
-            const canvas = document.getElementById('webcam-canvas');
-            const placeholder = document.getElementById('camera-placeholder');
-            const controlsBar = document.getElementById('video-controls-bar');
-
-            // Mirrored view for webcam
-            video.style.transform = 'scaleX(-1)';
-            canvas.style.transform = 'scaleX(-1)';
-
-            try {
-                cameraStream = await navigator.mediaDevices.getUserMedia({
-                    video: { width: { ideal: 640 }, height: { ideal: 480 }, frameRate: { ideal: 30 } }
-                });
-                video.srcObject = cameraStream;
-                await video.play();
-
-                placeholder.style.display = 'none';
-                video.style.display = 'block';
-                canvas.style.display = 'block';
-                document.getElementById('hud-overlay-activity').style.display = 'block';
-                document.getElementById('hud-overlay-score').style.display = 'block';
-                controlsBar.style.display = 'none'; // No scrubber needed for live webcam
-
-                initPoseModel();
-                requestAnimationFrame(processVideoFrame);
-            } catch (err) {
-                stopCurrentSource();
-                alert("Camera permission denied or camera unavailable: " + err.message);
+        function handleFileUpload(event) {
+            const file = event.target.files && event.target.files[0];
+            if (file) {
+                processUploadedFile(file);
+                // Reset file input so re-selecting the same file triggers onchange
+                event.target.value = '';
             }
         }
 
-        function handleFileUpload(event) {
-            const file = event.target.files && event.target.files[0];
-            if (!file) return;
-
-            stopCurrentSource();
-            updateTabHighlight('tab-btn-upload');
-            currentSourceType = 'upload';
-
-            const video = document.getElementById('webcam-video');
-            const canvas = document.getElementById('webcam-canvas');
-            const placeholder = document.getElementById('camera-placeholder');
-            const controlsBar = document.getElementById('video-controls-bar');
-
-            video.style.transform = 'scaleX(1)';
-            canvas.style.transform = 'scaleX(1)';
-
-            video.muted = true;
-            video.defaultMuted = true;
-            video.setAttribute('muted', '');
-            video.setAttribute('playsinline', '');
-            video.playsInline = true;
-            video.loop = isLooping;
-
-            const objectUrl = URL.createObjectURL(file);
-            video.src = objectUrl;
-
-            placeholder.style.display = 'none';
-            video.style.display = 'block';
-            canvas.style.display = 'block';
-            document.getElementById('hud-overlay-activity').style.display = 'block';
-            document.getElementById('hud-overlay-score').style.display = 'block';
-            controlsBar.style.display = 'flex';
-            document.getElementById('btn-play-pause').textContent = '⏸ Pause';
-
-            video.oncanplay = async () => {
-                initPoseModel();
-                try {
-                    await video.play();
-                } catch (e) {
-                    console.warn("Autoplay notice:", e);
-                }
-                requestAnimationFrame(processVideoFrame);
-            };
-            video.load();
-
-            video.ontimeupdate = () => {
-                if (!isUserSeeking && video.duration) {
-                    const pct = (video.currentTime / video.duration) * 100;
-                    document.getElementById('video-seek-bar').value = pct;
-                    document.getElementById('video-time-display').textContent = `${formatTime(video.currentTime)} / ${formatTime(video.duration)}`;
-                }
-            };
-
-            video.onended = () => {
-                if (isLooping) {
-                    video.currentTime = 0;
-                    video.play().catch(() => {});
-                }
-            };
-        }
+        // Drag & Drop Handling for Camera Box
+        const cameraBoxEl = document.getElementById('camera-box');
+        cameraBoxEl.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            cameraBoxEl.style.borderColor = 'var(--accent-cyan)';
+        });
+        cameraBoxEl.addEventListener('dragleave', (e) => {
+            cameraBoxEl.style.borderColor = 'transparent';
+        });
+        cameraBoxEl.addEventListener('drop', (e) => {
+            e.preventDefault();
+            cameraBoxEl.style.borderColor = 'transparent';
+            if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+                processUploadedFile(e.dataTransfer.files[0]);
+            }
+        });
 
         // ── Video Playback Controls ──
         function togglePlayPause() {
@@ -1677,7 +1684,7 @@
         }
 
         async function simulateFallTest() {
-            triggerConfirmedFall(0.95, 'SEVERE', 'Test Fall from Website');
+            triggerConfirmedFall(0.95, 'SEVERE', 'Test Fall Simulation');
         }
 
         function openLightbox(url) {
