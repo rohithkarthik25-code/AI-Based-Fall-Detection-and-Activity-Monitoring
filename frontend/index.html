@@ -308,7 +308,7 @@
         .camera-placeholder {
             text-align: center;
             padding: 32px 24px;
-            max-width: 480px;
+            max-width: 500px;
             z-index: 5;
         }
 
@@ -321,7 +321,6 @@
             font-weight: 700;
             font-size: 0.95rem;
             cursor: pointer;
-            margin-top: 14px;
             box-shadow: 0 4px 18px rgba(14, 165, 233, 0.4);
             transition: all 0.2s ease;
             letter-spacing: 0.3px;
@@ -568,7 +567,8 @@
             <div class="card-header">
                 <div class="card-title">📹 AI Vision Stream (Zero Lag)</div>
                 <div class="header-actions">
-                    <button class="btn-preset active" id="tab-btn-stored" onclick="startStoredVideo()">▶ Demo Fall Video</button>
+                    <button class="btn-preset active" id="tab-btn-stored-cam" onclick="startStoredVideo('camera')">▶ Demo Camera Feed</button>
+                    <button class="btn-preset" id="tab-btn-stored-comp" onclick="startStoredVideo('composite')">📺 Demo Composite</button>
                     <button class="btn-preset" id="tab-btn-webcam" onclick="startWebcam()">📷 Live Camera</button>
                     <button class="btn-preset" id="tab-btn-upload" onclick="document.getElementById('video-file-input').click()">📁 Upload</button>
                     <input type="file" id="video-file-input" accept="video/mp4,video/webm,video/ogg,video/avi" style="display: none;" onchange="handleFileUpload(event)">
@@ -581,9 +581,14 @@
                         Test with the pre-recorded fall video dataset (<code style="color: #38bdf8;">output_fall_detected_weighted.mp4</code>), use your live camera, or upload a custom video file!
                     </p>
                     
-                    <button class="btn-primary" onclick="startStoredVideo()">
-                        ▶ Run Stored Test Video (output_fall_detected_weighted.mp4)
-                    </button>
+                    <div style="display: flex; flex-direction: column; gap: 8px; margin-top: 14px;">
+                        <button class="btn-primary" onclick="startStoredVideo('camera')">
+                            ▶ Play Stored Fall Video (Camera Feed — 640x480)
+                        </button>
+                        <button class="btn-secondary" onclick="startStoredVideo('composite')">
+                            📺 Play Full Stored Video (Composite Split View — 1088x480)
+                        </button>
+                    </div>
 
                     <div style="display: flex; gap: 8px; justify-content: center; margin-top: 12px;">
                         <button class="btn-secondary" onclick="startWebcam()">📷 Use Live Camera</button>
@@ -1047,7 +1052,7 @@
 
         async function sendDirectTelegramAlert(severity, score, snapshotUrl) {
             const timeStr = new Date().toLocaleTimeString();
-            const sourceDesc = (currentSourceType === 'stored') ? 'Demo Video (output_fall_detected_weighted.mp4)' : ((currentSourceType === 'webcam') ? 'Live Webcam' : 'Uploaded Video');
+            const sourceDesc = (currentSourceType === 'stored') ? 'Demo Fall Video' : ((currentSourceType === 'webcam') ? 'Live Webcam' : 'Uploaded Video');
             const text = `🚨 <b>EMERGENCY: FALL DETECTED!</b>\n━━━━━━━━━━━━━━━━━━━\n👤 <b>Person:</b> #1\n⚠️ <b>Severity:</b> ${severity}\n📊 <b>Confidence Score:</b> ${(score * 100).toFixed(0)}%\n🕒 <b>Time:</b> ${timeStr}\n🌐 <b>Source:</b> ${sourceDesc}\n━━━━━━━━━━━━━━━━━━━\n<i>Immediate caregiver attention required!</i>`;
             
             try {
@@ -1218,7 +1223,7 @@
 
         // ── 7. Input Source Controllers (Stored Video / Webcam / Custom Upload) ──
         function updateTabHighlight(activeTabId) {
-            ['tab-btn-stored', 'tab-btn-webcam', 'tab-btn-upload'].forEach(id => {
+            ['tab-btn-stored-cam', 'tab-btn-stored-comp', 'tab-btn-webcam', 'tab-btn-upload'].forEach(id => {
                 const el = document.getElementById(id);
                 if (el) {
                     if (id === activeTabId) el.classList.add('active');
@@ -1254,10 +1259,15 @@
             updateTabHighlight(null);
         }
 
-        async function startStoredVideo() {
+        async function startStoredVideo(mode = 'camera') {
             stopCurrentSource();
-            updateTabHighlight('tab-btn-stored');
             currentSourceType = 'stored';
+
+            if (mode === 'camera') {
+                updateTabHighlight('tab-btn-stored-cam');
+            } else {
+                updateTabHighlight('tab-btn-stored-comp');
+            }
 
             const video = document.getElementById('webcam-video');
             const canvas = document.getElementById('webcam-canvas');
@@ -1268,22 +1278,19 @@
             video.style.transform = 'scaleX(1)';
             canvas.style.transform = 'scaleX(1)';
 
-            video.crossOrigin = "anonymous";
-            video.loop = isLooping;
             video.muted = true;
+            video.defaultMuted = true;
+            video.setAttribute('muted', '');
+            video.setAttribute('playsinline', '');
             video.playsInline = true;
+            video.loop = isLooping;
 
-            // Primary relative URL, automatic fallback to Supabase CDN URL
-            const primaryUrl = "output_fall_detected_weighted.mp4";
-            const fallbackUrl = "https://qbzuwqanxnkpeuioiiao.supabase.co/storage/v1/object/public/fall-snapshots/demo_fall_video.mp4";
+            // Choose file based on mode
+            const videoFile = (mode === 'composite') 
+                ? 'output_fall_detected_weighted.mp4' 
+                : 'output_fall_detected_camera.mp4';
 
-            video.src = primaryUrl;
-            video.onerror = () => {
-                if (video.src !== fallbackUrl) {
-                    console.log("Local video path fallback to Supabase CDN:", fallbackUrl);
-                    video.src = fallbackUrl;
-                }
-            };
+            video.src = videoFile;
 
             placeholder.style.display = 'none';
             video.style.display = 'block';
@@ -1293,17 +1300,31 @@
             controlsBar.style.display = 'flex';
             document.getElementById('btn-play-pause').textContent = '⏸ Pause';
 
-            video.onloadeddata = async () => {
+            const onReady = async () => {
                 initPoseModel();
-                await video.play();
+                try {
+                    await video.play();
+                } catch (err) {
+                    console.warn("Autoplay notice:", err);
+                }
                 requestAnimationFrame(processVideoFrame);
             };
+
+            video.oncanplay = onReady;
+            video.load();
 
             video.ontimeupdate = () => {
                 if (!isUserSeeking && video.duration) {
                     const pct = (video.currentTime / video.duration) * 100;
                     document.getElementById('video-seek-bar').value = pct;
                     document.getElementById('video-time-display').textContent = `${formatTime(video.currentTime)} / ${formatTime(video.duration)}`;
+                }
+            };
+
+            video.onended = () => {
+                if (isLooping) {
+                    video.currentTime = 0;
+                    video.play().catch(() => {});
                 }
             };
         }
@@ -1360,11 +1381,15 @@
             video.style.transform = 'scaleX(1)';
             canvas.style.transform = 'scaleX(1)';
 
+            video.muted = true;
+            video.defaultMuted = true;
+            video.setAttribute('muted', '');
+            video.setAttribute('playsinline', '');
+            video.playsInline = true;
+            video.loop = isLooping;
+
             const objectUrl = URL.createObjectURL(file);
             video.src = objectUrl;
-            video.loop = isLooping;
-            video.muted = true;
-            video.playsInline = true;
 
             placeholder.style.display = 'none';
             video.style.display = 'block';
@@ -1374,17 +1399,29 @@
             controlsBar.style.display = 'flex';
             document.getElementById('btn-play-pause').textContent = '⏸ Pause';
 
-            video.onloadeddata = async () => {
+            video.oncanplay = async () => {
                 initPoseModel();
-                await video.play();
+                try {
+                    await video.play();
+                } catch (e) {
+                    console.warn("Autoplay notice:", e);
+                }
                 requestAnimationFrame(processVideoFrame);
             };
+            video.load();
 
             video.ontimeupdate = () => {
                 if (!isUserSeeking && video.duration) {
                     const pct = (video.currentTime / video.duration) * 100;
                     document.getElementById('video-seek-bar').value = pct;
                     document.getElementById('video-time-display').textContent = `${formatTime(video.currentTime)} / ${formatTime(video.duration)}`;
+                }
+            };
+
+            video.onended = () => {
+                if (isLooping) {
+                    video.currentTime = 0;
+                    video.play().catch(() => {});
                 }
             };
         }
@@ -1422,6 +1459,11 @@
             const video = document.getElementById('webcam-video');
             if (video.duration) {
                 video.currentTime = (e.target.value / 100) * video.duration;
+                setTimeout(() => {
+                    if (poseModel && video.readyState >= 2) {
+                        poseModel.send({ image: video }).catch(() => {});
+                    }
+                }, 60);
             }
             isUserSeeking = false;
         }

@@ -30,6 +30,8 @@ elderly_fall_multimodal_dataset.csv
 *.avi
 *.mov
 !frontend/output_fall_detected_weighted.mp4
+!frontend/output_fall_detected_camera.mp4
+
 
 
 
