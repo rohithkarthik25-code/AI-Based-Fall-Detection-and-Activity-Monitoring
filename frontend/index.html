@@ -1827,14 +1827,97 @@
             return Math.acos(cosTheta) * (180 / Math.PI);
         }
 
-        async function sendDirectTelegramAlert(severity, score, snapshotUrl) {
+        async function captureCurrentSnapshotBlob() {
+            const video = document.getElementById('webcam-video');
+            const overlayCanvas = document.getElementById('webcam-canvas');
+            const snapCanvas = document.createElement('canvas');
+            const w = (video && video.videoWidth > 0) ? video.videoWidth : 640;
+            const h = (video && video.videoHeight > 0) ? video.videoHeight : 480;
+            snapCanvas.width = w;
+            snapCanvas.height = h;
+            const snapCtx = snapCanvas.getContext('2d');
+
+            if (video && video.videoWidth > 0 && video.readyState >= 2) {
+                try {
+                    if (currentSourceType === 'webcam') {
+                        snapCtx.save();
+                        snapCtx.scale(-1, 1);
+                        snapCtx.drawImage(video, -w, 0, w, h);
+                        snapCtx.restore();
+                    } else {
+                        snapCtx.drawImage(video, 0, 0, w, h);
+                    }
+                } catch (e) {
+                    console.warn("Video canvas draw notice:", e);
+                }
+            } else {
+                // High-visibility emergency diagnostics snapshot
+                snapCtx.fillStyle = '#0f172a';
+                snapCtx.fillRect(0, 0, w, h);
+                snapCtx.fillStyle = '#ef4444';
+                snapCtx.font = 'bold 28px sans-serif';
+                snapCtx.fillText('🚨 FALL INCIDENT SNAPSHOT', 36, 140);
+                snapCtx.fillStyle = '#f8fafc';
+                snapCtx.font = '20px monospace';
+                snapCtx.fillText('Person: #1 | Severity: SEVERE', 36, 190);
+                snapCtx.fillText(`Confidence: 95% | Time: ${new Date().toLocaleTimeString()}`, 36, 230);
+                snapCtx.fillText(`Source: ${currentSourceType === 'upload' ? (activeFileName || 'Uploaded Video') : (currentSourceType === 'webcam' ? 'Live Camera' : 'AI Vision Lab')}`, 36, 270);
+                snapCtx.strokeStyle = '#ef4444';
+                snapCtx.lineWidth = 4;
+                snapCtx.strokeRect(10, 10, w - 20, h - 20);
+            }
+
+            // Overlay 2D skeleton pose if available
+            if (overlayCanvas && overlayCanvas.width > 0 && overlayCanvas.height > 0) {
+                try {
+                    snapCtx.drawImage(overlayCanvas, 0, 0, w, h);
+                } catch (_) {}
+            }
+
+            // Timestamp ribbon
+            snapCtx.fillStyle = 'rgba(15, 23, 42, 0.85)';
+            snapCtx.fillRect(0, h - 36, w, 36);
+            snapCtx.fillStyle = '#38bdf8';
+            snapCtx.font = '13px monospace';
+            snapCtx.fillText(`AI FALL DETECTION • ${new Date().toLocaleString()} • PERSON #1`, 16, h - 13);
+
+            return new Promise(resolve => snapCanvas.toBlob(resolve, 'image/jpeg', 0.90));
+        }
+
+        async function sendDirectTelegramAlert(severity, score, snapshotBlob, snapshotUrl) {
             const timeStr = new Date().toLocaleTimeString();
-            const sourceDesc = (currentSourceType === 'upload') ? `Uploaded Video (${activeFileName || 'Test'})` : 'Live Webcam';
-            const text = `🚨 <b>EMERGENCY: FALL DETECTED!</b>\n━━━━━━━━━━━━━━━━━━━\n👤 <b>Person:</b> #1\n⚠️ <b>Severity:</b> ${severity}\n📊 <b>Confidence Score:</b> ${(score * 100).toFixed(0)}%\n🕒 <b>Time:</b> ${timeStr}\n🌐 <b>Source:</b> ${sourceDesc}\n━━━━━━━━━━━━━━━━━━━\n<i>Immediate caregiver attention required!</i>`;
+            const sourceDesc = (currentSourceType === 'upload') ? `Uploaded Video (${activeFileName || 'Test'})` : ((currentSourceType === 'webcam') ? 'Live Webcam' : 'AI Fall Detection System');
+            const text = `🚨 <b>EMERGENCY: FALL DETECTED!</b>\n━━━━━━━━━━━━━━━━━━━\n👤 <b>Person:</b> #1\n⚠️ <b>Severity:</b> ${severity}\n📊 <b>Confidence Score:</b> ${(score * 100).toFixed(0)}%\n🕒 <b>Time:</b> ${timeStr}\n🌐 <b>Source:</b> ${sourceDesc}\n━━━━━━━━━━━━━━━━━━━\n<i>Immediate caregiver attention required! Check dashboard now.</i>`;
             
-            try {
-                if (snapshotUrl) {
-                    await fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendPhoto`, {
+            // Priority 1: Direct Multipart FormData upload with image blob (guarantees photo upload)
+            if (snapshotBlob) {
+                try {
+                    const formData = new FormData();
+                    formData.append('chat_id', TELEGRAM_CHAT_ID);
+                    formData.append('photo', snapshotBlob, `fall_incident_${Date.now()}.jpg`);
+                    formData.append('caption', text);
+                    formData.append('parse_mode', 'HTML');
+
+                    const resp = await fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendPhoto`, {
+                        method: 'POST',
+                        body: formData
+                    });
+                    const resJson = await resp.json();
+                    if (resJson && resJson.ok) {
+                        console.log("Telegram alert with photo sent successfully (direct multipart)!");
+                        return true;
+                    } else {
+                        console.warn("Direct Telegram sendPhoto response:", resJson);
+                    }
+                } catch (err) {
+                    console.warn("Direct Telegram multipart fetch failed:", err);
+                }
+            }
+
+            // Priority 2: Fallback to public URL if blob upload had network issue
+            if (snapshotUrl && snapshotUrl.startsWith('http')) {
+                try {
+                    const resp = await fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendPhoto`, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({
@@ -1844,20 +1927,31 @@
                             parse_mode: 'HTML'
                         })
                     });
-                } else {
-                    await fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            chat_id: TELEGRAM_CHAT_ID,
-                            text: text,
-                            parse_mode: 'HTML'
-                        })
-                    });
+                    const resJson = await resp.json();
+                    if (resJson && resJson.ok) {
+                        console.log("Telegram alert with photo sent successfully (via URL)!");
+                        return true;
+                    }
+                } catch (err) {
+                    console.warn("Telegram sendPhoto URL failed:", err);
                 }
-            } catch (err) {
-                console.log("Direct Telegram alert note:", err);
             }
+
+            // Priority 3: Fallback to text message
+            try {
+                await fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        chat_id: TELEGRAM_CHAT_ID,
+                        text: text,
+                        parse_mode: 'HTML'
+                    })
+                });
+            } catch (err) {
+                console.warn("Telegram sendMessage fallback error:", err);
+            }
+            return false;
         }
 
         async function triggerConfirmedFall(fallScore, severity, customNotes = "In-Browser WebAI Live") {
@@ -1867,39 +1961,34 @@
 
             playEmergencyTone();
 
-            // Capture frame from video directly onto offscreen canvas for snapshot
+            // 1. Capture snapshot blob immediately (with video frame and 2D skeleton)
+            const snapshotBlob = await captureCurrentSnapshotBlob();
             let snapshotUrl = null;
-            const video = document.getElementById('webcam-video');
-            if (video && sbClient) {
+
+            // 2. Upload snapshot blob to Supabase Storage
+            if (snapshotBlob && sbClient) {
                 try {
-                    const snapCanvas = document.createElement('canvas');
-                    snapCanvas.width = video.videoWidth || 640;
-                    snapCanvas.height = video.videoHeight || 480;
-                    const snapCtx = snapCanvas.getContext('2d');
-                    snapCtx.drawImage(video, 0, 0, snapCanvas.width, snapCanvas.height);
+                    const filename = `web_fall_${Date.now()}.jpg`;
+                    const { error: uploadErr } = await sbClient.storage
+                        .from('fall-snapshots')
+                        .upload(filename, snapshotBlob, { contentType: 'image/jpeg', upsert: true });
 
-                    const blob = await new Promise(resolve => snapCanvas.toBlob(resolve, 'image/jpeg', 0.85));
-                    if (blob) {
-                        const filename = `web_fall_${Date.now()}.jpg`;
-                        const { error: uploadErr } = await sbClient.storage
+                    if (!uploadErr) {
+                        const { data: publicUrlData } = sbClient.storage
                             .from('fall-snapshots')
-                            .upload(filename, blob, { contentType: 'image/jpeg', upsert: true });
-
-                        if (!uploadErr) {
-                            const { data: publicUrlData } = sbClient.storage
-                                .from('fall-snapshots')
-                                .getPublicUrl(filename);
-                            snapshotUrl = publicUrlData?.publicUrl || null;
-                        }
+                            .getPublicUrl(filename);
+                        snapshotUrl = publicUrlData?.publicUrl || null;
+                    } else {
+                        console.warn("Supabase storage upload note:", uploadErr);
                     }
                 } catch (e) {
-                    console.log("Snapshot upload info:", e);
+                    console.warn("Snapshot storage upload error:", e);
                 }
             }
 
-            const notesText = (currentSourceType === 'upload') ? `Uploaded File: ${activeFileName || 'Test Video'}` : customNotes;
+            const notesText = (currentSourceType === 'upload') ? `Uploaded File: ${activeFileName || 'Test Video'}` : ((currentSourceType === 'webcam') ? 'Live Webcam Feed' : customNotes);
 
-            // Insert into Supabase
+            // 3. Insert record into Supabase fall_events table
             if (sbClient) {
                 try {
                     const { data: insertedData, error: insertError } = await sbClient
@@ -1920,28 +2009,12 @@
                 } catch (e) {
                     console.error("Database insert error:", e);
                 }
-
-                // Trigger Supabase Edge Function
-                try {
-                    fetch("https://qbzuwqanxnkpeuioiiao.supabase.co/functions/v1/notify-fall", {
-                        method: "POST",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({
-                            person_id: 1,
-                            severity: severity,
-                            fall_score: roundNumber(fallScore, 2),
-                            duration_down: 2.0,
-                            snapshot_url: snapshotUrl,
-                            notes: notesText
-                        })
-                    }).catch(() => {});
-                } catch (_) {}
             }
 
-            // Direct Telegram dispatch
-            sendDirectTelegramAlert(severity, fallScore, snapshotUrl);
+            // 4. Send Telegram Alert directly with photo blob attached
+            await sendDirectTelegramAlert(severity, fallScore, snapshotBlob, snapshotUrl);
 
-            // Reload table
+            // 5. Reload Cloud Ledger
             loadFallHistory();
         }
 

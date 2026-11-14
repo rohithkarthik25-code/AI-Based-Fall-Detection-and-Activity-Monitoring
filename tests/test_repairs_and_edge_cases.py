@@ -64,7 +64,7 @@ class TestRepairsAndEdgeCases(unittest.TestCase):
         if os.path.exists(test_dir):
             shutil.rmtree(test_dir)
 
-        logger = FallLogger(log_file=test_log, screenshot_dir=test_dir)
+        logger = FallLogger(log_file=test_log, screenshot_dir=test_dir, enable_supabase=False)
         try:
             # Pass frame=None
             logger.log(frame=None, person_id=1, severity="SEVERE", duration=2.5, score=0.92)
