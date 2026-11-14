@@ -161,3 +161,4 @@ class SupabaseDispatcher:
                 pass
 
         threading.Thread(target=_worker, daemon=True).start()
+

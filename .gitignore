@@ -20,10 +20,17 @@ tempCodeRunnerFile.py
 .vscode/
 .idea/
 
+# Datasets and archives
+Dataset/
+*.zip
+elderly_fall_multimodal_dataset.csv
+
 # Videos
 *.mp4
 *.avi
 *.mov
+
+
 
 # Runtime logs and event records
 fall_events.csv

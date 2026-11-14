@@ -3,3 +3,4 @@ param(
     [string[]]$ScriptArgs
 )
 & "$PSScriptRoot\venv\Scripts\python.exe" "$PSScriptRoot\main.py" @ScriptArgs
+

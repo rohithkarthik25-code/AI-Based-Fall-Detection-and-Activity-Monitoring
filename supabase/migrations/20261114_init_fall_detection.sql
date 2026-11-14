@@ -108,3 +108,4 @@ CREATE OR REPLACE TRIGGER on_fall_event_inserted
     AFTER INSERT ON public.fall_events
     FOR EACH ROW
     EXECUTE FUNCTION public.trigger_fall_notification();
+
