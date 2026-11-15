@@ -17,6 +17,15 @@ Deno.serve(async (req: Request) => {
     const payload = await req.json();
     const event = payload.record || payload;
 
+    // Do not dispatch Telegram alert if event is resolved, cancelled, or migrated historical data
+    if (event.resolved === true || event.status === 'CANCELLED_BY_RESIDENT' || (event.notes && event.notes.toLowerCase().includes('migrated'))) {
+      console.log("Skipping Telegram notification for resolved/migrated record:", event.id);
+      return new Response(
+        JSON.stringify({ success: true, skipped: true, reason: "Resolved or migrated historical record" }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 }
+      );
+    }
+
     const personId = event.person_id ?? "1";
     const severity = (event.severity ?? "SEVERE").toUpperCase();
     const score = event.fall_score !== undefined ? (Number(event.fall_score) * 100).toFixed(0) : "95";
