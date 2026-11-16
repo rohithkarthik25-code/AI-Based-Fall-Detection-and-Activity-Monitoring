@@ -9,7 +9,7 @@
     <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Outfit:wght@400;500;600;700&display=swap" rel="stylesheet">
 
     <!-- Three.js & OrbitControls -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
 
     <!-- Supabase JS Client -->
@@ -315,6 +315,8 @@
             height: 480px;
             background: radial-gradient(circle at center, #111726 0%, #06080e 100%);
             position: relative;
+            overflow: hidden;
+            border-radius: 0 0 12px 12px;
         }
 
         .viewport-overlay {
@@ -1213,51 +1215,39 @@
     </div>
 
     <script>
-        // ── 1. Three.js 3D Viewport Setup (Decoupled 60 FPS Render Loop) ──
-        const container = document.getElementById('viewport-3d');
-        const scene = new THREE.Scene();
-        scene.fog = new THREE.FogExp2(0x06080e, 0.08);
+        // =========================================================================
+        // 0. EXPLICIT GLOBAL BUTTON HANDLERS & STATE DECLARATIONS
+        // Guarantee immediate availability on window so buttons NEVER fail with ReferenceError
+        // =========================================================================
 
-        const camera = new THREE.PerspectiveCamera(50, container.clientWidth / container.clientHeight, 0.1, 100);
-        camera.position.set(0, 1.35, 3.2);
+        let currentSourceType = 'none'; // 'none' | 'webcam' | 'upload' | 'server'
+        let currentObjectUrl = null;
+        let cameraStream = null;
+        let rafId = null;
+        let isProcessingFrame = false;
+        let isLooping = true;
+        let isUserSeeking = false;
+        let activeFileName = '';
 
-        const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, powerPreference: "high-performance" });
-        renderer.setSize(container.clientWidth, container.clientHeight);
-        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
-        container.appendChild(renderer.domElement);
-
-        const controls = new THREE.OrbitControls(camera, renderer.domElement);
-        controls.enableDamping = true;
-        controls.dampingFactor = 0.08;
-        controls.target.set(0, 0.80, 0);
-
-        // Lighting & Ground Plane
-        scene.add(new THREE.AmbientLight(0xffffff, 0.9));
-        const dirLight = new THREE.DirectionalLight(0xffffff, 0.7);
-        dirLight.position.set(2, 4, 3);
-        scene.add(dirLight);
-
-        // Ground Reference Grid
-        const gridHelper = new THREE.GridHelper(4.0, 16, 0x06b6d4, 0x1f293d);
-        gridHelper.position.y = 0;
-        scene.add(gridHelper);
-
-        // Skeleton Joints & Bones
+        // Three.js & Kinematic Scene Objects
+        let scene = null;
+        let camera = null;
+        let renderer = null;
+        let controls = null;
         const JOINT_COUNT = 33;
         const joints = [];
-        const jointGeo = new THREE.SphereGeometry(0.026, 16, 16);
-        const headGeo = new THREE.SphereGeometry(0.055, 20, 20);
+        const boneLines = [];
+        let jointMatNormal = null;
+        let jointMatSit = null;
+        let jointMatFall = null;
+        let boneMatNormal = null;
+        let boneMatSit = null;
+        let boneMatFall = null;
 
-        const jointMatNormal = new THREE.MeshStandardMaterial({ color: 0x06b6d4, roughness: 0.25, emissive: 0x083344 });
-        const jointMatSit = new THREE.MeshStandardMaterial({ color: 0x10b981, roughness: 0.25, emissive: 0x064e3b });
-        const jointMatFall = new THREE.MeshStandardMaterial({ color: 0xef4444, roughness: 0.2, emissive: 0x7f1d1d });
-
+        // Target coordinates for smooth 60 FPS lerping
+        const targetPositions = [];
         for (let i = 0; i < JOINT_COUNT; i++) {
-            const geo = (i === 0) ? headGeo : jointGeo;
-            const m = new THREE.Mesh(geo, jointMatNormal);
-            m.visible = true;
-            scene.add(m);
-            joints.push(m);
+            targetPositions.push({ x: 0, y: 0, z: 0 });
         }
 
         const BONE_CONNECTIONS = [
@@ -1267,23 +1257,317 @@
             [27, 29], [29, 31], [28, 30], [30, 32],            // Feet
             [0, 11], [0, 12]                                   // Head to shoulders
         ];
-        const boneLines = [];
-        const boneMatNormal = new THREE.LineBasicMaterial({ color: 0x38bdf8, linewidth: 2 });
-        const boneMatSit = new THREE.LineBasicMaterial({ color: 0x34d399, linewidth: 2 });
-        const boneMatFall = new THREE.LineBasicMaterial({ color: 0xef4444, linewidth: 3 });
 
-        for (const _ of BONE_CONNECTIONS) {
-            const geo = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(), new THREE.Vector3()]);
-            const line = new THREE.Line(geo, boneMatNormal);
-            line.visible = true;
-            scene.add(line);
-            boneLines.push(line);
+        // Biomechanical State Machine & 5-Second Non-Recovery Window
+        const FSM_IDLE = 'IDLE';
+        const FSM_VERIFYING = 'VERIFYING';
+        const FSM_FALL_CONFIRMED = 'FALL_CONFIRMED';
+        let fsmFallState = FSM_IDLE;
+        let fsmVerificationStartTime = 0;
+        const FSM_NON_RECOVERY_WINDOW_MS = 5000;
+        let fallConfirmationCounter = 0;
+        let fallConfirmed = false;
+        let lastFallTimestamp = 0;
+        const FALL_COOLDOWN_MS = 6000;
+        let pendingFallData = null;
+        let recoveryChipTimeout = null;
+        let simulationTimer = null;
+        let simulationCountdownInterval = null;
+
+        const postureHistory = [];
+        const POSTURE_BUFFER_SIZE = 7;
+        let standingSec = 0;
+        let sittingSec = 0;
+
+        // ADL Statistics
+        const adlStats = {
+            walkingSec: 0,
+            standingSec: 0,
+            sittingSec: 0,
+            lyingSec: 0,
+            bendingSec: 0,
+            lastPosture: 'Standing',
+            transitions: 0,
+            continuousInactiveSec: 0
+        };
+
+        // Supabase & Cloud Config
+        const SUPABASE_URL = "https://qbzuwqanxnkpeuioiiao.supabase.co";
+        const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFienV3cWFueG5rcGV1aW9paWFvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTQ2MjYxMzMsImV4cCI6MjExMDIwMjEzM30.cC9AZlgWMe3doYp2DtxjYRUGdDVn5L7YmTHpiKjRP0Q";
+        const TELEGRAM_BOT_TOKEN = "9062818901:AAGIXsLlOJ-6V70_Wp_kTIAbIPSSD4-PFao";
+        const TELEGRAM_CHAT_ID = "6666395760";
+        let sbClient = null;
+        let activeFallEvent = null;
+        let cachedFallEvents = [];
+
+        // Audio Synthesizer & Web Speech Engine
+        let sirenOscillator = null;
+        let sirenGain = null;
+        let sirenAudioCtx = null;
+        let sirenTimer = null;
+        let sirenAutoStopTimeout = null;
+
+        // MediaPipe Pose Model
+        let poseModel = null;
+        let fpsCounter = 0;
+        let lastFpsUpdate = performance.now();
+        let lastFrameProcessTime = 0;
+
+        // =========================================================================
+        // 1. BUILT-IN INTERACTIVE ORBIT CONTROLS FALLBACK
+        // Guarantees 3D skeleton rotation/zooming even if external CDN OrbitControls fails
+        // =========================================================================
+
+        function createFallbackControls(cam, domElement, target) {
+            let isDragging = false;
+            let prevX = 0, prevY = 0;
+            let radius = 3.2;
+            let theta = 0;
+            let phi = Math.PI / 2.5;
+
+            function updateCameraFromAngles() {
+                const x = target.x + radius * Math.sin(phi) * Math.sin(theta);
+                const y = target.y + radius * Math.cos(phi);
+                const z = target.z + radius * Math.sin(phi) * Math.cos(theta);
+                cam.position.set(x, y, z);
+                cam.lookAt(target);
+            }
+
+            domElement.style.cursor = 'grab';
+
+            domElement.addEventListener('mousedown', (e) => {
+                isDragging = true;
+                prevX = e.clientX;
+                prevY = e.clientY;
+                domElement.style.cursor = 'grabbing';
+            });
+
+            window.addEventListener('mouseup', () => {
+                isDragging = false;
+                if (domElement) domElement.style.cursor = 'grab';
+            });
+
+            domElement.addEventListener('mousemove', (e) => {
+                if (!isDragging) return;
+                const dx = e.clientX - prevX;
+                const dy = e.clientY - prevY;
+                prevX = e.clientX;
+                prevY = e.clientY;
+                theta -= dx * 0.008;
+                phi = Math.max(0.1, Math.min(Math.PI - 0.1, phi - dy * 0.008));
+                updateCameraFromAngles();
+            });
+
+            domElement.addEventListener('wheel', (e) => {
+                e.preventDefault();
+                radius = Math.max(1.2, Math.min(8.0, radius + e.deltaY * 0.003));
+                updateCameraFromAngles();
+            }, { passive: false });
+
+            return {
+                update: () => {},
+                target: target,
+                enableDamping: true
+            };
         }
 
-        // Target coordinates for smooth 60 FPS lerping
-        const targetPositions = [];
-        for (let i = 0; i < JOINT_COUNT; i++) {
-            targetPositions.push(new THREE.Vector3(0, 0, 0));
+        // =========================================================================
+        // 2. THREE.JS 3D VIEWPORT SETUP (Decoupled 60 FPS Render Loop)
+        // =========================================================================
+
+        function initThreeScene() {
+            const container = document.getElementById('viewport-3d');
+            if (!container) return;
+
+            // Check if Three.js library is loaded
+            if (typeof THREE === 'undefined') {
+                console.warn("Three.js library is not loaded. Activating 2D kinematics canvas fallback.");
+                render2DFallbackViewport(container);
+                return;
+            }
+
+            try {
+                // Remove any pre-existing canvas
+                const oldCanvas = container.querySelector('canvas');
+                if (oldCanvas) oldCanvas.remove();
+
+                scene = new THREE.Scene();
+                scene.fog = new THREE.FogExp2(0x06080e, 0.06);
+
+                const width = Math.max(container.clientWidth || 0, 500);
+                const height = Math.max(container.clientHeight || 0, 480);
+
+                camera = new THREE.PerspectiveCamera(50, width / height, 0.1, 100);
+                camera.position.set(0, 1.35, 3.2);
+
+                renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, powerPreference: "high-performance" });
+                renderer.setSize(width, height);
+                renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5));
+                renderer.setClearColor(0x06080e, 1.0);
+                renderer.domElement.style.width = '100%';
+                renderer.domElement.style.height = '100%';
+                renderer.domElement.style.display = 'block';
+                container.appendChild(renderer.domElement);
+
+                // OrbitControls initialization with guaranteed fallback
+                if (typeof THREE.OrbitControls === 'function') {
+                    try {
+                        controls = new THREE.OrbitControls(camera, renderer.domElement);
+                        controls.enableDamping = true;
+                        controls.dampingFactor = 0.08;
+                        controls.target.set(0, 0.80, 0);
+                    } catch (ctrlErr) {
+                        console.warn("OrbitControls initialization failed, using built-in controls:", ctrlErr);
+                        controls = createFallbackControls(camera, renderer.domElement, new THREE.Vector3(0, 0.80, 0));
+                    }
+                } else {
+                    console.warn("THREE.OrbitControls not found on window, using built-in controls.");
+                    controls = createFallbackControls(camera, renderer.domElement, new THREE.Vector3(0, 0.80, 0));
+                }
+
+                // Lighting & Ground Plane
+                const ambLight = new THREE.AmbientLight(0xffffff, 1.0);
+                scene.add(ambLight);
+
+                const dirLight = new THREE.DirectionalLight(0xffffff, 0.85);
+                dirLight.position.set(2, 4, 3);
+                scene.add(dirLight);
+
+                // High-visibility ground grid
+                const gridHelper = new THREE.GridHelper(4.0, 16, 0x06b6d4, 0x1f293d);
+                gridHelper.position.y = 0;
+                scene.add(gridHelper);
+
+                // Materials
+                jointMatNormal = new THREE.MeshStandardMaterial({ color: 0x06b6d4, roughness: 0.25, emissive: 0x083344 });
+                jointMatSit = new THREE.MeshStandardMaterial({ color: 0x10b981, roughness: 0.25, emissive: 0x064e3b });
+                jointMatFall = new THREE.MeshStandardMaterial({ color: 0xef4444, roughness: 0.2, emissive: 0x7f1d1d });
+
+                boneMatNormal = new THREE.LineBasicMaterial({ color: 0x38bdf8, linewidth: 2 });
+                boneMatSit = new THREE.LineBasicMaterial({ color: 0x34d399, linewidth: 2 });
+                boneMatFall = new THREE.LineBasicMaterial({ color: 0xef4444, linewidth: 3 });
+
+                const jointGeo = new THREE.SphereGeometry(0.028, 16, 16);
+                const headGeo = new THREE.SphereGeometry(0.055, 20, 20);
+
+                joints.length = 0;
+                for (let i = 0; i < JOINT_COUNT; i++) {
+                    const geo = (i === 0) ? headGeo : jointGeo;
+                    const m = new THREE.Mesh(geo, jointMatNormal);
+                    // Show head, upper body, and legs
+                    m.visible = (i === 0 || (i >= 11 && i <= 16) || (i >= 23 && i <= 28));
+                    scene.add(m);
+                    joints.push(m);
+                }
+
+                boneLines.length = 0;
+                for (const _ of BONE_CONNECTIONS) {
+                    const geo = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(), new THREE.Vector3()]);
+                    const line = new THREE.Line(geo, boneMatNormal);
+                    line.visible = true;
+                    scene.add(line);
+                    boneLines.push(line);
+                }
+
+                // Load initial standing avatar coordinates
+                loadDefaultStandingAvatar();
+
+                // Synchronous first-frame render
+                renderer.render(scene, camera);
+
+                // Update status badge
+                const st = document.getElementById('3d-status');
+                if (st) {
+                    st.textContent = 'Three.js WebGL (60 FPS)';
+                    st.style.color = '#10b981';
+                }
+
+                // Start decoupled 60 FPS animation loop
+                animate();
+
+                // Window & container resize observation
+                window.addEventListener('resize', handleViewportResize);
+                if (window.ResizeObserver) {
+                    const ro = new ResizeObserver(() => handleViewportResize());
+                    ro.observe(container);
+                }
+
+            } catch (err) {
+                console.error("Three.js setup error:", err);
+                render2DFallbackViewport(container);
+            }
+        }
+
+        function handleViewportResize() {
+            const container = document.getElementById('viewport-3d');
+            if (!container || !renderer || !camera) return;
+            const w = Math.max(container.clientWidth || 0, 320);
+            const h = Math.max(container.clientHeight || 0, 240);
+            camera.aspect = w / h;
+            camera.updateProjectionMatrix();
+            renderer.setSize(w, h);
+            if (scene) renderer.render(scene, camera);
+        }
+
+        function render2DFallbackViewport(container) {
+            const canvas = document.createElement('canvas');
+            canvas.width = container.clientWidth || 500;
+            canvas.height = container.clientHeight || 480;
+            canvas.style.width = '100%';
+            canvas.style.height = '100%';
+            canvas.style.display = 'block';
+            container.appendChild(canvas);
+
+            const ctx = canvas.getContext('2d');
+            function draw2D() {
+                ctx.fillStyle = '#06080e';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                
+                // Ground grid
+                ctx.strokeStyle = '#1e293b';
+                ctx.lineWidth = 1;
+                for (let y = canvas.height - 40; y <= canvas.height; y += 10) {
+                    ctx.beginPath();
+                    ctx.moveTo(0, y);
+                    ctx.lineTo(canvas.width, y);
+                    ctx.stroke();
+                }
+
+                // Draw stick avatar in 2D
+                const cx = canvas.width / 2;
+                const cy = canvas.height / 2;
+                const scale = canvas.height / 2.4;
+
+                ctx.strokeStyle = '#38bdf8';
+                ctx.lineWidth = 3;
+                BONE_CONNECTIONS.forEach(([a, b]) => {
+                    const pA = targetPositions[a];
+                    const pB = targetPositions[b];
+                    if (pA && pB) {
+                        ctx.beginPath();
+                        ctx.moveTo(cx + pA.x * scale, (cy + 60) - pA.y * scale);
+                        ctx.lineTo(cx + pB.x * scale, (cy + 60) - pB.y * scale);
+                        ctx.stroke();
+                    }
+                });
+
+                ctx.fillStyle = '#06b6d4';
+                targetPositions.forEach((pt, idx) => {
+                    if (idx === 0 || (idx >= 11 && idx <= 16) || (idx >= 23 && idx <= 28)) {
+                        ctx.beginPath();
+                        ctx.arc(cx + pt.x * scale, (cy + 60) - pt.y * scale, idx === 0 ? 8 : 4, 0, 2 * Math.PI);
+                        ctx.fill();
+                    }
+                });
+
+                requestAnimationFrame(draw2D);
+            }
+            draw2D();
+            const st = document.getElementById('3d-status');
+            if (st) {
+                st.textContent = '2D Kinematics Mode';
+                st.style.color = '#f59e0b';
+            }
         }
 
         function loadDefaultStandingAvatar() {
@@ -1311,56 +1595,71 @@
 
             for (let i = 0; i < JOINT_COUNT; i++) {
                 const pt = defaultLandmarks[i] || { x: 0, y: 0, z: 0 };
-                targetPositions[i].set(pt.x, pt.y, pt.z);
-                joints[i].position.copy(targetPositions[i]);
-                joints[i].material = jointMatNormal;
+                if (targetPositions[i]) {
+                    targetPositions[i].x = pt.x;
+                    targetPositions[i].y = pt.y;
+                    targetPositions[i].z = pt.z;
+                }
+                if (joints[i]) {
+                    joints[i].position.set(pt.x, pt.y, pt.z);
+                    if (jointMatNormal) joints[i].material = jointMatNormal;
+                }
             }
             BONE_CONNECTIONS.forEach(([a, b], idx) => {
-                boneLines[idx].geometry.setFromPoints([joints[a].position, joints[b].position]);
-                boneLines[idx].material = boneMatNormal;
+                if (boneLines[idx] && joints[a] && joints[b]) {
+                    boneLines[idx].geometry.setFromPoints([joints[a].position, joints[b].position]);
+                    if (boneMatNormal) boneLines[idx].material = boneMatNormal;
+                }
             });
         }
 
         function setCameraPreset(view) {
-            if (view === 'front') { camera.position.set(0, 1.0, 2.8); controls.target.set(0, 0.80, 0); }
-            else if (view === 'side') { camera.position.set(2.8, 1.0, 0); controls.target.set(0, 0.80, 0); }
-            else if (view === 'top') { camera.position.set(0, 3.2, 0.01); controls.target.set(0, 0.80, 0); }
-            else if (view === 'iso') { camera.position.set(1.8, 1.6, 2.2); controls.target.set(0, 0.80, 0); }
-            controls.update();
+            if (!camera) return;
+            if (view === 'front') { 
+                camera.position.set(0, 1.0, 2.8); 
+                if (controls && controls.target) controls.target.set(0, 0.80, 0); 
+            } else if (view === 'side') { 
+                camera.position.set(2.8, 1.0, 0); 
+                if (controls && controls.target) controls.target.set(0, 0.80, 0); 
+            } else if (view === 'top') { 
+                camera.position.set(0, 3.2, 0.01); 
+                if (controls && controls.target) controls.target.set(0, 0.80, 0); 
+            } else if (view === 'iso') { 
+                camera.position.set(1.8, 1.6, 2.2); 
+                if (controls && controls.target) controls.target.set(0, 0.80, 0); 
+            }
+            camera.lookAt(0, 0.80, 0);
+            if (controls && typeof controls.update === 'function') controls.update();
+            if (renderer && scene) renderer.render(scene, camera);
         }
-
-        window.addEventListener('resize', () => {
-            camera.aspect = container.clientWidth / container.clientHeight;
-            camera.updateProjectionMatrix();
-            renderer.setSize(container.clientWidth, container.clientHeight);
-        });
 
         // 60 FPS Decoupled Smooth Interpolation Loop
         function animate() {
             requestAnimationFrame(animate);
-            controls.update();
+            if (!renderer || !scene || !camera) return;
 
-            // Smoothly lerp all 33 joints towards target positions at 60 FPS
+            if (controls && typeof controls.update === 'function') {
+                controls.update();
+            }
+
+            // Smoothly lerp all 33 joints towards target positions
             for (let i = 0; i < JOINT_COUNT; i++) {
-                joints[i].position.lerp(targetPositions[i], 0.35);
+                if (joints[i] && targetPositions[i]) {
+                    joints[i].position.x += (targetPositions[i].x - joints[i].position.x) * 0.35;
+                    joints[i].position.y += (targetPositions[i].y - joints[i].position.y) * 0.35;
+                    joints[i].position.z += (targetPositions[i].z - joints[i].position.z) * 0.35;
+                }
             }
 
             // Update bone connecting lines
             BONE_CONNECTIONS.forEach(([a, b], idx) => {
-                if (joints[a] && joints[b]) {
+                if (boneLines[idx] && joints[a] && joints[b]) {
                     boneLines[idx].geometry.setFromPoints([joints[a].position, joints[b].position]);
                 }
             });
 
             renderer.render(scene, camera);
         }
-        animate();
-        loadDefaultStandingAvatar();
-
-        // ── 2. Accurate Physical 3D Skeleton Positioning ──
-        let currentSourceType = 'none'; // 'none' | 'webcam' | 'upload'
-        let currentObjectUrl = null;
-        let rafId = null;
 
         function update3DTargetPositions(wlm, lm, isFallen = false, isSitting = false) {
             if (!wlm || wlm.length === 0) return;
@@ -1381,33 +1680,61 @@
                     const posY = -(pt.y - lowestY) + 0.05;
                     const posZ = -pt.z;
 
-                    targetPositions[i].set(posX, Math.max(0.02, posY), posZ);
-                    joints[i].material = currentJointMat;
+                    if (targetPositions[i]) {
+                        targetPositions[i].x = posX;
+                        targetPositions[i].y = Math.max(0.02, posY);
+                        targetPositions[i].z = posZ;
+                    }
+                    if (joints[i] && currentJointMat) {
+                        joints[i].material = currentJointMat;
+                    }
                 }
             }
 
-            BONE_CONNECTIONS.forEach((_, idx) => {
-                boneLines[idx].material = currentBoneMat;
-            });
+            if (currentBoneMat) {
+                BONE_CONNECTIONS.forEach((_, idx) => {
+                    if (boneLines[idx]) boneLines[idx].material = currentBoneMat;
+                });
+            }
         }
 
-        // ── 3. Supabase Client Setup ──
-        const SUPABASE_URL = "https://qbzuwqanxnkpeuioiiao.supabase.co";
-        const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFienV3cWFueG5rcGV1aW9paWFvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTQ2MjYxMzMsImV4cCI6MjExMDIwMjEzM30.cC9AZlgWMe3doYp2DtxjYRUGdDVn5L7YmTHpiKjRP0Q";
-        
-        const TELEGRAM_BOT_TOKEN = "9062818901:AAGIXsLlOJ-6V70_Wp_kTIAbIPSSD4-PFao";
-        const TELEGRAM_CHAT_ID = "6666395760";
+        // =========================================================================
+        // 3. SUPABASE CLIENT & CLOUD INCIDENT REPOSITORY
+        // =========================================================================
 
-        let sbClient = null;
-        try {
-            sbClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-            console.log("Supabase client initialized successfully.");
-        } catch (e) {
-            console.error("Supabase init error:", e);
+        function initSupabaseClient() {
+            try {
+                if (window.supabase && typeof window.supabase.createClient === 'function') {
+                    sbClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+                    console.log("Supabase client initialized successfully.");
+
+                    sbClient
+                        .channel('realtime_fall_events')
+                        .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'fall_events' }, payload => {
+                            const rec = payload.new;
+                            activeFallEvent = rec;
+                            const banner = document.getElementById('emergency-banner');
+                            if (banner) banner.style.display = 'flex';
+                            const title = document.getElementById('emergency-title');
+                            if (title) title.textContent = `🚨 ${rec.severity} FALL DETECTED!`;
+                            const desc = document.getElementById('emergency-desc');
+                            if (desc) desc.textContent = `Person #${rec.person_id} fell (Score: ${(Number(rec.fall_score) * 100).toFixed(0)}%). Telegram alert sent.`;
+                            playEmergencyTone();
+                            loadFallHistory();
+                        })
+                        .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'fall_events' }, () => {
+                            loadFallHistory();
+                        })
+                        .subscribe();
+
+                    loadFallHistory();
+                } else {
+                    console.warn("Supabase library not yet loaded on window.");
+                }
+            } catch (e) {
+                console.error("Supabase init error:", e);
+            }
         }
-
-        let activeFallEvent = null;
-        let cachedFallEvents = [];
 
         async function loadFallHistory() {
             if (!sbClient) return;
@@ -1419,6 +1746,8 @@
                     .limit(25);
 
                 const tbody = document.getElementById('incident-tbody');
+                if (!tbody) return;
+
                 if (error) {
                     tbody.innerHTML = `<tr><td colspan="8" style="text-align: center; color: #ef4444;">Error: ${error.message}</td></tr>`;
                     return;
@@ -1471,7 +1800,8 @@
 
             if (!error) {
                 if (activeFallEvent && activeFallEvent.id === id) {
-                    document.getElementById('emergency-banner').style.display = 'none';
+                    const banner = document.getElementById('emergency-banner');
+                    if (banner) banner.style.display = 'none';
                     activeFallEvent = null;
                 }
                 loadFallHistory();
@@ -1514,30 +1844,9 @@
             URL.revokeObjectURL(url);
         }
 
-        if (sbClient) {
-            sbClient
-                .channel('realtime_fall_events')
-                .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'fall_events' }, payload => {
-                    const rec = payload.new;
-                    activeFallEvent = rec;
-                    document.getElementById('emergency-title').textContent = `🚨 ${rec.severity} FALL DETECTED!`;
-                    document.getElementById('emergency-desc').textContent = `Person #${rec.person_id} fell (Score: ${(Number(rec.fall_score) * 100).toFixed(0)}%). Telegram alert sent.`;
-                    document.getElementById('emergency-banner').style.display = 'flex';
-                    playEmergencyTone();
-                    loadFallHistory();
-                })
-                .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'fall_events' }, () => {
-                    loadFallHistory();
-                })
-                .subscribe();
-        }
-
-                // ── 4. Audio Synthesizer & Web Speech Engine ──
-        let sirenOscillator = null;
-        let sirenGain = null;
-        let sirenAudioCtx = null;
-        let sirenTimer = null;
-        let sirenAutoStopTimeout = null;
+        // =========================================================================
+        // 4. AUDIO SYNTHESIZER & SPEECH ENGINE (10s Auto-Shutoff Siren)
+        // =========================================================================
 
         function playEmergencyTone() {
             try {
@@ -1613,36 +1922,9 @@
             } catch (_) {}
         }
 
-        // ── 5. Robust Biomechanical Calculation & State Engines ──
-        let cameraStream = null;
-        let poseModel = null;
-        let isProcessingFrame = false;
-        let isLooping = true;
-        let isUserSeeking = false;
-        let activeFileName = '';
-
-        const postureHistory = [];
-        const POSTURE_BUFFER_SIZE = 7;
-
-        let fallConfirmationCounter = 0;
-        const FALL_CONFIRMATION_FRAMES = 4;
-        let fallConfirmed = false;
-        let lastFallTimestamp = 0;
-        const FALL_COOLDOWN_MS = 6000;
-
-        let standingSec = 0;
-        let sittingSec = 0;
-
-        // ── Feature 1.1 State Machine: 5-Second Post-Fall Non-Recovery Direct Dispatch ──
-        const FSM_IDLE = 'IDLE';
-        const FSM_VERIFYING = 'VERIFYING';
-        const FSM_FALL_CONFIRMED = 'FALL_CONFIRMED';
-
-        let fsmFallState = FSM_IDLE;
-        let fsmVerificationStartTime = 0;
-        const FSM_NON_RECOVERY_WINDOW_MS = 5000; // 5.0s Non-Recovery Window before automatic Telegram dispatch
-        let recoveryChipTimeout = null;
-        let pendingFallData = null;
+        // =========================================================================
+        // 5. BIOMECHANICAL FALL STATE MACHINE & 5-SECOND NON-RECOVERY DISPATCH
+        // =========================================================================
 
         function triggerRecoveryDetected() {
             clearSimulation();
@@ -1679,7 +1961,6 @@
             if (rChip) rChip.style.display = 'none';
         }
 
-        // Helper functions for testing & dismissal
         function dismissAlertByResident() {
             resetEmergencyState();
         }
@@ -1705,29 +1986,28 @@
 
         // Accessibility shortcut: Spacebar or Escape resets active alert
         window.addEventListener('keydown', (e) => {
+            if (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA')) return;
             if (e.code === 'Space' || e.key === 'Escape') {
                 if (fsmFallState !== FSM_IDLE) {
                     e.preventDefault();
                     resetEmergencyState();
                 }
             }
+            const key = e.key.toLowerCase();
+            if (key === 'f') setCameraPreset('front');
+            else if (key === 's') setCameraPreset('side');
+            else if (key === 't') setCameraPreset('top');
+            else if (key === 'r') setCameraPreset('iso');
         });
 
-        // ── Feature 3.1: Continuous ADL Activity & Sedentary State ──
-        const adlStats = {
-            walkingSec: 0,
-            standingSec: 0,
-            sittingSec: 0,
-            lyingSec: 0,
-            bendingSec: 0,
-            lastPosture: 'Standing',
-            transitions: 0,
-            continuousInactiveSec: 0
-        };
+        // =========================================================================
+        // 6. CONTINUOUS ADL (ACTIVITIES OF DAILY LIVING) & SEDENTARY ANALYTICS
+        // =========================================================================
 
         function updateADLAnalytics() {
             if (currentSourceType === 'none') return;
-            const posture = document.getElementById('hud-posture').textContent;
+            const postEl = document.getElementById('hud-posture');
+            const posture = postEl ? postEl.textContent : 'Unknown';
 
             // Track posture transitions
             if (posture !== adlStats.lastPosture && posture !== 'Unknown' && posture !== 'FALLEN') {
@@ -1760,8 +2040,10 @@
             // Sync with ribbon standing/sitting timers
             standingSec = adlStats.standingSec + adlStats.walkingSec;
             sittingSec = adlStats.sittingSec;
-            document.getElementById('hud-stand-time').textContent = standingSec + 's';
-            document.getElementById('hud-sit-time').textContent = sittingSec + 's';
+            const standEl = document.getElementById('hud-stand-time');
+            if (standEl) standEl.textContent = standingSec + 's';
+            const sitEl = document.getElementById('hud-sit-time');
+            if (sitEl) sitEl.textContent = sittingSec + 's';
 
             // Calculate active vs sedentary split
             const activeSec = adlStats.walkingSec + adlStats.standingSec + adlStats.bendingSec;
@@ -1773,56 +2055,71 @@
             const sitPct = Math.round((adlStats.sittingSec / totalSec) * 100);
             const lyingPct = Math.round((adlStats.lyingSec / totalSec) * 100);
 
-            document.getElementById('adl-walk-time').textContent = formatMinsSecs(adlStats.walkingSec);
-            document.getElementById('adl-walk-pct').textContent = `${walkPct}%`;
+            const walkEl = document.getElementById('adl-walk-time');
+            if (walkEl) walkEl.textContent = formatMinsSecs(adlStats.walkingSec);
+            const walkPctEl = document.getElementById('adl-walk-pct');
+            if (walkPctEl) walkPctEl.textContent = `${walkPct}%`;
 
-            document.getElementById('adl-stand-time').textContent = formatMinsSecs(adlStats.standingSec);
-            document.getElementById('adl-stand-pct').textContent = `${standPct}%`;
+            const standTimeEl = document.getElementById('adl-stand-time');
+            if (standTimeEl) standTimeEl.textContent = formatMinsSecs(adlStats.standingSec);
+            const standPctEl = document.getElementById('adl-stand-pct');
+            if (standPctEl) standPctEl.textContent = `${standPct}%`;
 
-            document.getElementById('adl-sit-time').textContent = formatMinsSecs(adlStats.sittingSec);
-            document.getElementById('adl-sit-pct').textContent = `${sitPct}%`;
+            const sitTimeEl = document.getElementById('adl-sit-time');
+            if (sitTimeEl) sitTimeEl.textContent = formatMinsSecs(adlStats.sittingSec);
+            const sitPctEl = document.getElementById('adl-sit-pct');
+            if (sitPctEl) sitPctEl.textContent = `${sitPct}%`;
 
-            document.getElementById('adl-lying-time').textContent = formatMinsSecs(adlStats.lyingSec);
-            document.getElementById('adl-lying-pct').textContent = `${lyingPct}%`;
+            const lyingTimeEl = document.getElementById('adl-lying-time');
+            if (lyingTimeEl) lyingTimeEl.textContent = formatMinsSecs(adlStats.lyingSec);
+            const lyingPctEl = document.getElementById('adl-lying-pct');
+            if (lyingPctEl) lyingPctEl.textContent = `${lyingPct}%`;
 
             // Continuous Inactivity timer
             const inactMins = Math.floor(adlStats.continuousInactiveSec / 60);
             const inactSecs = adlStats.continuousInactiveSec % 60;
-            document.getElementById('adl-inactive-duration').textContent =
-                `${inactMins < 10 ? '0' : ''}${inactMins}:${inactSecs < 10 ? '0' : ''}${inactSecs}`;
+            const inactEl = document.getElementById('adl-inactive-duration');
+            if (inactEl) inactEl.textContent = `${inactMins < 10 ? '0' : ''}${inactMins}:${inactSecs < 10 ? '0' : ''}${inactSecs}`;
 
-            // Sedentary Alert threshold: 45s for demo, >45m for clinical
+            // Sedentary Alert threshold
             const chip = document.getElementById('sedentary-status-chip');
-            if (adlStats.continuousInactiveSec >= 45) {
-                chip.textContent = '⚠️ Sedentary: Time to Stand & Stretch!';
-                chip.style.color = '#ef4444';
-                chip.style.borderColor = 'rgba(239, 68, 68, 0.4)';
-                chip.style.background = 'rgba(239, 68, 68, 0.15)';
-            } else if (adlStats.continuousInactiveSec >= 25) {
-                chip.textContent = '🟡 Sedentary Period';
-                chip.style.color = '#f59e0b';
-                chip.style.borderColor = 'rgba(245, 158, 11, 0.4)';
-                chip.style.background = 'rgba(245, 158, 11, 0.12)';
-            } else {
-                chip.textContent = '🟢 Active & Mobile';
-                chip.style.color = '#10b981';
-                chip.style.borderColor = 'rgba(16, 185, 129, 0.3)';
-                chip.style.background = 'rgba(16, 185, 129, 0.1)';
+            if (chip) {
+                if (adlStats.continuousInactiveSec >= 45) {
+                    chip.textContent = '⚠️ Sedentary: Time to Stand & Stretch!';
+                    chip.style.color = '#ef4444';
+                    chip.style.borderColor = 'rgba(239, 68, 68, 0.4)';
+                    chip.style.background = 'rgba(239, 68, 68, 0.15)';
+                } else if (adlStats.continuousInactiveSec >= 25) {
+                    chip.textContent = '🟡 Sedentary Period';
+                    chip.style.color = '#f59e0b';
+                    chip.style.borderColor = 'rgba(245, 158, 11, 0.4)';
+                    chip.style.background = 'rgba(245, 158, 11, 0.12)';
+                } else {
+                    chip.textContent = '🟢 Active & Mobile';
+                    chip.style.color = '#10b981';
+                    chip.style.borderColor = 'rgba(16, 185, 129, 0.3)';
+                    chip.style.background = 'rgba(16, 185, 129, 0.1)';
+                }
             }
 
             // Posture transitions & mobility score
-            document.getElementById('adl-transitions-count').textContent = adlStats.transitions;
+            const transEl = document.getElementById('adl-transitions-count');
+            if (transEl) transEl.textContent = adlStats.transitions;
             const activeRatio = activeSec / totalSec;
             const mobilityScore = Math.min(100, Math.round(70 + (adlStats.transitions * 3) + (activeRatio * 20)));
             const mobLabel = mobilityScore > 85 ? 'Optimal' : (mobilityScore > 65 ? 'Moderate' : 'Reduced');
-            document.getElementById('adl-mobility-index').textContent = `Mobility: ${mobLabel} (${mobilityScore}/100)`;
+            const mobEl = document.getElementById('adl-mobility-index');
+            if (mobEl) mobEl.textContent = `Mobility: ${mobLabel} (${mobilityScore}/100)`;
 
             // Proportional split bar
             const activePct = Math.round((activeSec / totalSec) * 100);
             const sedPct = 100 - activePct;
-            document.getElementById('adl-split-active').style.width = `${activePct}%`;
-            document.getElementById('adl-split-sedentary').style.width = `${sedPct}%`;
-            document.getElementById('adl-ratio-text').textContent = `${activePct}% Active / ${sedPct}% Sedentary`;
+            const splitAct = document.getElementById('adl-split-active');
+            if (splitAct) splitAct.style.width = `${activePct}%`;
+            const splitSed = document.getElementById('adl-split-sedentary');
+            if (splitSed) splitSed.style.width = `${sedPct}%`;
+            const ratioText = document.getElementById('adl-ratio-text');
+            if (ratioText) ratioText.textContent = `${activePct}% Active / ${sedPct}% Sedentary`;
         }
 
         function resetADLStats() {
@@ -1855,6 +2152,10 @@
             const cosTheta = Math.max(-1.0, Math.min(1.0, dot / (mag1 * mag2)));
             return Math.acos(cosTheta) * (180 / Math.PI);
         }
+
+        // =========================================================================
+        // 7. SNAPSHOT CAPTURE & TELEGRAM DISPATCH
+        // =========================================================================
 
         async function captureCurrentSnapshotBlob() {
             const video = document.getElementById('webcam-video');
@@ -1918,7 +2219,7 @@
             const sourceDesc = (currentSourceType === 'upload') ? `Uploaded Video (${activeFileName || 'Test'})` : ((currentSourceType === 'webcam') ? 'Live Webcam' : 'AI Fall Detection System');
             const text = `🚨 <b>EMERGENCY: FALL DETECTED!</b>\n━━━━━━━━━━━━━━━━━━━\n👤 <b>Person:</b> #1\n⚠️ <b>Severity:</b> ${severity}\n📊 <b>Confidence Score:</b> ${(score * 100).toFixed(0)}%\n⏱️ <b>Duration Down:</b> 5.0s (No Recovery)\n🕒 <b>Time:</b> ${timeStr}\n🌐 <b>Source:</b> ${sourceDesc}\n━━━━━━━━━━━━━━━━━━━\n<i>Immediate caregiver attention required! Check dashboard now.</i>`;
             
-            // Priority 1: Direct Multipart FormData upload with image blob (guarantees photo upload)
+            // Priority 1: Direct Multipart FormData upload with image blob
             if (snapshotBlob) {
                 try {
                     const formData = new FormData();
@@ -1935,15 +2236,13 @@
                     if (resJson && resJson.ok) {
                         console.log("Telegram alert with photo sent successfully (direct multipart)!");
                         return true;
-                    } else {
-                        console.warn("Direct Telegram sendPhoto response:", resJson);
                     }
                 } catch (err) {
                     console.warn("Direct Telegram multipart fetch failed:", err);
                 }
             }
 
-            // Priority 2: Fallback to public URL if blob upload had network issue
+            // Priority 2: Fallback to public URL if available
             if (snapshotUrl && snapshotUrl.startsWith('http')) {
                 try {
                     const resp = await fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendPhoto`, {
@@ -1990,7 +2289,7 @@
 
             playEmergencyTone();
 
-            // 1. Capture snapshot blob immediately (with video frame and 2D skeleton)
+            // 1. Capture snapshot blob immediately
             const snapshotBlob = await captureCurrentSnapshotBlob();
             let snapshotUrl = null;
 
@@ -2007,8 +2306,6 @@
                             .from('fall-snapshots')
                             .getPublicUrl(filename);
                         snapshotUrl = publicUrlData?.publicUrl || null;
-                    } else {
-                        console.warn("Supabase storage upload note:", uploadErr);
                     }
                 } catch (e) {
                     console.warn("Snapshot storage upload error:", e);
@@ -2058,10 +2355,9 @@
             return `${mins}:${secs < 10 ? '0' : ''}${secs}`;
         }
 
-        // ── 6. Zero-Lag Frame Processing Loop ──
-        let fpsCounter = 0;
-        let lastFpsUpdate = performance.now();
-        let lastFrameProcessTime = 0;
+        // =========================================================================
+        // 8. MEDIAPIPE IN-BROWSER POSE MODEL & FRAME PROCESSING
+        // =========================================================================
 
         function initPoseModel() {
             if (!poseModel) {
@@ -2097,7 +2393,7 @@
                 isProcessingFrame = false;
             }
 
-            if (poseModel && !isProcessingFrame && video.readyState >= 2 && video.videoWidth > 0 && !video.paused && !video.ended) {
+            if (poseModel && !isProcessingFrame && video && video.readyState >= 2 && video.videoWidth > 0 && !video.paused && !video.ended) {
                 isProcessingFrame = true;
                 lastFrameProcessTime = now;
                 poseModel.send({ image: video })
@@ -2108,7 +2404,8 @@
             // Calculate live throughput FPS
             fpsCounter++;
             if (now - lastFpsUpdate >= 1000) {
-                document.getElementById('hud-fps').textContent = fpsCounter + ' FPS';
+                const fpsEl = document.getElementById('hud-fps');
+                if (fpsEl) fpsEl.textContent = fpsCounter + ' FPS';
                 fpsCounter = 0;
                 lastFpsUpdate = now;
             }
@@ -2116,7 +2413,10 @@
             rafId = requestAnimationFrame(processVideoFrame);
         }
 
-        // ── 7. Input Source Controllers (Video Upload & Live Webcam) ──
+        // =========================================================================
+        // 9. INPUT SOURCE CONTROLLERS (Video Upload & Live Webcam)
+        // =========================================================================
+
         function updateTabHighlight(activeTabId) {
             ['tab-btn-upload', 'tab-btn-webcam-on', 'tab-btn-webcam'].forEach(id => {
                 const el = document.getElementById(id);
@@ -2183,29 +2483,36 @@
             const webcamControlsBar = document.getElementById('webcam-controls-bar');
             const sourceTag = document.getElementById('source-tag');
 
-            try { video.pause(); } catch (_) {}
-            video.srcObject = null;
-            video.removeAttribute('src');
+            if (video) {
+                try { video.pause(); } catch (_) {}
+                video.srcObject = null;
+                video.removeAttribute('src');
+                video.style.display = 'none';
+            }
 
             if (canvas) {
                 const ctx = canvas.getContext('2d');
                 ctx.clearRect(0, 0, canvas.width, canvas.height);
+                canvas.style.display = 'none';
             }
 
             currentSourceType = 'none';
             activeFileName = '';
-            video.style.display = 'none';
-            canvas.style.display = 'none';
-            controlsBar.style.display = 'none';
+            if (placeholder) placeholder.style.display = 'block';
+            if (controlsBar) controlsBar.style.display = 'none';
             if (webcamControlsBar) webcamControlsBar.style.display = 'none';
-            sourceTag.style.display = 'none';
-            document.getElementById('hud-overlay-activity').style.display = 'none';
-            document.getElementById('hud-overlay-score').style.display = 'none';
+            if (sourceTag) sourceTag.style.display = 'none';
+
+            const actEl = document.getElementById('hud-overlay-activity');
+            if (actEl) actEl.style.display = 'none';
+            const scoreEl = document.getElementById('hud-overlay-score');
+            if (scoreEl) scoreEl.style.display = 'none';
             const authB = document.getElementById('hud-overlay-authenticity');
             if (authB) authB.style.display = 'none';
-            placeholder.style.display = 'block';
 
-            document.getElementById('hud-fps').textContent = '-- FPS';
+            const fpsEl = document.getElementById('hud-fps');
+            if (fpsEl) fpsEl.textContent = '-- FPS';
+
             loadDefaultStandingAvatar();
             updateTabHighlight(null);
         }
@@ -2236,8 +2543,8 @@
             const sourceTag = document.getElementById('source-tag');
 
             // Mirrored view for live selfie webcam
-            video.style.transform = 'scaleX(-1)';
-            canvas.style.transform = 'scaleX(-1)';
+            if (video) video.style.transform = 'scaleX(-1)';
+            if (canvas) canvas.style.transform = 'scaleX(-1)';
 
             try {
                 cameraStream = await getMedia({
@@ -2258,24 +2565,30 @@
                 video.playsInline = true;
                 video.autoplay = true;
 
-                placeholder.style.display = 'none';
-                video.style.display = 'block';
-                canvas.style.display = 'block';
-                document.getElementById('hud-overlay-activity').style.display = 'block';
-                document.getElementById('hud-overlay-score').style.display = 'block';
+                if (placeholder) placeholder.style.display = 'none';
+                if (video) video.style.display = 'block';
+                if (canvas) canvas.style.display = 'block';
+                
+                const actEl = document.getElementById('hud-overlay-activity');
+                if (actEl) actEl.style.display = 'block';
+                const scoreEl = document.getElementById('hud-overlay-score');
+                if (scoreEl) scoreEl.style.display = 'block';
+
                 const authB = document.getElementById('hud-overlay-authenticity');
                 if (authB) {
                     authB.className = 'hud-auth-badge';
                     authB.innerHTML = '🛡️ AUTHENTICITY: VERIFIED REAL (99%)';
                     authB.style.display = 'block';
                 }
-                controlsBar.style.display = 'none';
+                if (controlsBar) controlsBar.style.display = 'none';
 
                 const webcamControls = document.getElementById('webcam-controls-bar');
                 if (webcamControls) webcamControls.style.display = 'flex';
                 
-                sourceTag.textContent = '📷 Live Camera Stream (Active)';
-                sourceTag.style.display = 'block';
+                if (sourceTag) {
+                    sourceTag.textContent = '📷 Live Camera Stream (Active)';
+                    sourceTag.style.display = 'block';
+                }
 
                 initPoseModel();
 
@@ -2322,24 +2635,32 @@
             const sourceTag = document.getElementById('source-tag');
 
             // Normal un-mirrored perspective for pre-recorded video files
-            video.style.transform = 'scaleX(1)';
-            canvas.style.transform = 'scaleX(1)';
+            if (video) {
+                video.style.transform = 'scaleX(1)';
+                video.muted = true;
+                video.defaultMuted = true;
+                video.setAttribute('muted', '');
+                video.setAttribute('playsinline', '');
+                video.playsInline = true;
+                video.loop = isLooping;
 
-            video.muted = true;
-            video.defaultMuted = true;
-            video.setAttribute('muted', '');
-            video.setAttribute('playsinline', '');
-            video.playsInline = true;
-            video.loop = isLooping;
+                currentObjectUrl = URL.createObjectURL(file);
+                video.src = currentObjectUrl;
+                video.style.display = 'block';
+            }
 
-            currentObjectUrl = URL.createObjectURL(file);
-            video.src = currentObjectUrl;
+            if (canvas) {
+                canvas.style.transform = 'scaleX(1)';
+                canvas.style.display = 'block';
+            }
 
-            placeholder.style.display = 'none';
-            video.style.display = 'block';
-            canvas.style.display = 'block';
-            document.getElementById('hud-overlay-activity').style.display = 'block';
-            document.getElementById('hud-overlay-score').style.display = 'block';
+            if (placeholder) placeholder.style.display = 'none';
+
+            const actEl = document.getElementById('hud-overlay-activity');
+            if (actEl) actEl.style.display = 'block';
+            const scoreEl = document.getElementById('hud-overlay-score');
+            if (scoreEl) scoreEl.style.display = 'block';
+
             const authB = document.getElementById('hud-overlay-authenticity');
             const isSyntheticFile = /(ai|fake|synth|deepfake)/i.test(file.name);
             if (authB) {
@@ -2352,11 +2673,14 @@
                 }
                 authB.style.display = 'block';
             }
-            controlsBar.style.display = 'flex';
-            document.getElementById('btn-play-pause').textContent = '⏸ Pause';
+            if (controlsBar) controlsBar.style.display = 'flex';
+            const playBtn = document.getElementById('btn-play-pause');
+            if (playBtn) playBtn.textContent = '⏸ Pause';
 
-            sourceTag.textContent = `🎬 File: ${file.name}`;
-            sourceTag.style.display = 'block';
+            if (sourceTag) {
+                sourceTag.textContent = `🎬 File: ${file.name}`;
+                sourceTag.style.display = 'block';
+            }
 
             const onReady = async () => {
                 video.oncanplay = null;
@@ -2364,10 +2688,10 @@
                 initPoseModel();
                 try {
                     await video.play();
-                    document.getElementById('btn-play-pause').textContent = '⏸ Pause';
+                    if (playBtn) playBtn.textContent = '⏸ Pause';
                 } catch (e) {
                     console.warn("Autoplay notice:", e);
-                    document.getElementById('btn-play-pause').textContent = '▶ Play';
+                    if (playBtn) playBtn.textContent = '▶ Play';
                 }
                 if (rafId) cancelAnimationFrame(rafId);
                 rafId = requestAnimationFrame(processVideoFrame);
@@ -2383,8 +2707,10 @@
             video.ontimeupdate = () => {
                 if (!isUserSeeking && video.duration) {
                     const pct = (video.currentTime / video.duration) * 100;
-                    document.getElementById('video-seek-bar').value = pct;
-                    document.getElementById('video-time-display').textContent = `${formatTime(video.currentTime)} / ${formatTime(video.duration)}`;
+                    const seekBar = document.getElementById('video-seek-bar');
+                    if (seekBar) seekBar.value = pct;
+                    const timeDisp = document.getElementById('video-time-display');
+                    if (timeDisp) timeDisp.textContent = `${formatTime(video.currentTime)} / ${formatTime(video.duration)}`;
                 }
             };
 
@@ -2393,7 +2719,7 @@
                     video.currentTime = 0;
                     video.play().catch(() => {});
                 } else {
-                    document.getElementById('btn-play-pause').textContent = '▶ Play';
+                    if (playBtn) playBtn.textContent = '▶ Play';
                 }
             };
         }
@@ -2402,62 +2728,48 @@
             const file = event.target.files && event.target.files[0];
             if (file) {
                 processUploadedFile(file);
-                // Reset file input so re-selecting the same file triggers onchange
                 event.target.value = '';
             }
         }
-
-        // Drag & Drop Handling for Camera Box
-        const cameraBoxEl = document.getElementById('camera-box');
-        cameraBoxEl.addEventListener('dragover', (e) => {
-            e.preventDefault();
-            cameraBoxEl.style.borderColor = 'var(--accent-cyan)';
-        });
-        cameraBoxEl.addEventListener('dragleave', (e) => {
-            cameraBoxEl.style.borderColor = 'transparent';
-        });
-        cameraBoxEl.addEventListener('drop', (e) => {
-            e.preventDefault();
-            cameraBoxEl.style.borderColor = 'transparent';
-            if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-                processUploadedFile(e.dataTransfer.files[0]);
-            }
-        });
 
         // ── Video Playback Controls ──
         function togglePlayPause() {
             const video = document.getElementById('webcam-video');
             const btn = document.getElementById('btn-play-pause');
+            if (!video) return;
             if (video.paused) {
                 video.play().then(() => {
-                    btn.textContent = '⏸ Pause';
+                    if (btn) btn.textContent = '⏸ Pause';
                 }).catch(e => console.warn(e));
             } else {
                 video.pause();
-                btn.textContent = '▶ Play';
+                if (btn) btn.textContent = '▶ Play';
             }
         }
 
         function restartVideo() {
             const video = document.getElementById('webcam-video');
+            if (!video) return;
             video.currentTime = 0;
             video.play().then(() => {
-                document.getElementById('btn-play-pause').textContent = '⏸ Pause';
+                const btn = document.getElementById('btn-play-pause');
+                if (btn) btn.textContent = '⏸ Pause';
             }).catch(e => console.warn(e));
         }
 
         function onSeekInput(e) {
             isUserSeeking = true;
             const video = document.getElementById('webcam-video');
-            if (video.duration) {
+            if (video && video.duration) {
                 const targetTime = (e.target.value / 100) * video.duration;
-                document.getElementById('video-time-display').textContent = `${formatTime(targetTime)} / ${formatTime(video.duration)}`;
+                const timeDisp = document.getElementById('video-time-display');
+                if (timeDisp) timeDisp.textContent = `${formatTime(targetTime)} / ${formatTime(video.duration)}`;
             }
         }
 
         function onSeekChange(e) {
             const video = document.getElementById('webcam-video');
-            if (video.duration) {
+            if (video && video.duration) {
                 video.currentTime = (e.target.value / 100) * video.duration;
                 setTimeout(() => {
                     if (poseModel && video.readyState >= 2) {
@@ -2472,14 +2784,18 @@
             const video = document.getElementById('webcam-video');
             const btn = document.getElementById('btn-loop-toggle');
             isLooping = !isLooping;
-            video.loop = isLooping;
-            btn.textContent = isLooping ? '🔁 Loop: ON' : '➡ Loop: OFF';
+            if (video) video.loop = isLooping;
+            if (btn) btn.textContent = isLooping ? '🔁 Loop: ON' : '➡ Loop: OFF';
         }
 
-        // ── 8. Robust Biomechanical Classification & Sitting vs Standing Logic ──
+        // =========================================================================
+        // 10. ROBUST BIOMECHANICAL CLASSIFICATION & POSE RESULTS HANDLER
+        // =========================================================================
+
         function onPoseResults(results) {
             const canvas = document.getElementById('webcam-canvas');
             const video = document.getElementById('webcam-video');
+            if (!canvas || !video) return;
             const ctx = canvas.getContext('2d');
 
             if (canvas.width !== video.videoWidth || canvas.height !== video.videoHeight) {
@@ -2509,7 +2825,7 @@
             const dx = midHipX - midShX;
             const torsoAngle = Math.abs(Math.atan2(dx, dy) * (180 / Math.PI));
 
-            // 2. 3D World Hip Flexion (Shoulder -> Hip -> Knee in meters)
+            // 2. 3D World Hip Flexion & Knee Flexion (meters)
             const wlSh = { x: (wlm[11].x + wlm[12].x)/2, y: (wlm[11].y + wlm[12].y)/2, z: (wlm[11].z + wlm[12].z)/2 };
             const wlHip = { x: (wlm[23].x + wlm[24].x)/2, y: (wlm[23].y + wlm[24].y)/2, z: (wlm[23].z + wlm[24].z)/2 };
             const wlKnee = { x: (wlm[25].x + wlm[26].x)/2, y: (wlm[25].y + wlm[26].y)/2, z: (wlm[25].z + wlm[26].z)/2 };
@@ -2536,7 +2852,7 @@
             const boxH = Math.max(0.01, maxY - minY);
             const aspectRatio = boxW / boxH;
 
-            // 6. Desk Seated Heuristic (Knees/ankles occluded under desk while sitting upright)
+            // 6. Desk Seated Heuristic
             const kneesOccludedOrLow = (lKnee.y > 0.88 || rKnee.y > 0.88 || (lKnee.visibility < 0.45 && rKnee.visibility < 0.45));
             const isDeskSeated = (kneesOccludedOrLow && midHipY > 0.60 && torsoAngle < 30 && aspectRatio > 0.48);
 
@@ -2633,7 +2949,7 @@
                         vChip.style.color = '#ffffff';
                         vChip.style.display = 'block';
                     }
-                    return; // Prevent emergency siren and dispatch on AI videos
+                    return; // Prevent emergency siren and dispatch on synthetic media
                 }
             }
 
@@ -2701,22 +3017,34 @@
             }
 
             // Update Analytics Ribbon
-            document.getElementById('hud-posture').textContent = smoothedPosture;
-            document.getElementById('hud-posture').style.color = postureColor;
-            document.getElementById('hud-fall-score').textContent = (fallProbability * 100).toFixed(0) + '%';
-            document.getElementById('hud-fall-score').style.color = fallProbability > 0.4 ? '#ef4444' : '#10b981';
-            document.getElementById('hud-torso-angle').textContent = torsoAngle.toFixed(0) + '°';
-            document.getElementById('hud-joint-angle').textContent = `${hipFlex3D.toFixed(0)}° / ${kneeAngle3D.toFixed(0)}°`;
+            const postDisp = document.getElementById('hud-posture');
+            if (postDisp) {
+                postDisp.textContent = smoothedPosture;
+                postDisp.style.color = postureColor;
+            }
+            const scoreDisp = document.getElementById('hud-fall-score');
+            if (scoreDisp) {
+                scoreDisp.textContent = (fallProbability * 100).toFixed(0) + '%';
+                scoreDisp.style.color = fallProbability > 0.4 ? '#ef4444' : '#10b981';
+            }
+            const torsoDisp = document.getElementById('hud-torso-angle');
+            if (torsoDisp) torsoDisp.textContent = torsoAngle.toFixed(0) + '°';
+            const jointDisp = document.getElementById('hud-joint-angle');
+            if (jointDisp) jointDisp.textContent = `${hipFlex3D.toFixed(0)}° / ${kneeAngle3D.toFixed(0)}°`;
 
             // Overlays on Camera Box
             const hudBadge = document.getElementById('hud-overlay-activity');
-            hudBadge.textContent = `${smoothedPosture.toUpperCase()}`;
-            hudBadge.style.color = postureColor;
-            hudBadge.style.borderColor = postureColor;
+            if (hudBadge) {
+                hudBadge.textContent = `${smoothedPosture.toUpperCase()}`;
+                hudBadge.style.color = postureColor;
+                hudBadge.style.borderColor = postureColor;
+            }
 
             const hudScore = document.getElementById('hud-overlay-score');
-            hudScore.textContent = `FALL RISK: ${(fallProbability * 100).toFixed(0)}%`;
-            hudScore.style.color = fallProbability > 0.4 ? '#ef4444' : '#10b981';
+            if (hudScore) {
+                hudScore.textContent = `FALL RISK: ${(fallProbability * 100).toFixed(0)}%`;
+                hudScore.style.color = fallProbability > 0.4 ? '#ef4444' : '#10b981';
+            }
 
             // Update 3D Metric Skeleton Viewport Targets
             update3DTargetPositions(wlm, lm, fallConfirmed || fallProbability >= 0.50, smoothedPosture === 'Sitting');
@@ -2748,8 +3076,9 @@
             ctx.restore();
         }
 
-        let simulationTimer = null;
-        let simulationCountdownInterval = null;
+        // =========================================================================
+        // 11. EMERGENCY SIMULATION & MODAL CONTROLS
+        // =========================================================================
 
         function clearSimulation() {
             if (simulationTimer) {
@@ -2813,15 +3142,137 @@
         }
 
         function openLightbox(url) {
-            document.getElementById('lightbox-img').src = url;
-            document.getElementById('lightbox').style.display = 'flex';
-        }
-        function closeLightbox() {
-            document.getElementById('lightbox').style.display = 'none';
+            const img = document.getElementById('lightbox-img');
+            const lb = document.getElementById('lightbox');
+            if (img) img.src = url;
+            if (lb) lb.style.display = 'flex';
         }
 
-        // Initialize table on page load
-        loadFallHistory();
+        function closeLightbox() {
+            const lb = document.getElementById('lightbox');
+            if (lb) lb.style.display = 'none';
+        }
+
+        // =========================================================================
+        // 12. BACKEND WEBSOCKET TELEMETRY CONSUMER
+        // Real-time zero-delay metric landmarks stream from Python FastAPI pipeline
+        // =========================================================================
+
+        function initWebSocketTelemetry() {
+            if (!window.WebSocket || !location.host) return;
+            try {
+                const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
+                const wsUrl = `${protocol}//${location.host}/ws/telemetry`;
+                const ws = new WebSocket(wsUrl);
+
+                ws.onopen = () => {
+                    console.log("WebSocket telemetry connected:", wsUrl);
+                };
+
+                ws.onmessage = (event) => {
+                    try {
+                        const data = JSON.parse(event.data);
+                        if (!data) return;
+
+                        if (currentSourceType === 'none') {
+                            if (data.landmarks_3d && data.landmarks_3d.length > 0) {
+                                const wlm = data.landmarks_3d.map(pt => ({ x: pt[0], y: pt[1], z: pt[2] }));
+                                const isFall = data.fall_risk > 0.5;
+                                const isSit = data.posture === 'Sitting';
+                                update3DTargetPositions(wlm, wlm, isFall, isSit);
+                            }
+                            if (data.fps) {
+                                const fpsEl = document.getElementById('hud-fps');
+                                if (fpsEl) fpsEl.textContent = `${Math.round(data.fps)} FPS`;
+                            }
+                            if (data.posture) {
+                                const postEl = document.getElementById('hud-posture');
+                                if (postEl) postEl.textContent = data.posture;
+                            }
+                            if (data.fall_risk !== undefined) {
+                                const scoreEl = document.getElementById('hud-fall-score');
+                                if (scoreEl) scoreEl.textContent = `${Math.round(data.fall_risk * 100)}%`;
+                            }
+                            if (data.torso_angle !== undefined) {
+                                const torsoEl = document.getElementById('hud-torso-angle');
+                                if (torsoEl) torsoEl.textContent = `${Math.round(data.torso_angle)}°`;
+                            }
+                        }
+                    } catch (_) {}
+                };
+
+                ws.onclose = () => {
+                    setTimeout(initWebSocketTelemetry, 3000);
+                };
+            } catch (_) {}
+        }
+
+        // =========================================================================
+        // 13. DRAG & DROP FOR VIDEO UPLOADS
+        // =========================================================================
+
+        const cameraBoxEl = document.getElementById('camera-box');
+        if (cameraBoxEl) {
+            cameraBoxEl.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                cameraBoxEl.style.borderColor = 'var(--accent-cyan)';
+            });
+            cameraBoxEl.addEventListener('dragleave', (e) => {
+                cameraBoxEl.style.borderColor = 'transparent';
+            });
+            cameraBoxEl.addEventListener('drop', (e) => {
+                e.preventDefault();
+                cameraBoxEl.style.borderColor = 'transparent';
+                if (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0]) {
+                    processUploadedFile(e.dataTransfer.files[0]);
+                }
+            });
+        }
+
+        // =========================================================================
+        // 14. EXPLICIT WINDOW BINDINGS
+        // Attaches all functions to window to guarantee zero ReferenceError exceptions
+        // =========================================================================
+
+        window.startWebcam = startWebcam;
+        window.stopCurrentSource = stopCurrentSource;
+        window.toggleWebcam = toggleWebcam;
+        window.handleFileUpload = handleFileUpload;
+        window.processUploadedFile = processUploadedFile;
+        window.simulateFallTest = simulateFallTest;
+        window.setCameraPreset = setCameraPreset;
+        window.togglePlayPause = togglePlayPause;
+        window.restartVideo = restartVideo;
+        window.toggleLoop = toggleLoop;
+        window.onSeekInput = onSeekInput;
+        window.onSeekChange = onSeekChange;
+        window.resetADLStats = resetADLStats;
+        window.exportCSVLogs = exportCSVLogs;
+        window.loadFallHistory = loadFallHistory;
+        window.resolveFall = resolveFall;
+        window.resolveCurrentFall = resolveCurrentFall;
+        window.openLightbox = openLightbox;
+        window.closeLightbox = closeLightbox;
+        window.dismissAlertByResident = dismissAlertByResident;
+        window.cancelEmergencyAlert = cancelEmergencyAlert;
+        window.immediateEmergencyDispatch = immediateEmergencyDispatch;
+
+        // =========================================================================
+        // 15. INITIALIZATION SEQUENCE
+        // =========================================================================
+
+        function runInit() {
+            initThreeScene();
+            initSupabaseClient();
+            initWebSocketTelemetry();
+        }
+
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', runInit);
+        } else {
+            runInit();
+        }
+
     </script>
 </body>
 </html>
