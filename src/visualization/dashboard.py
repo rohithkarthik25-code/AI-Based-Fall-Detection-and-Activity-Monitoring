@@ -29,7 +29,6 @@ STATUS_NORMAL_COLOR   = (80, 210, 60)    # Emerald Green
 STATUS_WARNING_COLOR  = (0, 215, 255)    # Amber Yellow
 STATUS_FALL_COLOR     = (40, 50, 240)    # Crimson Red
 STATUS_RECOVERY_COLOR = (245, 160, 45)   # Cerulean Blue
-STATUS_SYNTHETIC_COLOR = (200, 100, 240) # Violet / Magenta (AI Guardrail)
 
 STATE_COLORS = {
     "NORMAL":    STATUS_NORMAL_COLOR,
@@ -37,7 +36,6 @@ STATE_COLORS = {
     "CANDIDATE": STATUS_WARNING_COLOR,
     "FALLEN":    STATUS_FALL_COLOR,
     "RECOVERY":  STATUS_RECOVERY_COLOR,
-    "SYNTHETIC": STATUS_SYNTHETIC_COLOR,
 }
 
 SEVERITY_COLORS = {
@@ -89,9 +87,6 @@ class Dashboard:
         self.fall_active: bool = False
         self.fall_lost_frames: int = 0
         self.frame_times: deque = deque(maxlen=10)
-        self.is_synthetic: bool = False
-        self.synthetic_score: float = 0.0
-        self.synthetic_reasons: List[str] = []
 
     def update_fall(self, severity: str = "NONE") -> None:
         """Records confirmed fall incident timestamp and increments counter."""
@@ -107,6 +102,7 @@ class Dashboard:
         summary_state: Optional[Dict[str, Any]] = None,
         profiler: Any = None,
         tracked_persons: Optional[List[Any]] = None,
+        authenticity: Optional[Dict[str, Any]] = None,
     ) -> np.ndarray:
         """
         Draws the professional structured HUD panel on the camera feed.
@@ -132,10 +128,7 @@ class Dashboard:
             if cand > 0 or sc > 0.40:
                 is_warning = True
 
-        if self.is_synthetic:
-            status_text = "AI SYNTHETIC"
-            status_color = STATUS_SYNTHETIC_COLOR
-        elif is_fall:
+        if is_fall:
             status_text = "FALL DETECTED"
             status_color = STATUS_FALL_COLOR
         elif is_recovery:
@@ -154,7 +147,7 @@ class Dashboard:
         card_w = min(360, max(280, fw - 24))
 
         has_postures = bool(summary_state and "time_percentages" in summary_state)
-        card_h = 224 if has_postures else 198
+        card_h = 248 if has_postures else 222
         card_h = min(card_h, fh - 24)
 
         if card_w > 50 and card_h > 50 and card_y + card_h <= fh and card_x + card_w <= fw:
@@ -274,15 +267,31 @@ class Dashboard:
                 breakdown = f"Sit: {pcts.get('Sitting', 0):.0f}% | Stand: {pcts.get('Standing', 0):.0f}% | Walk: {pcts.get('Walking', 0):.0f}%"
                 cv2.putText(frame, breakdown, (card_x + 95, y_r6), cv2.FONT_HERSHEY_SIMPLEX, 0.38, COLOR_TEXT_DIM, 1, cv2.LINE_AA)
 
-        # ── 3. Emergency Status Indicators & Banners (Step 5) ──
-        if self.is_synthetic:
-            pid_str = f"P{summary_state.get('person_id', 1)}" if summary_state else "P1"
-            if is_fall or (summary_state and summary_state.get("fall_detected")):
-                banner_text = f"🛡️ AI VIDEO SPOOF REJECTED — {pid_str} FALL SUPPRESSED (Score: {self.synthetic_score:.2f})"
+            # ── Row 7: Media Authenticity & Deepfake Defense ──
+            y_r7 = card_y + 208 if has_postures else card_y + 184
+            cv2.putText(frame, "MEDIA AUTH", (card_x + 12, y_r7), cv2.FONT_HERSHEY_SIMPLEX, 0.38, COLOR_TEXT_LABEL, 1, cv2.LINE_AA)
+            if authenticity:
+                auth_verdict = authenticity.get("verdict", "VERIFYING")
+                auth_conf = authenticity.get("confidence", 0.0)
+                if auth_verdict == "AI/FAKE":
+                    auth_col = STATUS_WARNING_COLOR
+                    auth_txt = f"AI SYNTHETIC ({auth_conf:.0f}%) [BLOCKED]"
+                elif auth_verdict == "REAL":
+                    auth_col = STATUS_NORMAL_COLOR
+                    auth_txt = f"VERIFIED REAL ({auth_conf:.0f}%)"
+                else:
+                    auth_col = COLOR_TEXT_DIM
+                    auth_txt = f"ANALYZING ({auth_conf:.0f}%)"
             else:
-                banner_text = f"🛡️ AI GENERATED VIDEO DETECTED — {pid_str} (Score: {self.synthetic_score:.2f}) [MONITORING]"
-            self._draw_emergency_banner(frame, banner_text, STATUS_SYNTHETIC_COLOR)
+                auth_col = STATUS_NORMAL_COLOR
+                auth_txt = "VERIFIED REAL (100%)"
+            cv2.putText(frame, auth_txt, (card_x + 95, y_r7), cv2.FONT_HERSHEY_SIMPLEX, 0.40, auth_col, 1, cv2.LINE_AA)
 
+        # ── 3. Emergency Status Indicators & Banners (Step 5) ──
+        is_synthetic_blocked = bool(authenticity and authenticity.get("is_ai_fake", False))
+        if is_synthetic_blocked and (is_fall or (summary_state and summary_state.get("candidate_frames", 0) > 0)):
+            banner_text = "! FRAUD ALERT: SYNTHETIC AI VIDEO DETECTED — FALL ALARM SUPPRESSED !"
+            self._draw_emergency_banner(frame, banner_text, STATUS_WARNING_COLOR)
         elif is_fall:
             pid_str = f"P{summary_state.get('person_id', 1)}" if summary_state else "P1"
             sev_str = summary_state.get("severity", "SEVERE") if summary_state else "SEVERE"

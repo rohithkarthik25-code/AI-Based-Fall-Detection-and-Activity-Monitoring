@@ -739,7 +739,7 @@
                     <span class="group-label">Input Source:</span>
                     <select class="source-select" id="sourceSelector" onchange="changeSource(this.value)">
                         <option value="0">Webcam 0 (Live)</option>
-                        <option value="output_fall_detected_weighted.mp4">Recorded Video Stream</option>
+                        <option value="output_fall_detected_weighted.mp4">Demo: output_fall_detected_weighted.mp4</option>
                     </select>
                     <button class="btn btn-danger" onclick="triggerTestAlert()">🚨 Test Alarm</button>
                 </div>
@@ -1573,13 +1573,14 @@
 
             banner.className = "status-banner " + (data.fall_active ? "fall" : (data.overall_status ? data.overall_status.toLowerCase().replace(" ", "") : "normal"));
             
-            if (data.is_synthetic) {
+            const auth = data.video_authenticity || {};
+            if (auth.is_ai_fake) {
                 badge.className = "status-badge warning";
-                badge.style.backgroundColor = "rgba(168, 85, 247, 0.25)";
-                badge.style.borderColor = "#c084fc";
-                badge.style.color = "#d8b4fe";
-                badge.innerText = "🛡️ AI SYNTHETIC";
-                desc.innerText = "AI-generated video simulation detected. Emergency fall dispatch suppressed.";
+                badge.style.backgroundColor = "rgba(239, 68, 68, 0.25)";
+                badge.style.borderColor = "#ef4444";
+                badge.style.color = "#f87171";
+                badge.innerText = "🚨 SYNTHETIC AI VIDEO";
+                desc.innerText = "AI-generated synthetic media detected. Emergency fall dispatch suppressed.";
                 stopSiren();
             } else if (data.fall_active) {
                 badge.className = "status-badge fall";

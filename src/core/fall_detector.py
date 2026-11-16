@@ -26,7 +26,7 @@ from activity_monitor import ActivityMonitor
 from visualizer_3d import SkeletonVisualizer3D
 from pipeline_profiler import PipelineProfiler
 from alert_dispatcher import AlertDispatcher
-from synthetic_video_detector import SyntheticVideoDetector, SyntheticDetectionResult
+from ai_video_detector import AIVideoDetector, AIDetectionResult
 
 
 SEVERITY_RANK = {"NONE": 0, "MILD": 1, "MODERATE": 2, "SEVERE": 3}
@@ -46,6 +46,8 @@ class FallDetector:
         imgsz: int = 480,
         enable_alerts: bool = True,
         alert_config_path: Optional[str] = "alert_config.json",
+        enable_ai_video_defense: bool = True,
+        video_source_path: Optional[str] = None,
     ) -> None:
         self.detector = YOLODetector(model_path=yolo_model_path, imgsz=imgsz)
         self.pose = PoseEstimator(model_path=pose_model_path)
@@ -57,7 +59,13 @@ class FallDetector:
         self.dashboard = Dashboard()
         self.alarm = AlarmSystem()
         self.alert_dispatcher = AlertDispatcher(config_path=alert_config_path, enabled=enable_alerts)
-        self.synthetic_detector = SyntheticVideoDetector()
+
+        self.enable_ai_video_defense = enable_ai_video_defense
+        self.ai_detector = (
+            AIVideoDetector(video_path=video_source_path)
+            if enable_ai_video_defense
+            else None
+        )
 
         self.enable_3d = enable_3d
         self.enable_activity = enable_activity
@@ -136,6 +144,29 @@ class FallDetector:
         tracked = self.tracker.update(detected_boxes)
         self.profiler.end_stage("bytetrack_tracking")
 
+        # ── AI Video Authenticity & Synthetic Media Defense ──
+        ai_verdict: Optional[AIDetectionResult] = None
+        if self.enable_ai_video_defense and self.ai_detector:
+            ref_box = None
+            ref_lms = None
+            if detected_boxes:
+                best_d = max(detected_boxes, key=lambda d: (d.x2 - d.x1) * (d.y2 - d.y1))
+                ref_box = best_d.as_xyxy()
+            for _, p_box, p_state in tracked:
+                lp = p_state.get("last_pose")
+                if lp and getattr(lp, "has_pose", False) and lp.landmarks:
+                    ref_lms = lp.landmarks
+                    ref_box = p_box
+                    break
+            self.ai_detector.process_frame(
+                frame=frame,
+                landmarks=ref_lms,
+                box=ref_box,
+                now=now,
+                fps=fps,
+            )
+            ai_verdict = self.ai_detector.get_aggregate_verdict()
+
         active_fall_count = 0
         t_pose_accum = 0.0
         t_feat_accum = 0.0
@@ -144,12 +175,6 @@ class FallDetector:
 
         poses_computed_this_frame = 0
         max_steady_poses_per_frame = 2
-
-        # ── Global Initial Synthetic Scan ──
-        synth_result = self.synthetic_detector.analyze_frame(frame, tracked)
-        self.dashboard.is_synthetic = synth_result.is_synthetic
-        self.dashboard.synthetic_score = synth_result.synthetic_score
-        self.dashboard.synthetic_reasons = synth_result.reasons
 
         for person_id, box, state in tracked:
             is_emergency = bool(state.get("fall_detected", False) or state.get("candidate_frames", 0) > 0)
@@ -236,25 +261,22 @@ class FallDetector:
 
             prev_fall_detected = state.get("fall_detected", False)
 
-            # ── 8.5. Multi-Modal Synthetic / AI Video Verification Guardrail ──
-            synth_result = self.synthetic_detector.analyze_frame(frame, tracked)
-            self.dashboard.is_synthetic = synth_result.is_synthetic
-            self.dashboard.synthetic_score = synth_result.synthetic_score
-            self.dashboard.synthetic_reasons = synth_result.reasons
-
             # ── 9. State Machine ──
             transition = self.state_machine.update(state, score_result, now_t=now)
 
-            # ── 10. Alarm + dashboard on confirmed fall ──
+            # ── 10. Alarm + dashboard on confirmed fall (Guarded by AI Video Authenticity) ──
             if transition.confirmed_fall:
-                if synth_result.is_synthetic:
-                    # AI-generated video spoof detected: suppress alarm, alert dispatcher, and incident logging
-                    print(
-                        f"[SyntheticGuardrail] 🛡️ AI GENERATED VIDEO DETECTED (Score: {synth_result.synthetic_score:.2f}). "
-                        f"Suppressing false emergency alert for Person {person_id}."
-                    )
+                is_synthetic_ai = bool(ai_verdict and ai_verdict.is_ai_fake())
+                if is_synthetic_ai:
+                    # Synthetic AI media defense triggered: block siren and emergency dispatch!
+                    state["fall_suppressed_ai"] = True
+                    state["authenticity_verdict"] = "AI/FAKE"
                     state["fall_detected"] = False
-                    state["is_synthetic_spoof"] = True
+                    print(
+                        f"[AIVideoDefense] 🚨 SYNTHETIC AI VIDEO DETECTED! "
+                        f"(Confidence: {ai_verdict.confidence*100:.1f}%, AI prob: {ai_verdict.ai_probability:.2f}). "
+                        f"Fall alert for Person #{person_id} SUPPRESSED. Emergency siren & dispatch blocked."
+                    )
                 else:
                     state["fall_start_time"] = now
                     self.dashboard.update_fall(score_result.severity)
@@ -269,9 +291,9 @@ class FallDetector:
                     )
 
             # ── 11. Duration tracking + CSV logging ──
-            if state["fall_detected"] and state.get("fall_start_time") is not None:
-                state["fall_duration"] = time.time() - state["fall_start_time"]
-                if transition.confirmed_fall and not synth_result.is_synthetic:
+            if state["fall_detected"] and not state.get("fall_suppressed_ai", False) and state.get("fall_start_time") is not None:
+                state["fall_duration"] = max(0.0, now - state["fall_start_time"])
+                if transition.confirmed_fall:
                     self.logger.log(
                         frame,
                         person_id,
@@ -280,7 +302,7 @@ class FallDetector:
                         score=score_result.score,
                     )
 
-            if state["fall_detected"] and state.get("fall_duration", 0) >= 5.0 and not synth_result.is_synthetic:
+            if state["fall_detected"] and state.get("fall_duration", 0) >= 5.0:
                 self.alarm.escalate()
 
             # ── 12. Alarm reset when person recovers ──
@@ -362,6 +384,17 @@ class FallDetector:
             self.dashboard.fall_active = False
             self.dashboard.fall_lost_frames = 0
 
+        telemetry_auth = {
+            "verdict": ai_verdict.final_result if ai_verdict else "REAL",
+            "confidence": round(ai_verdict.confidence * 100, 1) if ai_verdict else 100.0,
+            "ai_probability": ai_verdict.ai_probability if ai_verdict else 0.0,
+            "real_probability": ai_verdict.real_probability if ai_verdict else 1.0,
+            "is_ai_fake": bool(ai_verdict.is_ai_fake()) if ai_verdict else False,
+            "is_real": bool(ai_verdict.is_real()) if ai_verdict else True,
+            "reasons": ai_verdict.reasons[:3] if ai_verdict else [],
+            "metrics": ai_verdict.metrics if ai_verdict else {},
+        }
+
         # ── Dashboard Rendering ──
         self.profiler.start_stage("dashboard_render")
         frame = self.dashboard.draw(
@@ -371,6 +404,7 @@ class FallDetector:
             summary_state=focus_state,
             profiler=self.profiler,
             tracked_persons=tracked,
+            authenticity=telemetry_auth,
         )
         self.profiler.end_stage("dashboard_render")
 
@@ -390,9 +424,7 @@ class FallDetector:
         self.profiler.end_stage("visualizer_3d")
 
         overall_status = "NORMAL"
-        if synth_result.is_synthetic:
-            overall_status = "AI GENERATED VIDEO (SPOOF REJECTED)"
-        elif self.dashboard.fall_active:
+        if self.dashboard.fall_active:
             overall_status = "FALL DETECTED"
         elif any(p[2].get("candidate_frames", 0) > 0 for p in tracked):
             overall_status = "WARNING"
@@ -422,11 +454,6 @@ class FallDetector:
             "focus_person_id": focus_person_id,
             "focus_world_landmarks": _serialize_world_landmarks(focus_world_landmarks),
             "overall_status": overall_status,
-            "is_synthetic": bool(synth_result.is_synthetic),
-            "synthetic_score": float(synth_result.synthetic_score),
-            "synthetic_label": str(synth_result.status_label),
-            "synthetic_reasons": list(synth_result.reasons),
-            "synthetic_metrics": synth_result.metrics,
             "camera_frame": frame,
             "frame_width": w_f,
             "frame_height": h_f,
@@ -448,7 +475,8 @@ class FallDetector:
             ],
             "profiler": {
                 "avg_fps": round(float(self.profiler.average_fps), 1),
-            }
+            },
+            "video_authenticity": telemetry_auth,
         }
 
         return out_frame, telemetry
@@ -464,6 +492,9 @@ class FallDetector:
 
         if not cap.isOpened():
             raise FileNotFoundError(f"Cannot open video/webcam source: {video_path}")
+
+        if isinstance(video_path, str) and self.ai_detector:
+            self.ai_detector.audio_analyzer.video_path = video_path
 
         # Set low buffer size on webcams to prevent frame queuing latency
         if isinstance(video_path, int):
