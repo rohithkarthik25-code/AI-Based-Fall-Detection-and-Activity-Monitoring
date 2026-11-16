@@ -328,6 +328,101 @@
             z-index: 10;
         }
 
+        .viewport-layers-overlay {
+            position: absolute;
+            top: 12px;
+            right: 12px;
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: flex-end;
+            gap: 6px;
+            z-index: 10;
+            max-width: 350px;
+        }
+
+        .hud-layer-btn {
+            background: rgba(15, 23, 42, 0.78);
+            border: 1px solid rgba(6, 182, 212, 0.28);
+            color: #94a3b8;
+            font-size: 11px;
+            font-weight: 600;
+            padding: 4px 9px;
+            border-radius: 6px;
+            cursor: pointer;
+            backdrop-filter: blur(8px);
+            transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            user-select: none;
+        }
+
+        .hud-layer-btn:hover {
+            border-color: #06b6d4;
+            color: #e2e8f0;
+            background: rgba(15, 23, 42, 0.95);
+        }
+
+        .hud-layer-btn.active {
+            background: rgba(6, 182, 212, 0.18);
+            border-color: #06b6d4;
+            color: #38bdf8;
+            box-shadow: 0 0 10px rgba(6, 182, 212, 0.22);
+        }
+
+        .hud-dot {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: #64748b;
+            display: inline-block;
+            transition: background-color 0.2s, box-shadow 0.2s;
+        }
+
+        .hud-layer-btn.active .hud-dot {
+            background: #06b6d4;
+            box-shadow: 0 0 6px #06b6d4;
+        }
+
+        .viewport-stability-badge {
+            position: absolute;
+            bottom: 12px;
+            left: 12px;
+            background: rgba(11, 15, 25, 0.88);
+            border: 1px solid rgba(16, 185, 129, 0.4);
+            border-radius: 8px;
+            padding: 6px 12px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 11px;
+            color: #10b981;
+            z-index: 10;
+            backdrop-filter: blur(8px);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5);
+            pointer-events: none;
+            transition: all 0.25s ease;
+        }
+
+        .viewport-stability-badge.warning {
+            border-color: rgba(245, 158, 11, 0.7);
+            color: #f59e0b;
+            box-shadow: 0 0 12px rgba(245, 158, 11, 0.25);
+        }
+
+        .viewport-stability-badge.critical {
+            border-color: rgba(239, 68, 68, 0.85);
+            color: #ef4444;
+            box-shadow: 0 0 18px rgba(239, 68, 68, 0.45);
+            animation: pulseCritical 1.2s infinite;
+        }
+
+        @keyframes pulseCritical {
+            0%, 100% { transform: scale(1); opacity: 1; }
+            50% { transform: scale(1.02); opacity: 0.88; }
+        }
+
         /* ── Video Stream Box (Zero-Lag GPU Accelerated) ── */
         .camera-box {
             position: relative;
@@ -1101,10 +1196,25 @@
             </div>
             <div id="viewport-3d">
                 <div class="viewport-overlay">
-                    <button class="btn-preset" onclick="setCameraPreset('front')">Front (F)</button>
-                    <button class="btn-preset" onclick="setCameraPreset('side')">Side (S)</button>
-                    <button class="btn-preset" onclick="setCameraPreset('top')">Top (T)</button>
-                    <button class="btn-preset" onclick="setCameraPreset('iso')">Isometric (R)</button>
+                    <button class="btn-preset active" id="cam-preset-iso" onclick="setCameraPreset('iso')">Isometric (R)</button>
+                    <button class="btn-preset" id="cam-preset-front" onclick="setCameraPreset('front')">Front (F)</button>
+                    <button class="btn-preset" id="cam-preset-side" onclick="setCameraPreset('side')">Side (S)</button>
+                    <button class="btn-preset" id="cam-preset-top" onclick="setCameraPreset('top')">Top (T)</button>
+                </div>
+                <div class="viewport-layers-overlay">
+                    <button class="hud-layer-btn active" id="layer-btn-mesh" onclick="toggleViewportLayer('mesh')"><span class="hud-dot"></span> 3D Mesh</button>
+                    <button class="hud-layer-btn active" id="layer-btn-bones" onclick="toggleViewportLayer('bones')"><span class="hud-dot"></span> Bones</button>
+                    <button class="hud-layer-btn active" id="layer-btn-com" onclick="toggleViewportLayer('com')"><span class="hud-dot"></span> Balance (CoM)</button>
+                    <button class="hud-layer-btn active" id="layer-btn-trail" onclick="toggleViewportLayer('trail')"><span class="hud-dot"></span> Motion Trail</button>
+                    <button class="hud-layer-btn active" id="layer-btn-radar" onclick="toggleViewportLayer('radar')"><span class="hud-dot"></span> Radar Grid</button>
+                </div>
+                <div class="viewport-stability-badge" id="viewport-stability-badge">
+                    <span id="stability-icon">⚖️</span>
+                    <span id="stability-status-text">Balance: STABLE</span>
+                    <span style="opacity:0.35;">|</span>
+                    <span id="stability-margin-text">Margin: +15cm</span>
+                    <span style="opacity:0.35;">|</span>
+                    <span id="stability-velocity-text">0.0 m/s</span>
                 </div>
             </div>
         </div>
@@ -1275,6 +1385,324 @@
         let boneMatSit = null;
         let boneMatFall = null;
 
+        // Option A & C: HUD Layer Visibility States
+        const viewportLayers = {
+            mesh: true,      // Volumetric 3D Mannequin Limbs
+            bones: true,     // Skeleton Wireframe Bones & Joint Nodes
+            com: true,       // Center of Mass (CoM) & Base of Support (BoS)
+            trail: true,     // 3D Motion Trajectory Ribbon
+            radar: true      // Holographic Floor Radar Grid & Drop Shadow
+        };
+
+        // Volumetric 3D Mannequin Segments
+        const MANNEQUIN_SEGMENTS = [
+            { a: 11, b: 12, r: 0.046, name: 'shoulders' },
+            { a: 'neck', b: 'pelvis', r: 0.082, name: 'torso' },
+            { a: 23, b: 24, r: 0.062, name: 'pelvis' },
+            { a: 11, b: 13, r: 0.038, name: 'left_upper_arm' },
+            { a: 13, b: 15, r: 0.032, name: 'left_forearm' },
+            { a: 12, b: 14, r: 0.038, name: 'right_upper_arm' },
+            { a: 14, b: 16, r: 0.032, name: 'right_forearm' },
+            { a: 23, b: 25, r: 0.058, name: 'left_thigh' },
+            { a: 25, b: 27, r: 0.046, name: 'left_calf' },
+            { a: 24, b: 26, r: 0.058, name: 'right_thigh' },
+            { a: 26, b: 28, r: 0.046, name: 'right_calf' },
+            { a: 27, b: 31, r: 0.032, name: 'left_foot' },
+            { a: 28, b: 32, r: 0.032, name: 'right_foot' }
+        ];
+
+        const mannequinMeshes = [];
+        let headMannequinMesh = null;
+        let headVisorMesh = null;
+        let meshMatNormal = null;
+        let meshMatSit = null;
+        let meshMatFall = null;
+
+        // Holographic Floor Radar & Dynamic Drop Shadow
+        let floorRadarGroup = null;
+        let radarGridHelper = null;
+        let radarPulseMesh = null;
+        let radarPulseRadius = 0.1;
+        let avatarShadowMesh = null;
+
+        // Biomechanical Diagnostics (CoM, BoS, Motion Trail)
+        let comSphere = null;
+        let comPlumbLine = null;
+        let comTargetRing = null;
+        let bosFootprintMesh = null;
+        let bosOutlineLine = null;
+        let motionTrailLine = null;
+        const trajectoryBuffer = [];
+        const TRAJECTORY_MAX_POINTS = 35;
+        let lastTrajectoryTime = performance.now();
+        let lastDescentVelocity = 0.0;
+        let lastStabilityMargin = 0.0;
+
+        function toggleViewportLayer(layerKey) {
+            if (viewportLayers.hasOwnProperty(layerKey)) {
+                viewportLayers[layerKey] = !viewportLayers[layerKey];
+                if (typeof document !== 'undefined') {
+                    const btn = document.getElementById(`layer-btn-${layerKey}`);
+                    if (btn) {
+                        btn.classList.toggle('active', viewportLayers[layerKey]);
+                    }
+                }
+                applyViewportLayerVisibility();
+            }
+        }
+        if (typeof window !== 'undefined') {
+            window.toggleViewportLayer = toggleViewportLayer;
+            window.viewportLayers = viewportLayers;
+        }
+
+        function applyViewportLayerVisibility() {
+            // 1. Mannequin Mesh Layer
+            if (typeof mannequinMeshes !== 'undefined') {
+                mannequinMeshes.forEach(m => { if (m) m.visible = viewportLayers.mesh; });
+            }
+            if (typeof headMannequinMesh !== 'undefined' && headMannequinMesh) headMannequinMesh.visible = viewportLayers.mesh;
+            if (typeof headVisorMesh !== 'undefined' && headVisorMesh) headVisorMesh.visible = viewportLayers.mesh;
+
+            // 2. Skeleton Bones & Joints Layer
+            if (typeof boneLines !== 'undefined') {
+                boneLines.forEach(l => { if (l) l.visible = viewportLayers.bones; });
+            }
+            if (typeof joints !== 'undefined') {
+                joints.forEach((j, i) => {
+                    if (j) {
+                        const isVisibleNode = (i === 0 || (i >= 11 && i <= 16) || (i >= 23 && i <= 28));
+                        j.visible = isVisibleNode && viewportLayers.bones;
+                    }
+                });
+            }
+
+            // 3. Biomechanical Stability (CoM & BoS) Layer
+            if (comSphere) comSphere.visible = viewportLayers.com;
+            if (comPlumbLine) comPlumbLine.visible = viewportLayers.com;
+            if (comTargetRing) comTargetRing.visible = viewportLayers.com;
+            if (bosFootprintMesh) bosFootprintMesh.visible = viewportLayers.com;
+            if (bosOutlineLine) bosOutlineLine.visible = viewportLayers.com;
+
+            // 4. Motion Trajectory Ribbon Layer
+            if (motionTrailLine) motionTrailLine.visible = viewportLayers.trail;
+
+            // 5. Floor Radar Grid & Shadow Layer
+            if (floorRadarGroup) floorRadarGroup.visible = viewportLayers.radar;
+            if (radarGridHelper) radarGridHelper.visible = viewportLayers.radar;
+            if (avatarShadowMesh) avatarShadowMesh.visible = viewportLayers.radar;
+
+            if (typeof document !== 'undefined') {
+                const badge = document.getElementById('viewport-stability-badge');
+                if (badge) {
+                    badge.style.display = viewportLayers.com ? 'flex' : 'none';
+                }
+            }
+        }
+
+        function computeCenterOfMassPositions(pts) {
+            if (!pts || pts.length < 29) {
+                return { x: 0, y: 0.88, z: 0 };
+            }
+            const pL = pts[23] || { x: -0.15, y: 0.88, z: 0 };
+            const pR = pts[24] || { x: 0.15, y: 0.88, z: 0 };
+            const sL = pts[11] || { x: -0.22, y: 1.40, z: 0 };
+            const sR = pts[12] || { x: 0.22, y: 1.40, z: 0 };
+            const aL = pts[27] || { x: -0.16, y: 0.05, z: 0 };
+            const aR = pts[28] || { x: 0.16, y: 0.05, z: 0 };
+            const head = pts[0] || { x: 0, y: 1.62, z: 0 };
+
+            const pelvX = (pL.x + pR.x) * 0.5;
+            const pelvY = (pL.y + pR.y) * 0.5;
+            const pelvZ = (pL.z + pR.z) * 0.5;
+
+            const shldX = (sL.x + sR.x) * 0.5;
+            const shldY = (sL.y + sR.y) * 0.5;
+            const shldZ = (sL.z + sR.z) * 0.5;
+
+            const anklX = (aL.x + aR.x) * 0.5;
+            const anklY = (aL.y + aR.y) * 0.5;
+            const anklZ = (aL.z + aR.z) * 0.5;
+
+            return {
+                x: 0.50 * pelvX + 0.35 * shldX + 0.10 * anklX + 0.05 * head.x,
+                y: 0.50 * pelvY + 0.35 * shldY + 0.10 * anklY + 0.05 * head.y,
+                z: 0.50 * pelvZ + 0.35 * shldZ + 0.10 * anklZ + 0.05 * head.z
+            };
+        }
+
+        function extractFootContactPoints(pts) {
+            const footIndices = [27, 28, 29, 30, 31, 32];
+            const rawPoints = [];
+            footIndices.forEach(idx => {
+                const pt = pts[idx];
+                if (pt && !isNaN(pt.x) && !isNaN(pt.z) && isFinite(pt.x) && isFinite(pt.z)) {
+                    const soleOffset = (idx % 2 === 1) ? -0.035 : 0.035;
+                    rawPoints.push({ x: pt.x + soleOffset, z: pt.z });
+                    rawPoints.push({ x: pt.x - soleOffset, z: pt.z });
+                }
+            });
+
+            if (rawPoints.length < 3) {
+                const ankleL = pts[27] || { x: -0.15, z: 0 };
+                const ankleR = pts[28] || { x: 0.15, z: 0 };
+                return [
+                    { x: ankleL.x - 0.08, z: ankleL.z - 0.12 },
+                    { x: ankleR.x + 0.08, z: ankleR.z - 0.12 },
+                    { x: ankleR.x + 0.08, z: ankleR.z + 0.14 },
+                    { x: ankleL.x - 0.08, z: ankleL.z + 0.14 }
+                ];
+            }
+            return rawPoints;
+        }
+
+        function computeConvexHull2D(points) {
+            if (!points || points.length < 3) return points || [];
+            const sorted = points.slice().sort((a, b) => a.x === b.x ? a.z - b.z : a.x - b.x);
+            const cross = (o, a, b) => (a.x - o.x) * (b.z - o.z) - (a.z - o.z) * (b.x - o.x);
+
+            const lower = [];
+            for (let i = 0; i < sorted.length; i++) {
+                while (lower.length >= 2 && cross(lower[lower.length - 2], lower[lower.length - 1], sorted[i]) <= 0) {
+                    lower.pop();
+                }
+                lower.push(sorted[i]);
+            }
+
+            const upper = [];
+            for (let i = sorted.length - 1; i >= 0; i--) {
+                while (upper.length >= 2 && cross(upper[upper.length - 2], upper[upper.length - 1], sorted[i]) <= 0) {
+                    upper.pop();
+                }
+                upper.push(sorted[i]);
+            }
+
+            lower.pop();
+            upper.pop();
+            return lower.concat(upper);
+        }
+
+        function isPointInPolygon2D(px, pz, poly) {
+            if (!poly || poly.length < 3) return false;
+            let inside = false;
+            for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+                const xi = poly[i].x, zi = poly[i].z;
+                const xj = poly[j].x, zj = poly[j].z;
+                const intersect = ((zi > pz) !== (zj > pz)) &&
+                    (px < (xj - xi) * (pz - zi) / (zj - zi + 1e-9) + xi);
+                if (intersect) inside = !inside;
+            }
+            return inside;
+        }
+
+        function computeStabilityMargin2D(px, pz, poly) {
+            if (!poly || poly.length < 3) return 0.0;
+            const inside = isPointInPolygon2D(px, pz, poly);
+            let minDist = Infinity;
+            const n = poly.length;
+            for (let i = 0; i < n; i++) {
+                const x1 = poly[i].x, z1 = poly[i].z;
+                const x2 = poly[(i + 1) % n].x, z2 = poly[(i + 1) % n].z;
+                const dx = x2 - x1;
+                const dz = z2 - z1;
+                const segLenSq = dx * dx + dz * dz;
+                let dist = 0;
+                if (segLenSq < 1e-9) {
+                    dist = Math.hypot(px - x1, pz - z1);
+                } else {
+                    const t = Math.max(0, Math.min(1, ((px - x1) * dx + (pz - z1) * dz) / segLenSq));
+                    const projX = x1 + t * dx;
+                    const projZ = z1 + t * dz;
+                    dist = Math.hypot(px - projX, pz - projZ);
+                }
+                if (dist < minDist) minDist = dist;
+            }
+            if (!isFinite(minDist)) return 0.0;
+            return inside ? minDist : -minDist;
+        }
+
+        function updateHUDStabilityBadge(isInside, margin, velocity, isFallen) {
+            const badge = document.getElementById('viewport-stability-badge');
+            const icon = document.getElementById('stability-icon');
+            const statusText = document.getElementById('stability-status-text');
+            const marginText = document.getElementById('stability-margin-text');
+            const velText = document.getElementById('stability-velocity-text');
+            if (!badge || !statusText || !marginText || !velText) return;
+
+            velText.textContent = `${(velocity || 0).toFixed(1)} m/s`;
+
+            if (isFallen) {
+                badge.className = 'viewport-stability-badge critical';
+                icon.textContent = '🚨';
+                statusText.textContent = 'COLLAPSE DETECTED';
+                marginText.textContent = 'Margin: VOID';
+            } else if (!isInside || margin < 0) {
+                badge.className = 'viewport-stability-badge warning';
+                icon.textContent = '⚠️';
+                statusText.textContent = 'POSTURAL INSTABILITY';
+                marginText.textContent = `Margin: -${Math.abs(margin * 100).toFixed(0)}cm`;
+            } else if (margin < 0.035) {
+                badge.className = 'viewport-stability-badge warning';
+                icon.textContent = '⚠️';
+                statusText.textContent = 'MARGINAL BALANCE';
+                marginText.textContent = `Margin: +${(margin * 100).toFixed(0)}cm`;
+            } else {
+                badge.className = 'viewport-stability-badge';
+                icon.textContent = '⚖️';
+                statusText.textContent = 'Balance: STABLE';
+                marginText.textContent = `Margin: +${(margin * 100).toFixed(0)}cm`;
+            }
+        }
+
+        function updateMotionTrailGeometry(line, buffer) {
+            if (!line || !buffer || buffer.length < 2) return;
+            const points = [];
+            const colors = [];
+            const count = buffer.length;
+
+            for (let i = 0; i < count; i++) {
+                const item = buffer[i];
+                points.push(new THREE.Vector3(item.x, item.y, item.z));
+                const alphaRatio = Math.max(0.1, (i + 1) / count);
+
+                if (item.isFall || item.speed > 1.2) {
+                    colors.push(0.95 * alphaRatio, 0.25 * alphaRatio, 0.15 * alphaRatio);
+                } else {
+                    colors.push(0.02 * alphaRatio, 0.72 * alphaRatio, 0.88 * alphaRatio);
+                }
+            }
+
+            line.geometry.setFromPoints(points);
+            line.geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+            if (line.geometry.attributes.color) {
+                line.geometry.attributes.color.needsUpdate = true;
+            }
+        }
+
+        function updateBoSVisualizer(lineLoop, fillMesh, polygon, isInside, isFallen) {
+            if (!lineLoop || !fillMesh || !polygon || polygon.length < 3) return;
+
+            const floorY = 0.003;
+            const loopPoints = polygon.map(p => new THREE.Vector3(p.x, floorY, p.z));
+            lineLoop.geometry.setFromPoints(loopPoints);
+
+            const colorHex = isFallen ? 0xef4444 : (isInside ? 0x10b981 : 0xf59e0b);
+            lineLoop.material.color.setHex(colorHex);
+
+            const shape = new THREE.Shape();
+            shape.moveTo(polygon[0].x, polygon[0].z);
+            for (let i = 1; i < polygon.length; i++) {
+                shape.lineTo(polygon[i].x, polygon[i].z);
+            }
+            shape.closePath();
+
+            if (fillMesh.geometry) fillMesh.geometry.dispose();
+            fillMesh.geometry = new THREE.ShapeGeometry(shape);
+            fillMesh.rotation.x = Math.PI / 2;
+            fillMesh.position.y = floorY - 0.001;
+            fillMesh.material.color.setHex(colorHex);
+            fillMesh.material.opacity = isFallen ? 0.35 : 0.22;
+        }
+
         // Current & Target 3D coordinates for smooth 60 FPS lerping
         const currentJointPositions = [];
         const targetPositions = [];
@@ -1380,8 +1808,8 @@
                 {x: 0.16, y: 0.46, z: 0},    // 26: right knee
                 {x: -0.16, y: 0.05, z: 0},   // 27: left ankle
                 {x: 0.16, y: 0.05, z: 0},    // 28: right ankle
-                {x: -0.16, y: 0.05, z: 0}, {x: 0.16, y: 0.05, z: 0},
-                {x: -0.16, y: 0.05, z: 0.1}, {x: 0.16, y: 0.05, z: 0.1}
+                {x: -0.16, y: 0.05, z: -0.08}, {x: 0.16, y: 0.05, z: -0.08}, // 29, 30: heels
+                {x: -0.16, y: 0.05, z: 0.14}, {x: 0.16, y: 0.05, z: 0.14}   // 31, 32: toes
             ];
 
             for (let i = 0; i < JOINT_COUNT; i++) {
@@ -1407,6 +1835,39 @@
                     if (boneMatNormal) boneLines[idx].material = boneMatNormal;
                 }
             });
+
+            if (typeof THREE !== 'undefined' && mannequinMeshes.length > 0 && joints[11] && joints[12] && joints[23] && joints[24]) {
+                const p11 = joints[11].position, p12 = joints[12].position;
+                const p23 = joints[23].position, p24 = joints[24].position;
+                const neckPt = new THREE.Vector3().addVectors(p11, p12).multiplyScalar(0.5);
+                const pelvisPt = new THREE.Vector3().addVectors(p23, p24).multiplyScalar(0.5);
+
+                MANNEQUIN_SEGMENTS.forEach((seg, idx) => {
+                    const mesh = mannequinMeshes[idx];
+                    if (!mesh) return;
+                    let pA = (seg.a === 'neck') ? neckPt : ((seg.a === 'pelvis') ? pelvisPt : joints[seg.a]?.position);
+                    let pB = (seg.b === 'neck') ? neckPt : ((seg.b === 'pelvis') ? pelvisPt : joints[seg.b]?.position);
+                    if (pA && pB) {
+                        const dist = pA.distanceTo(pB);
+                        if (dist > 0.005) {
+                            mesh.visible = viewportLayers.mesh;
+                            const mid = new THREE.Vector3().addVectors(pA, pB).multiplyScalar(0.5);
+                            mesh.position.copy(mid);
+                            mesh.scale.set(seg.r, dist, seg.r);
+                            const dir = new THREE.Vector3().subVectors(pB, pA).normalize();
+                            mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir);
+                        }
+                    }
+                });
+
+                if (headMannequinMesh && joints[0]) {
+                    headMannequinMesh.position.copy(joints[0].position);
+                    if (headVisorMesh) {
+                        headVisorMesh.position.copy(joints[0].position);
+                        headVisorMesh.rotation.x = Math.PI / 2;
+                    }
+                }
+            }
         }
 
         // Initialize target positions immediately so data is never empty zeroes
@@ -1496,22 +1957,22 @@
                 if (oldCanvas) oldCanvas.remove();
 
                 scene = new THREE.Scene();
-                scene.fog = new THREE.FogExp2(0x06080e, 0.06);
+                scene.fog = new THREE.FogExp2(0x06080e, 0.05);
 
                 const width = Math.max(container.clientWidth || 0, 500);
                 const height = Math.max(container.clientHeight || 0, 480);
 
                 camera = new THREE.PerspectiveCamera(50, width / height, 0.1, 100);
-                camera.position.set(0, 1.35, 3.2);
+                camera.position.set(1.8, 1.6, 2.2);
 
                 renderer = new THREE.WebGLRenderer({
-                    antialias: false,
+                    antialias: true,
                     alpha: true,
                     powerPreference: "default",
                     failIfMajorPerformanceCaveat: false
                 });
                 renderer.setSize(width, height);
-                renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5));
+                renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2.0));
                 renderer.setClearColor(0x06080e, 1.0);
                 renderer.domElement.style.width = '100%';
                 renderer.domElement.style.height = '100%';
@@ -1532,34 +1993,115 @@
                     controls = createFallbackControls(camera, renderer.domElement, new THREE.Vector3(0, 0.80, 0));
                 }
 
-                // Lighting & Ground Plane
-                const ambLight = new THREE.AmbientLight(0xffffff, 1.0);
+                // ── Lighting & Ambient Setup ──
+                const ambLight = new THREE.AmbientLight(0xffffff, 0.95);
                 scene.add(ambLight);
 
                 const dirLight = new THREE.DirectionalLight(0xffffff, 0.85);
-                dirLight.position.set(2, 4, 3);
+                dirLight.position.set(2.5, 4.5, 3.5);
                 scene.add(dirLight);
 
-                // Ground grid
-                const gridHelper = new THREE.GridHelper(4.0, 16, 0x06b6d4, 0x1f293d);
-                gridHelper.position.y = 0;
-                scene.add(gridHelper);
+                const rimLight = new THREE.DirectionalLight(0x06b6d4, 0.65);
+                rimLight.position.set(-2.5, 2.0, -2.5);
+                scene.add(rimLight);
 
-                // Materials
-                jointMatNormal = new THREE.MeshStandardMaterial({ color: 0x06b6d4, roughness: 0.25, emissive: 0x083344 });
-                jointMatSit = new THREE.MeshStandardMaterial({ color: 0x10b981, roughness: 0.25, emissive: 0x064e3b });
-                jointMatFall = new THREE.MeshStandardMaterial({ color: 0xef4444, roughness: 0.2, emissive: 0x7f1d1d });
+                // ── Holographic Floor Radar Group ──
+                floorRadarGroup = new THREE.Group();
+
+                radarGridHelper = new THREE.GridHelper(4.0, 16, 0x06b6d4, 0x161f30);
+                radarGridHelper.position.y = 0;
+                floorRadarGroup.add(radarGridHelper);
+
+                // Concentric Glowing Radar Rings
+                const radarRadii = [0.4, 0.8, 1.2, 1.6, 2.0];
+                radarRadii.forEach(r => {
+                    const ringGeo = new THREE.RingGeometry(r - 0.003, r + 0.003, 64);
+                    const ringMat = new THREE.MeshBasicMaterial({ color: 0x06b6d4, side: THREE.DoubleSide, transparent: true, opacity: 0.25 });
+                    const ringMesh = new THREE.Mesh(ringGeo, ringMat);
+                    ringMesh.rotation.x = -Math.PI / 2;
+                    ringMesh.position.y = 0.001;
+                    floorRadarGroup.add(ringMesh);
+                });
+
+                // Pulsing Sonar Sweep Ring
+                const pulseGeo = new THREE.RingGeometry(0.98, 1.02, 64);
+                const pulseMat = new THREE.MeshBasicMaterial({ color: 0x06b6d4, side: THREE.DoubleSide, transparent: true, opacity: 0.35 });
+                radarPulseMesh = new THREE.Mesh(pulseGeo, pulseMat);
+                radarPulseMesh.rotation.x = -Math.PI / 2;
+                radarPulseMesh.position.y = 0.002;
+                floorRadarGroup.add(radarPulseMesh);
+
+                // Dynamic Avatar Drop Shadow on Ground
+                const shadowGeo = new THREE.CircleGeometry(0.35, 32);
+                const shadowMat = new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.55 });
+                avatarShadowMesh = new THREE.Mesh(shadowGeo, shadowMat);
+                avatarShadowMesh.rotation.x = -Math.PI / 2;
+                avatarShadowMesh.position.y = 0.0015;
+                floorRadarGroup.add(avatarShadowMesh);
+
+                scene.add(floorRadarGroup);
+
+                // ── Volumetric Hologram Mannequin Materials ──
+                meshMatNormal = new THREE.MeshStandardMaterial({
+                    color: 0x06b6d4,
+                    metalness: 0.30,
+                    roughness: 0.20,
+                    transparent: true,
+                    opacity: 0.78,
+                    emissive: 0x083344,
+                    emissiveIntensity: 0.65
+                });
+                meshMatSit = new THREE.MeshStandardMaterial({
+                    color: 0x10b981,
+                    metalness: 0.30,
+                    roughness: 0.20,
+                    transparent: true,
+                    opacity: 0.78,
+                    emissive: 0x064e3b,
+                    emissiveIntensity: 0.65
+                });
+                meshMatFall = new THREE.MeshStandardMaterial({
+                    color: 0xef4444,
+                    metalness: 0.40,
+                    roughness: 0.15,
+                    transparent: true,
+                    opacity: 0.88,
+                    emissive: 0x991b1b,
+                    emissiveIntensity: 0.90
+                });
+
+                // ── Skeleton Wireframe Materials ──
+                jointMatNormal = new THREE.MeshStandardMaterial({ color: 0x38bdf8, roughness: 0.25, emissive: 0x083344 });
+                jointMatSit = new THREE.MeshStandardMaterial({ color: 0x34d399, roughness: 0.25, emissive: 0x064e3b });
+                jointMatFall = new THREE.MeshStandardMaterial({ color: 0xf87171, roughness: 0.20, emissive: 0x7f1d1d });
 
                 boneMatNormal = new THREE.LineBasicMaterial({ color: 0x38bdf8, linewidth: 2 });
                 boneMatSit = new THREE.LineBasicMaterial({ color: 0x34d399, linewidth: 2 });
                 boneMatFall = new THREE.LineBasicMaterial({ color: 0xef4444, linewidth: 3 });
 
-                const jointGeo = new THREE.SphereGeometry(0.028, 16, 16);
-                const headGeo = new THREE.SphereGeometry(0.055, 20, 20);
+                // ── Create Volumetric Limbs (Cylinders) ──
+                mannequinMeshes.length = 0;
+                const unitCylGeo = new THREE.CylinderGeometry(1, 1, 1, 16);
+                MANNEQUIN_SEGMENTS.forEach(() => {
+                    const m = new THREE.Mesh(unitCylGeo, meshMatNormal);
+                    scene.add(m);
+                    mannequinMeshes.push(m);
+                });
+
+                // Head Mannequin & Cyber Visor
+                headMannequinMesh = new THREE.Mesh(new THREE.SphereGeometry(0.075, 20, 20), meshMatNormal);
+                scene.add(headMannequinMesh);
+
+                headVisorMesh = new THREE.Mesh(new THREE.TorusGeometry(0.078, 0.010, 8, 24), new THREE.MeshBasicMaterial({ color: 0x38bdf8 }));
+                scene.add(headVisorMesh);
+
+                // ── Create Skeleton Joints & Bones ──
+                const jointGeo = new THREE.SphereGeometry(0.026, 16, 16);
+                const headJointGeo = new THREE.SphereGeometry(0.052, 20, 20);
 
                 joints.length = 0;
                 for (let i = 0; i < JOINT_COUNT; i++) {
-                    const geo = (i === 0) ? headGeo : jointGeo;
+                    const geo = (i === 0) ? headJointGeo : jointGeo;
                     const m = new THREE.Mesh(geo, jointMatNormal);
                     m.visible = (i === 0 || (i >= 11 && i <= 16) || (i >= 23 && i <= 28));
                     scene.add(m);
@@ -1574,6 +2116,53 @@
                     scene.add(line);
                     boneLines.push(line);
                 }
+
+                // ── Biomechanical Stability Diagnostics (Option C) ──
+                // CoM Sphere
+                comSphere = new THREE.Mesh(
+                    new THREE.SphereGeometry(0.040, 16, 16),
+                    new THREE.MeshStandardMaterial({ color: 0xfacc15, emissive: 0xeab308, roughness: 0.15 })
+                );
+                scene.add(comSphere);
+
+                // Gravity Plumb Line
+                comPlumbLine = new THREE.Line(
+                    new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(), new THREE.Vector3()]),
+                    new THREE.LineBasicMaterial({ color: 0x10b981, linewidth: 2.5 })
+                );
+                scene.add(comPlumbLine);
+
+                // Ground Target Ring under CoM
+                comTargetRing = new THREE.Mesh(
+                    new THREE.RingGeometry(0.038, 0.058, 32),
+                    new THREE.MeshBasicMaterial({ color: 0xfacc15, side: THREE.DoubleSide, transparent: true, opacity: 0.85 })
+                );
+                comTargetRing.rotation.x = -Math.PI / 2;
+                comTargetRing.position.y = 0.003;
+                scene.add(comTargetRing);
+
+                // Base of Support (BoS) Footprint Fill & Perimeter Line
+                bosFootprintMesh = new THREE.Mesh(
+                    new THREE.BufferGeometry(),
+                    new THREE.MeshBasicMaterial({ color: 0x10b981, transparent: true, opacity: 0.22, side: THREE.DoubleSide })
+                );
+                scene.add(bosFootprintMesh);
+
+                bosOutlineLine = new THREE.LineLoop(
+                    new THREE.BufferGeometry(),
+                    new THREE.LineBasicMaterial({ color: 0x10b981, linewidth: 2.5 })
+                );
+                scene.add(bosOutlineLine);
+
+                // Motion Trajectory Ribbon
+                motionTrailLine = new THREE.Line(
+                    new THREE.BufferGeometry(),
+                    new THREE.LineBasicMaterial({ vertexColors: true, linewidth: 3.0, transparent: true, opacity: 0.90 })
+                );
+                scene.add(motionTrailLine);
+
+                // Initialize initial visibility based on HUD layer toggles
+                applyViewportLayerVisibility();
 
                 loadDefaultStandingAvatar();
                 renderer.render(scene, camera);
@@ -1600,7 +2189,7 @@
 
         // =========================================================================
         // 4. ZERO-DEPENDENCY 3D PERSPECTIVE CANVAS ENGINE
-        // Renders complete 3D rotatable skeleton & ground grid even with WebGL disabled
+        // Renders complete 3D rotatable volumetric limbs, radar, and stability analytics
         // =========================================================================
 
         function initPerspectiveCanvasScene(container) {
@@ -1619,7 +2208,6 @@
 
             ctx2D = canvas2D.getContext('2d');
 
-            // Interactive mouse rotation and wheel zooming
             canvas2D.addEventListener('mousedown', (e) => {
                 perspectiveCam.isDragging = true;
                 perspectiveCam.prevX = e.clientX;
@@ -1660,7 +2248,6 @@
                 st.style.color = '#38bdf8';
             }
 
-            // Start 60 FPS perspective canvas render loop
             animatePerspectiveCanvas();
         }
 
@@ -1670,13 +2257,11 @@
             const dy = y - ty;
             const dz = z - tz;
 
-            // Azimuth rotation around Y
             const cosA = Math.cos(perspectiveCam.azimuth);
             const sinA = Math.sin(perspectiveCam.azimuth);
             const x1 = dx * cosA - dz * sinA;
             const z1 = dx * sinA + dz * cosA;
 
-            // Elevation rotation around X
             const cosE = Math.cos(perspectiveCam.elevation);
             const sinE = Math.sin(perspectiveCam.elevation);
             const y2 = dy * cosE - z1 * sinE;
@@ -1699,50 +2284,9 @@
             const w = canvas2D.width;
             const h = canvas2D.height;
 
-            // Clear background
             ctx2D.fillStyle = '#06080e';
             ctx2D.fillRect(0, 0, w, h);
 
-            // 1. Draw 3D Ground Grid
-            ctx2D.lineWidth = 1;
-            ctx2D.strokeStyle = '#161f30';
-            const gridRange = 2.0;
-            const gridSteps = 10;
-            const step = (gridRange * 2) / gridSteps;
-
-            for (let i = -gridRange; i <= gridRange + 0.01; i += step) {
-                const p1 = project3D(i, 0, -gridRange, w, h);
-                const p2 = project3D(i, 0, gridRange, w, h);
-                if (p1.depth > 0.2 && p2.depth > 0.2) {
-                    ctx2D.beginPath();
-                    ctx2D.moveTo(p1.sx, p1.sy);
-                    ctx2D.lineTo(p2.sx, p2.sy);
-                    ctx2D.stroke();
-                }
-
-                const p3 = project3D(-gridRange, 0, i, w, h);
-                const p4 = project3D(gridRange, 0, i, w, h);
-                if (p3.depth > 0.2 && p4.depth > 0.2) {
-                    ctx2D.beginPath();
-                    ctx2D.moveTo(p3.sx, p3.sy);
-                    ctx2D.lineTo(p4.sx, p4.sy);
-                    ctx2D.stroke();
-                }
-            }
-
-            // Ground Center Cross
-            ctx2D.strokeStyle = 'rgba(6, 182, 212, 0.4)';
-            ctx2D.lineWidth = 1.5;
-            const cX1 = project3D(-0.8, 0, 0, w, h);
-            const cX2 = project3D(0.8, 0, 0, w, h);
-            if (cX1.depth > 0.2 && cX2.depth > 0.2) {
-                ctx2D.beginPath();
-                ctx2D.moveTo(cX1.sx, cX1.sy);
-                ctx2D.lineTo(cX2.sx, cX2.sy);
-                ctx2D.stroke();
-            }
-
-            // 2. Lerp joint positions smoothly
             for (let i = 0; i < JOINT_COUNT; i++) {
                 if (currentJointPositions[i] && targetPositions[i]) {
                     currentJointPositions[i].x += (targetPositions[i].x - currentJointPositions[i].x) * 0.35;
@@ -1751,50 +2295,282 @@
                 }
             }
 
-            // Determine active posture color
             const postEl = document.getElementById('hud-posture');
             const posture = postEl ? postEl.textContent : 'Standing';
-            const boneColor = (posture === 'FALLEN') ? '#ef4444' : ((posture === 'Sitting') ? '#34d399' : '#38bdf8');
-            const jointColor = (posture === 'FALLEN') ? '#f87171' : ((posture === 'Sitting') ? '#10b981' : '#06b6d4');
+            const isFallen = (posture === 'FALLEN') || (fsmFallState === FSM_FALL_CONFIRMED);
+            const isSitting = (posture === 'Sitting');
 
-            // 3. Draw Connecting 3D Bones
-            ctx2D.strokeStyle = boneColor;
-            BONE_CONNECTIONS.forEach(([a, b]) => {
-                const jA = currentJointPositions[a];
-                const jB = currentJointPositions[b];
-                if (jA && jB) {
-                    const pA = project3D(jA.x, jA.y, jA.z, w, h);
-                    const pB = project3D(jB.x, jB.y, jB.z, w, h);
+            // Biomechanical Analytics
+            const com = computeCenterOfMassPositions(currentJointPositions);
+            const now = performance.now();
+            const dt = Math.max(1e-3, (now - lastTrajectoryTime) / 1000.0);
+            lastTrajectoryTime = now;
+
+            const prevPos = trajectoryBuffer.length > 0 ? trajectoryBuffer[trajectoryBuffer.length - 1] : com;
+            const dy = Math.abs(com.y - prevPos.y);
+            const speed = Math.hypot(com.x - prevPos.x, com.y - prevPos.y, com.z - prevPos.z) / dt;
+            lastDescentVelocity = dy / dt;
+
+            trajectoryBuffer.push({ x: com.x, y: com.y, z: com.z, speed: speed, isFall: isFallen });
+            if (trajectoryBuffer.length > TRAJECTORY_MAX_POINTS) trajectoryBuffer.shift();
+
+            const footPoints = extractFootContactPoints(currentJointPositions);
+            const bosPoly = computeConvexHull2D(footPoints);
+            const isInsideBoS = isPointInPolygon2D(com.x, com.z, bosPoly);
+            const stabilityMargin = computeStabilityMargin2D(com.x, com.z, bosPoly);
+            lastStabilityMargin = stabilityMargin;
+
+            // 1. Radar Floor Layer
+            if (viewportLayers.radar) {
+                ctx2D.lineWidth = 1;
+                ctx2D.strokeStyle = '#161f30';
+                const gridRange = 2.0;
+                const gridSteps = 10;
+                const step = (gridRange * 2) / gridSteps;
+
+                for (let i = -gridRange; i <= gridRange + 0.01; i += step) {
+                    const p1 = project3D(i, 0, -gridRange, w, h);
+                    const p2 = project3D(i, 0, gridRange, w, h);
+                    if (p1.depth > 0.2 && p2.depth > 0.2) {
+                        ctx2D.beginPath();
+                        ctx2D.moveTo(p1.sx, p1.sy);
+                        ctx2D.lineTo(p2.sx, p2.sy);
+                        ctx2D.stroke();
+                    }
+                    const p3 = project3D(-gridRange, 0, i, w, h);
+                    const p4 = project3D(gridRange, 0, i, w, h);
+                    if (p3.depth > 0.2 && p4.depth > 0.2) {
+                        ctx2D.beginPath();
+                        ctx2D.moveTo(p3.sx, p3.sy);
+                        ctx2D.lineTo(p4.sx, p4.sy);
+                        ctx2D.stroke();
+                    }
+                }
+
+                const radarRings = [0.4, 0.8, 1.2, 1.6, 2.0];
+                radarRings.forEach(rad => {
+                    ctx2D.beginPath();
+                    ctx2D.strokeStyle = 'rgba(6, 182, 212, 0.20)';
+                    ctx2D.lineWidth = 1;
+                    const segments = 32;
+                    for (let s = 0; s <= segments; s++) {
+                        const theta = (s / segments) * 2 * Math.PI;
+                        const rx = rad * Math.cos(theta);
+                        const rz = rad * Math.sin(theta);
+                        const p = project3D(rx, 0, rz, w, h);
+                        if (p.depth > 0.2) {
+                            if (s === 0) ctx2D.moveTo(p.sx, p.sy);
+                            else ctx2D.lineTo(p.sx, p.sy);
+                        }
+                    }
+                    ctx2D.stroke();
+                });
+
+                radarPulseRadius += 0.015;
+                if (radarPulseRadius > 2.2) radarPulseRadius = 0.2;
+                const waveAlpha = Math.max(0, 0.35 * (1.0 - radarPulseRadius / 2.2));
+                ctx2D.beginPath();
+                ctx2D.strokeStyle = `rgba(6, 182, 212, ${waveAlpha})`;
+                ctx2D.lineWidth = 1.5;
+                for (let s = 0; s <= 32; s++) {
+                    const theta = (s / 32) * 2 * Math.PI;
+                    const rx = radarPulseRadius * Math.cos(theta);
+                    const rz = radarPulseRadius * Math.sin(theta);
+                    const p = project3D(rx, 0, rz, w, h);
+                    if (p.depth > 0.2) {
+                        if (s === 0) ctx2D.moveTo(p.sx, p.sy);
+                        else ctx2D.lineTo(p.sx, p.sy);
+                    }
+                }
+                ctx2D.stroke();
+
+                const shadowProj = project3D(com.x, 0, com.z, w, h);
+                if (shadowProj.depth > 0.2) {
+                    const sRadius = Math.max(8, Math.min(60, 45.0 / shadowProj.depth));
+                    ctx2D.beginPath();
+                    ctx2D.ellipse(shadowProj.sx, shadowProj.sy, sRadius, sRadius * 0.45, 0, 0, 2 * Math.PI);
+                    ctx2D.fillStyle = 'rgba(0, 0, 0, 0.55)';
+                    ctx2D.fill();
+                }
+            }
+
+            // 2. Base of Support (BoS) Footprint Layer
+            if (viewportLayers.com && bosPoly.length >= 3) {
+                const bosColor = isFallen ? '#ef4444' : (isInsideBoS ? '#10b981' : '#f59e0b');
+                const bosFill = isFallen ? 'rgba(239, 68, 68, 0.22)' : (isInsideBoS ? 'rgba(16, 185, 129, 0.20)' : 'rgba(245, 158, 11, 0.20)');
+
+                ctx2D.beginPath();
+                let first = true;
+                bosPoly.forEach(pt => {
+                    const p = project3D(pt.x, 0, pt.z, w, h);
+                    if (p.depth > 0.2) {
+                        if (first) { ctx2D.moveTo(p.sx, p.sy); first = false; }
+                        else ctx2D.lineTo(p.sx, p.sy);
+                    }
+                });
+                ctx2D.closePath();
+                ctx2D.fillStyle = bosFill;
+                ctx2D.fill();
+                ctx2D.strokeStyle = bosColor;
+                ctx2D.lineWidth = 1.5;
+                ctx2D.stroke();
+            }
+
+            // 3. Motion Trajectory Ribbon Layer
+            if (viewportLayers.trail && trajectoryBuffer.length >= 2) {
+                for (let i = 1; i < trajectoryBuffer.length; i++) {
+                    const pA = project3D(trajectoryBuffer[i - 1].x, trajectoryBuffer[i - 1].y, trajectoryBuffer[i - 1].z, w, h);
+                    const pB = project3D(trajectoryBuffer[i].x, trajectoryBuffer[i].y, trajectoryBuffer[i].z, w, h);
                     if (pA.depth > 0.2 && pB.depth > 0.2) {
-                        ctx2D.lineWidth = Math.max(1.5, Math.min(4.5, 8.0 / ((pA.depth + pB.depth) / 2)));
+                        const alpha = (i / trajectoryBuffer.length);
+                        const isSurge = trajectoryBuffer[i].isFall || trajectoryBuffer[i].speed > 1.2;
+                        ctx2D.strokeStyle = isSurge ? `rgba(239, 68, 68, ${alpha * 0.9})` : `rgba(6, 182, 212, ${alpha * 0.8})`;
+                        ctx2D.lineWidth = Math.max(1, 3.5 * alpha);
                         ctx2D.beginPath();
                         ctx2D.moveTo(pA.sx, pA.sy);
                         ctx2D.lineTo(pB.sx, pB.sy);
                         ctx2D.stroke();
                     }
                 }
-            });
+            }
 
-            // 4. Draw 3D Spherical Joints
-            for (let i = 0; i < JOINT_COUNT; i++) {
-                if (i === 0 || (i >= 11 && i <= 16) || (i >= 23 && i <= 28)) {
-                    const jPt = currentJointPositions[i];
-                    if (jPt) {
-                        const proj = project3D(jPt.x, jPt.y, jPt.z, w, h);
-                        if (proj.depth > 0.2) {
-                            const radius = Math.max(2.5, Math.min(16, (i === 0 ? 18.0 : 9.0) / proj.depth));
+            // 4. Volumetric 3D Capsule Mannequin Mesh Layer
+            const limbFill = isFallen ? 'rgba(239, 68, 68, 0.75)' : (isSitting ? 'rgba(16, 185, 129, 0.72)' : 'rgba(6, 182, 212, 0.72)');
+
+            if (viewportLayers.mesh) {
+                const j11 = currentJointPositions[11], j12 = currentJointPositions[12];
+                const j23 = currentJointPositions[23], j24 = currentJointPositions[24];
+                const neck = { x: (j11.x + j12.x) * 0.5, y: (j11.y + j12.y) * 0.5, z: (j11.z + j12.z) * 0.5 };
+                const pelvis = { x: (j23.x + j24.x) * 0.5, y: (j23.y + j24.y) * 0.5, z: (j23.z + j24.z) * 0.5 };
+
+                MANNEQUIN_SEGMENTS.forEach(seg => {
+                    let ptA = (seg.a === 'neck') ? neck : ((seg.a === 'pelvis') ? pelvis : currentJointPositions[seg.a]);
+                    let ptB = (seg.b === 'neck') ? neck : ((seg.b === 'pelvis') ? pelvis : currentJointPositions[seg.b]);
+
+                    if (ptA && ptB) {
+                        const pA = project3D(ptA.x, ptA.y, ptA.z, w, h);
+                        const pB = project3D(ptB.x, ptB.y, ptB.z, w, h);
+                        if (pA.depth > 0.2 && pB.depth > 0.2) {
+                            const avgDepth = (pA.depth + pB.depth) * 0.5;
+                            const limbWidth = Math.max(3.0, (seg.r * 180.0) / avgDepth);
+
                             ctx2D.beginPath();
-                            ctx2D.arc(proj.sx, proj.sy, radius, 0, 2 * Math.PI);
-                            ctx2D.fillStyle = jointColor;
-                            ctx2D.fill();
-
-                            ctx2D.lineWidth = 1;
-                            ctx2D.strokeStyle = '#ffffff';
+                            ctx2D.strokeStyle = limbFill;
+                            ctx2D.lineWidth = limbWidth;
+                            ctx2D.lineCap = 'round';
+                            ctx2D.moveTo(pA.sx, pA.sy);
+                            ctx2D.lineTo(pB.sx, pB.sy);
                             ctx2D.stroke();
+
+                            ctx2D.beginPath();
+                            ctx2D.strokeStyle = 'rgba(255, 255, 255, 0.35)';
+                            ctx2D.lineWidth = Math.max(1, limbWidth * 0.25);
+                            ctx2D.moveTo(pA.sx, pA.sy);
+                            ctx2D.lineTo(pB.sx, pB.sy);
+                            ctx2D.stroke();
+                        }
+                    }
+                });
+
+                const headPt = currentJointPositions[0];
+                if (headPt) {
+                    const pHead = project3D(headPt.x, headPt.y, headPt.z, w, h);
+                    if (pHead.depth > 0.2) {
+                        const headR = Math.max(6, 26.0 / pHead.depth);
+                        ctx2D.beginPath();
+                        ctx2D.arc(pHead.sx, pHead.sy, headR, 0, 2 * Math.PI);
+                        ctx2D.fillStyle = limbFill;
+                        ctx2D.fill();
+                        ctx2D.strokeStyle = '#ffffff';
+                        ctx2D.lineWidth = 1.5;
+                        ctx2D.stroke();
+
+                        ctx2D.beginPath();
+                        ctx2D.ellipse(pHead.sx, pHead.sy, headR * 1.15, headR * 0.45, 0, 0, 2 * Math.PI);
+                        ctx2D.strokeStyle = '#38bdf8';
+                        ctx2D.lineWidth = 2;
+                        ctx2D.stroke();
+                    }
+                }
+            }
+
+            // 5. Skeleton Bones & Joints Layer
+            if (viewportLayers.bones) {
+                const boneColor = isFallen ? '#ef4444' : (isSitting ? '#34d399' : '#38bdf8');
+                const jointColor = isFallen ? '#f87171' : (isSitting ? '#10b981' : '#06b6d4');
+
+                ctx2D.strokeStyle = boneColor;
+                BONE_CONNECTIONS.forEach(([a, b]) => {
+                    const jA = currentJointPositions[a];
+                    const jB = currentJointPositions[b];
+                    if (jA && jB) {
+                        const pA = project3D(jA.x, jA.y, jA.z, w, h);
+                        const pB = project3D(jB.x, jB.y, jB.z, w, h);
+                        if (pA.depth > 0.2 && pB.depth > 0.2) {
+                            ctx2D.lineWidth = Math.max(1.5, Math.min(4.0, 7.0 / ((pA.depth + pB.depth) / 2)));
+                            ctx2D.beginPath();
+                            ctx2D.moveTo(pA.sx, pA.sy);
+                            ctx2D.lineTo(pB.sx, pB.sy);
+                            ctx2D.stroke();
+                        }
+                    }
+                });
+
+                for (let i = 0; i < JOINT_COUNT; i++) {
+                    if (i === 0 || (i >= 11 && i <= 16) || (i >= 23 && i <= 28)) {
+                        const jPt = currentJointPositions[i];
+                        if (jPt) {
+                            const proj = project3D(jPt.x, jPt.y, jPt.z, w, h);
+                            if (proj.depth > 0.2) {
+                                const radius = Math.max(2.5, Math.min(14, (i === 0 ? 16.0 : 8.0) / proj.depth));
+                                ctx2D.beginPath();
+                                ctx2D.arc(proj.sx, proj.sy, radius, 0, 2 * Math.PI);
+                                ctx2D.fillStyle = jointColor;
+                                ctx2D.fill();
+                                ctx2D.lineWidth = 1;
+                                ctx2D.strokeStyle = '#ffffff';
+                                ctx2D.stroke();
+                            }
                         }
                     }
                 }
             }
+
+            // 6. Center of Mass & Gravity Plumb Line Layer
+            if (viewportLayers.com) {
+                const pCoM = project3D(com.x, com.y, com.z, w, h);
+                const pFloor = project3D(com.x, 0.002, com.z, w, h);
+
+                if (pCoM.depth > 0.2 && pFloor.depth > 0.2) {
+                    ctx2D.save();
+                    ctx2D.setLineDash([4, 4]);
+                    ctx2D.strokeStyle = isFallen ? '#ef4444' : (isInsideBoS ? '#10b981' : '#f59e0b');
+                    ctx2D.lineWidth = 2;
+                    ctx2D.beginPath();
+                    ctx2D.moveTo(pCoM.sx, pCoM.sy);
+                    ctx2D.lineTo(pFloor.sx, pFloor.sy);
+                    ctx2D.stroke();
+                    ctx2D.restore();
+
+                    const ringR = Math.max(3, 14.0 / pFloor.depth);
+                    ctx2D.beginPath();
+                    ctx2D.arc(pFloor.sx, pFloor.sy, ringR, 0, 2 * Math.PI);
+                    ctx2D.strokeStyle = '#facc15';
+                    ctx2D.lineWidth = 2;
+                    ctx2D.stroke();
+
+                    const comR = Math.max(4, 12.0 / pCoM.depth);
+                    ctx2D.beginPath();
+                    ctx2D.arc(pCoM.sx, pCoM.sy, comR, 0, 2 * Math.PI);
+                    ctx2D.fillStyle = '#facc15';
+                    ctx2D.fill();
+                    ctx2D.strokeStyle = '#ffffff';
+                    ctx2D.lineWidth = 1.5;
+                    ctx2D.stroke();
+                }
+            }
+
+            updateHUDStabilityBadge(isInsideBoS, stabilityMargin, lastDescentVelocity, isFallen);
         }
 
         function handleViewportResize() {
@@ -1809,6 +2585,10 @@
         }
 
         function setCameraPreset(view) {
+            document.querySelectorAll('.viewport-overlay .btn-preset').forEach(b => b.classList.remove('active'));
+            const activeBtn = document.getElementById(`cam-preset-${view}`);
+            if (activeBtn) activeBtn.classList.add('active');
+
             if (isUsing2DFallback) {
                 if (view === 'front') { perspectiveCam.azimuth = 0; perspectiveCam.elevation = 0.12; perspectiveCam.distance = 3.2; }
                 else if (view === 'side') { perspectiveCam.azimuth = Math.PI / 2; perspectiveCam.elevation = 0.12; perspectiveCam.distance = 3.2; }
@@ -1845,6 +2625,7 @@
                 controls.update();
             }
 
+            // 1. Lerp Joint Positions Smoothly
             for (let i = 0; i < JOINT_COUNT; i++) {
                 if (joints[i] && targetPositions[i]) {
                     joints[i].position.x += (targetPositions[i].x - joints[i].position.x) * 0.35;
@@ -1853,11 +2634,123 @@
                 }
             }
 
-            BONE_CONNECTIONS.forEach(([a, b], idx) => {
-                if (boneLines[idx] && joints[a] && joints[b]) {
-                    boneLines[idx].geometry.setFromPoints([joints[a].position, joints[b].position]);
+            // 2. Update Skeleton Bones
+            if (viewportLayers.bones) {
+                BONE_CONNECTIONS.forEach(([a, b], idx) => {
+                    if (boneLines[idx] && joints[a] && joints[b]) {
+                        boneLines[idx].geometry.setFromPoints([joints[a].position, joints[b].position]);
+                    }
+                });
+            }
+
+            // 3. Update Volumetric Mannequin Limbs
+            if (viewportLayers.mesh) {
+                const p11 = joints[11].position, p12 = joints[12].position;
+                const p23 = joints[23].position, p24 = joints[24].position;
+
+                const neckPt = new THREE.Vector3().addVectors(p11, p12).multiplyScalar(0.5);
+                const pelvisPt = new THREE.Vector3().addVectors(p23, p24).multiplyScalar(0.5);
+
+                MANNEQUIN_SEGMENTS.forEach((seg, idx) => {
+                    const mesh = mannequinMeshes[idx];
+                    if (!mesh) return;
+
+                    let pA, pB;
+                    if (seg.a === 'neck') pA = neckPt;
+                    else if (seg.a === 'pelvis') pA = pelvisPt;
+                    else pA = joints[seg.a] ? joints[seg.a].position : null;
+
+                    if (seg.b === 'neck') pB = neckPt;
+                    else if (seg.b === 'pelvis') pB = pelvisPt;
+                    else pB = joints[seg.b] ? joints[seg.b].position : null;
+
+                    if (pA && pB) {
+                        const dist = pA.distanceTo(pB);
+                        if (dist > 0.005) {
+                            mesh.visible = true;
+                            const mid = new THREE.Vector3().addVectors(pA, pB).multiplyScalar(0.5);
+                            mesh.position.copy(mid);
+                            mesh.scale.set(seg.r, dist, seg.r);
+
+                            const dir = new THREE.Vector3().subVectors(pB, pA).normalize();
+                            mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir);
+                        } else {
+                            mesh.visible = false;
+                        }
+                    }
+                });
+
+                if (headMannequinMesh && joints[0]) {
+                    headMannequinMesh.position.copy(joints[0].position);
+                    if (headVisorMesh) {
+                        headVisorMesh.position.copy(joints[0].position);
+                        headVisorMesh.rotation.x = Math.PI / 2;
+                    }
                 }
-            });
+            }
+
+            // 4. Biomechanical Stability Analytics (Option C)
+            const jointPoints = joints.map(j => j.position);
+            const com = computeCenterOfMassPositions(jointPoints);
+            const now = performance.now();
+            const dt = Math.max(1e-3, (now - lastTrajectoryTime) / 1000.0);
+            lastTrajectoryTime = now;
+
+            const postEl = document.getElementById('hud-posture');
+            const posture = postEl ? postEl.textContent : 'Standing';
+            const isFallen = (posture === 'FALLEN') || (fsmFallState === FSM_FALL_CONFIRMED);
+
+            const prevPos = trajectoryBuffer.length > 0 ? trajectoryBuffer[trajectoryBuffer.length - 1] : com;
+            const dy = Math.abs(com.y - prevPos.y);
+            const speed = Math.hypot(com.x - prevPos.x, com.y - prevPos.y, com.z - prevPos.z) / dt;
+            lastDescentVelocity = dy / dt;
+
+            trajectoryBuffer.push({ x: com.x, y: com.y, z: com.z, speed: speed, isFall: isFallen });
+            if (trajectoryBuffer.length > TRAJECTORY_MAX_POINTS) trajectoryBuffer.shift();
+
+            if (motionTrailLine && viewportLayers.trail) {
+                updateMotionTrailGeometry(motionTrailLine, trajectoryBuffer);
+            }
+
+            const footPoints = extractFootContactPoints(jointPoints);
+            const bosPoly = computeConvexHull2D(footPoints);
+            const isInsideBoS = isPointInPolygon2D(com.x, com.z, bosPoly);
+            const stabilityMargin = computeStabilityMargin2D(com.x, com.z, bosPoly);
+            lastStabilityMargin = stabilityMargin;
+
+            if (viewportLayers.com) {
+                if (comSphere) {
+                    comSphere.position.set(com.x, com.y, com.z);
+                }
+                if (comPlumbLine) {
+                    comPlumbLine.geometry.setFromPoints([
+                        new THREE.Vector3(com.x, com.y, com.z),
+                        new THREE.Vector3(com.x, 0.002, com.z)
+                    ]);
+                    comPlumbLine.material.color.setHex(isFallen ? 0xef4444 : (isInsideBoS ? 0x10b981 : 0xf59e0b));
+                }
+                if (comTargetRing) {
+                    comTargetRing.position.set(com.x, 0.003, com.z);
+                }
+                updateBoSVisualizer(bosOutlineLine, bosFootprintMesh, bosPoly, isInsideBoS, isFallen);
+            }
+
+            // 5. Floor Radar Pulsing & Avatar Drop Shadow (Option A)
+            if (viewportLayers.radar && radarPulseMesh) {
+                radarPulseRadius += 0.015;
+                if (radarPulseRadius > 2.2) radarPulseRadius = 0.2;
+                radarPulseMesh.scale.set(radarPulseRadius, radarPulseRadius, 1);
+                radarPulseMesh.material.opacity = Math.max(0, 0.35 * (1.0 - radarPulseRadius / 2.2));
+            }
+            if (avatarShadowMesh) {
+                avatarShadowMesh.position.set(com.x, 0.0015, com.z);
+                const heightFactor = Math.max(0.1, Math.min(1.8, com.y));
+                const shadowScale = isFallen ? 1.6 : (0.7 + (1.8 - heightFactor) * 0.4);
+                avatarShadowMesh.scale.set(shadowScale, shadowScale, 1);
+            }
+
+            // 6. Update HUD Stability Badge
+            updateHUDStabilityBadge(isInsideBoS, stabilityMargin, lastDescentVelocity, isFallen);
 
             renderer.render(scene, camera);
         }
@@ -1865,6 +2758,7 @@
         function update3DTargetPositions(wlm, lm, isFallen = false, isSitting = false) {
             if (!wlm || wlm.length === 0) return;
 
+            const currentMeshMat = isFallen ? meshMatFall : (isSitting ? meshMatSit : meshMatNormal);
             const currentJointMat = isFallen ? jointMatFall : (isSitting ? jointMatSit : jointMatNormal);
             const currentBoneMat = isFallen ? boneMatFall : (isSitting ? boneMatSit : boneMatNormal);
 
@@ -1887,6 +2781,15 @@
                     if (joints[i] && currentJointMat) {
                         joints[i].material = currentJointMat;
                     }
+                }
+            }
+
+            if (currentMeshMat) {
+                mannequinMeshes.forEach(m => {
+                    if (m) m.material = currentMeshMat;
+                });
+                if (headMannequinMesh) {
+                    headMannequinMesh.material = currentMeshMat;
                 }
             }
 

@@ -174,6 +174,275 @@ def _get_bone_base_thickness(i1: int, i2: int, group: str) -> int:
     return 3
 
 
+class BiomechanicsEngine:
+    """
+    Biomechanical Center of Mass (CoM), Base of Support (BoS),
+    and Postural Stability Analytics for 3D human pose kinematics.
+    """
+    def __init__(self, history_len: int = 35) -> None:
+        self.history_len = history_len
+        self.trajectory_history: List[Tuple[float, float, float, float]] = []  # (x, y, z, timestamp)
+        self.last_stability_margin: float = 0.0
+        self.last_is_stable: bool = True
+        self.last_descent_velocity: float = 0.0
+
+    @staticmethod
+    def compute_center_of_mass(landmarks: Any) -> Optional[np.ndarray]:
+        """
+        Computes 3D Center of Mass (CoM) using Winter's anthropometric segment model.
+        Returns np.ndarray([x, y, z]) in metric space (meters).
+        """
+        if landmarks is None or len(landmarks) < 29:
+            return None
+
+        def _get_pt(idx):
+            if idx >= len(landmarks):
+                return None
+            lm = landmarks[idx]
+            if lm is None:
+                return None
+            if hasattr(lm, 'x'):
+                x, y, z = lm.x, lm.y, lm.z
+            else:
+                x, y, z = lm[0], lm[1], lm[2]
+            if math.isnan(x) or math.isnan(y) or math.isnan(z) or math.isinf(x) or math.isinf(y) or math.isinf(z):
+                return None
+            return np.array([x, y, z], dtype=np.float32)
+
+        pL, pR = _get_pt(23), _get_pt(24) # Hips
+        sL, sR = _get_pt(11), _get_pt(12) # Shoulders
+        aL, aR = _get_pt(27), _get_pt(28) # Ankles
+        head = _get_pt(0)                 # Head/Nose
+
+        if pL is None and pR is None:
+            if sL is not None and sR is not None:
+                pelvis = (sL + sR) * 0.5 - np.array([0.0, 0.50, 0.0], dtype=np.float32)
+            else:
+                return None
+        elif pL is None:
+            pelvis = pR
+        elif pR is None:
+            pelvis = pL
+        else:
+            pelvis = (pL + pR) * 0.5
+
+        if sL is None and sR is None:
+            shoulders = pelvis + np.array([0.0, 0.50, 0.0], dtype=np.float32)
+        elif sL is None:
+            shoulders = sR
+        elif sR is None:
+            shoulders = sL
+        else:
+            shoulders = (sL + sR) * 0.5
+
+        if aL is not None and aR is not None:
+            ankles = (aL + aR) * 0.5
+        elif aL is not None:
+            ankles = aL
+        elif aR is not None:
+            ankles = aR
+        else:
+            ankles = pelvis - np.array([0.0, 0.85, 0.0], dtype=np.float32)
+
+        h_pt = head if head is not None else shoulders + np.array([0.0, 0.25, 0.0], dtype=np.float32)
+
+        com = 0.50 * pelvis + 0.35 * shoulders + 0.10 * ankles + 0.05 * h_pt
+        return com
+
+    @staticmethod
+    def compute_base_of_support_polygon(landmarks: Any) -> Optional[np.ndarray]:
+        """
+        Computes 2D Base of Support (BoS) convex polygon on ground (X, Z plane) in meters.
+        Uses foot contact landmarks: 27 (L ankle), 29 (L heel), 31 (L toe),
+        28 (R ankle), 30 (R heel), 32 (R toe).
+        """
+        if landmarks is None or len(landmarks) < 29:
+            return None
+
+        foot_indices = [27, 28, 29, 30, 31, 32]
+        pts_2d = []
+
+        for idx in foot_indices:
+            if idx >= len(landmarks):
+                continue
+            lm = landmarks[idx]
+            if lm is None:
+                continue
+            if hasattr(lm, 'x'):
+                x, z = lm.x, lm.z
+            else:
+                x, z = lm[0], lm[2]
+            if not (math.isnan(x) or math.isnan(z) or math.isinf(x) or math.isinf(z)):
+                pts_2d.append([float(x), float(z)])
+
+        if len(pts_2d) == 0:
+            return None
+
+        if len(pts_2d) < 3:
+            expanded = []
+            for px, pz in pts_2d:
+                expanded.extend([
+                    [px - 0.08, pz - 0.12],
+                    [px + 0.08, pz - 0.12],
+                    [px + 0.08, pz + 0.12],
+                    [px - 0.08, pz + 0.12],
+                ])
+            pts_2d = expanded
+
+        pts_arr = np.array(pts_2d, dtype=np.float32)
+        if np.ptp(pts_arr[:, 0]) < 1e-4 and np.ptp(pts_arr[:, 1]) < 1e-4:
+            px, pz = pts_arr[0, 0], pts_arr[0, 1]
+            return np.array([
+                [px - 0.08, pz - 0.12],
+                [px + 0.08, pz - 0.12],
+                [px + 0.08, pz + 0.12],
+                [px - 0.08, pz + 0.12],
+            ], dtype=np.float32)
+
+        try:
+            hull_idx = cv2.convexHull(pts_arr, returnPoints=False)
+            if hull_idx is not None and len(hull_idx) >= 3:
+                hull_pts = pts_arr[hull_idx.flatten()]
+                return hull_pts
+        except Exception:
+            pass
+
+        min_x, max_x = np.min(pts_arr[:, 0]), np.max(pts_arr[:, 0])
+        min_z, max_z = np.min(pts_arr[:, 1]), np.max(pts_arr[:, 1])
+        if max_x - min_x < 0.10:
+            cx = (min_x + max_x) * 0.5
+            min_x, max_x = cx - 0.08, cx + 0.08
+        if max_z - min_z < 0.15:
+            cz = (min_z + max_z) * 0.5
+            min_z, max_z = cz - 0.12, cz + 0.12
+        return np.array([
+            [min_x, min_z],
+            [max_x, min_z],
+            [max_x, max_z],
+            [min_x, max_z]
+        ], dtype=np.float32)
+
+    @staticmethod
+    def is_point_in_polygon(px: float, pz: float, polygon: np.ndarray) -> bool:
+        """
+        Ray-casting point-in-polygon containment test on the X-Z ground plane.
+        """
+        if polygon is None or len(polygon) < 3:
+            return False
+
+        n = len(polygon)
+        inside = False
+        j = n - 1
+        for i in range(n):
+            xi, zi = polygon[i][0], polygon[i][1]
+            xj, zj = polygon[j][0], polygon[j][1]
+
+            if ((zi > pz) != (zj > pz)) and (px < (xj - xi) * (pz - zi) / (zj - zi + 1e-9) + xi):
+                inside = not inside
+            j = i
+        return inside
+
+    @staticmethod
+    def compute_stability_margin(com: np.ndarray, polygon: np.ndarray) -> float:
+        """
+        Calculates distance from ground projected CoM (X, Z) to polygon perimeter in meters.
+        Positive if CoM is inside BoS (stable), negative if outside (unstable).
+        """
+        if com is None or polygon is None or len(polygon) < 3:
+            return 0.0
+
+        px, pz = float(com[0]), float(com[2])
+        is_inside = BiomechanicsEngine.is_point_in_polygon(px, pz, polygon)
+
+        min_dist = float('inf')
+        n = len(polygon)
+        for i in range(n):
+            x1, z1 = polygon[i][0], polygon[i][1]
+            x2, z2 = polygon[(i + 1) % n][0], polygon[(i + 1) % n][1]
+
+            dx = x2 - x1
+            dz = z2 - z1
+            seg_len_sq = dx * dx + dz * dz
+            if seg_len_sq < 1e-9:
+                dist = math.hypot(px - x1, pz - z1)
+            else:
+                t = max(0.0, min(1.0, ((px - x1) * dx + (pz - z1) * dz) / seg_len_sq))
+                proj_x = x1 + t * dx
+                proj_z = z1 + t * dz
+                dist = math.hypot(px - proj_x, pz - proj_z)
+            if dist < min_dist:
+                min_dist = dist
+
+        if math.isinf(min_dist):
+            return 0.0
+
+        return min_dist if is_inside else -min_dist
+
+    def update_trajectory(self, com: Optional[np.ndarray], timestamp: float) -> float:
+        """
+        Appends CoM to trajectory FIFO buffer and calculates instantaneous descent velocity (m/s).
+        """
+        if com is None:
+            return 0.0
+
+        x, y, z = float(com[0]), float(com[1]), float(com[2])
+        self.trajectory_history.append((x, y, z, timestamp))
+        if len(self.trajectory_history) > self.history_len:
+            self.trajectory_history.pop(0)
+
+        if len(self.trajectory_history) < 2:
+            self.last_descent_velocity = 0.0
+            return 0.0
+
+        prev = self.trajectory_history[-2]
+        curr = self.trajectory_history[-1]
+        dt = max(1e-4, curr[3] - prev[3])
+        dy = abs(curr[1] - prev[1])
+        velocity = dy / dt
+        self.last_descent_velocity = velocity
+        return velocity
+
+    def evaluate_stability(self, landmarks: Any, timestamp: float = 0.0) -> Dict[str, Any]:
+        """
+        Evaluates full biomechanical stability state:
+        CoM, BoS polygon, stability margin, descent velocity, and stability classification.
+        """
+        com = self.compute_center_of_mass(landmarks)
+        if com is None:
+            return {
+                "com": None,
+                "bos": None,
+                "margin_m": 0.0,
+                "is_stable": True,
+                "status": "UNKNOWN",
+                "velocity_mps": 0.0
+            }
+
+        bos = self.compute_base_of_support_polygon(landmarks)
+        margin = self.compute_stability_margin(com, bos) if bos is not None else 0.0
+        is_inside = self.is_point_in_polygon(com[0], com[2], bos) if bos is not None else True
+        velocity = self.update_trajectory(com, timestamp)
+
+        if margin > 0.03 and is_inside:
+            status = "STABLE"
+        elif margin >= 0.0 or abs(margin) < 0.04:
+            status = "MARGINAL"
+        else:
+            status = "UNSTABLE"
+
+        self.last_stability_margin = margin
+        self.last_is_stable = (status == "STABLE")
+
+        return {
+            "com": com,
+            "bos": bos,
+            "margin_m": margin,
+            "is_stable": self.last_is_stable,
+            "status": status,
+            "velocity_mps": velocity
+        }
+
+
 @dataclass
 class CameraState:
     """Stores 3D orbit camera parameters."""
@@ -224,6 +493,9 @@ class SkeletonVisualizer3D:
 
         # Floor level tracker (in meters below hip center)
         self.floor_y_m = 0.95
+
+        # Biomechanical stability & trajectory engine
+        self.biomechanics = BiomechanicsEngine()
 
         # Smoothing filters for automatic centering & dynamic camera distance
         self._smooth_center: Optional[np.ndarray] = None
