@@ -953,42 +953,6 @@
     <!-- Feature 2.2: Reassurance Banner for Dismissals -->
     <div id="reassurance-banner"></div>
 
-    <!-- Feature 2.2: 30-Second Emergency Dispatch Countdown Modal -->
-    <div id="emergency-modal" class="emergency-modal-backdrop">
-        <div class="emergency-modal-card">
-            <div class="modal-pulse-header">
-                <div class="modal-alert-icon">🚨</div>
-                <div>
-                    <h2 class="modal-title">EMERGENCY: FALL DETECTED!</h2>
-                    <p class="modal-subtitle">AI Inactivity Window Confirmed Subject on Ground</p>
-                </div>
-            </div>
-
-            <div class="countdown-circle-container">
-                <div class="countdown-digits" id="countdown-number">30</div>
-                <div class="countdown-unit">SECONDS UNTIL CAREGIVER DISPATCH</div>
-            </div>
-
-            <div class="countdown-bar-wrapper">
-                <div class="countdown-bar-fill" id="countdown-bar-fill" style="width: 100%;"></div>
-            </div>
-
-            <p class="modal-info-text">
-                Caregivers and emergency alert services will be notified in 30 seconds.<br>
-                If you are unhurt or this is a false alarm, click below or press <b>[Spacebar]</b>.
-            </p>
-
-            <div class="modal-btn-row">
-                <button class="btn-im-ok" onclick="dismissAlertByResident()">
-                    ✅ I AM OK — CANCEL ALERT
-                </button>
-                <button class="btn-dispatch-now" onclick="immediateEmergencyDispatch()">
-                    🚨 DISPATCH NOW
-                </button>
-            </div>
-        </div>
-    </div>
-
 
     <!-- Header Navigation -->
     <header>
@@ -1658,85 +1622,41 @@
         let standingSec = 0;
         let sittingSec = 0;
 
-        // ── Feature 1.1 State Machine: Post-Fall Inactivity & Recovery Verification ──
+        // ── Feature 1.1 State Machine: 5-Second Post-Fall Non-Recovery Direct Dispatch ──
         const FSM_IDLE = 'IDLE';
         const FSM_VERIFYING = 'VERIFYING';
         const FSM_FALL_CONFIRMED = 'FALL_CONFIRMED';
 
         let fsmFallState = FSM_IDLE;
         let fsmVerificationStartTime = 0;
-        const FSM_VERIFICATION_WINDOW_MS = 2000; // 2.0s Inactivity Window to prevent bending false-positives
+        const FSM_NON_RECOVERY_WINDOW_MS = 5000; // 5.0s Non-Recovery Window before automatic Telegram dispatch
         let recoveryChipTimeout = null;
+        let pendingFallData = null;
 
         function triggerRecoveryDetected() {
             fsmFallState = FSM_IDLE;
+            fsmVerificationStartTime = 0;
+            pendingFallData = null;
+            fallConfirmed = false;
+            stopEmergencyAudioSiren();
+
             const vChip = document.getElementById('hud-verification-chip');
             const rChip = document.getElementById('hud-recovery-chip');
             if (vChip) vChip.style.display = 'none';
             if (rChip) {
-                rChip.textContent = '🛡️ RECOVERY DETECTED — False Alarm Prevented (Bending / Shoelace)';
+                rChip.textContent = '🛡️ RECOVERY DETECTED — Subject Recovered Within 5s (No Alert Sent)';
                 rChip.style.display = 'block';
                 if (recoveryChipTimeout) clearTimeout(recoveryChipTimeout);
                 recoveryChipTimeout = setTimeout(() => {
                     rChip.style.display = 'none';
-                }, 3000);
+                }, 3500);
             }
-        }
-
-        // ── Feature 2.2: 30-Second Emergency Dispatch Countdown Engine ──
-        let emergencyCountdownTimer = null;
-        let emergencyRemainingSeconds = 30;
-        let pendingFallData = null;
-
-        function startEmergencyCountdown(score, severity, customNotes = "In-Browser WebAI Live") {
-            if (emergencyCountdownTimer) return;
-            if (fsmFallState === FSM_FALL_CONFIRMED && document.getElementById('emergency-modal').style.display === 'flex') return;
-
-            fsmFallState = FSM_FALL_CONFIRMED;
-            emergencyRemainingSeconds = 30;
-            pendingFallData = {
-                score: score,
-                severity: severity,
-                customNotes: customNotes,
-                time: Date.now()
-            };
-
-            const modal = document.getElementById('emergency-modal');
-            const countNum = document.getElementById('countdown-number');
-            const countFill = document.getElementById('countdown-bar-fill');
-
-            countNum.textContent = '30';
-            countFill.style.width = '100%';
-            modal.style.display = 'flex';
-
-            startEmergencyAudioSiren();
-            speakAlert("Warning: Fall detected! Emergency alert will be dispatched in 30 seconds. Press I am OK to cancel.");
-
-            emergencyCountdownTimer = setInterval(() => {
-                emergencyRemainingSeconds--;
-                countNum.textContent = emergencyRemainingSeconds;
-                countFill.style.width = `${(emergencyRemainingSeconds / 30) * 100}%`;
-
-                if (emergencyRemainingSeconds <= 0) {
-                    clearInterval(emergencyCountdownTimer);
-                    emergencyCountdownTimer = null;
-                    modal.style.display = 'none';
-                    stopEmergencyAudioSiren();
-                    dispatchConfirmedEmergency();
-                }
-            }, 1000);
         }
 
         function resetEmergencyState() {
-            if (emergencyCountdownTimer) {
-                clearInterval(emergencyCountdownTimer);
-                emergencyCountdownTimer = null;
-            }
             stopEmergencyAudioSiren();
-            const modal = document.getElementById('emergency-modal');
-            if (modal) modal.style.display = 'none';
-
             fsmFallState = FSM_IDLE;
+            fsmVerificationStartTime = 0;
             fallConfirmationCounter = 0;
             fallConfirmed = false;
             pendingFallData = null;
@@ -1746,71 +1666,36 @@
             if (rChip) rChip.style.display = 'none';
         }
 
+        // Helper functions for testing & dismissal
         function dismissAlertByResident() {
-            if (!emergencyCountdownTimer && fsmFallState !== FSM_FALL_CONFIRMED) return;
-
-            if (emergencyCountdownTimer) {
-                clearInterval(emergencyCountdownTimer);
-                emergencyCountdownTimer = null;
-            }
-            stopEmergencyAudioSiren();
-            const modal = document.getElementById('emergency-modal');
-            if (modal) modal.style.display = 'none';
-
-            speakAlert("Emergency alert cancelled. Glad you are safe.");
-            showReassuranceBanner("✅ Emergency Alert Cancelled: Resident confirmed safe via 'I Am OK' (False Alarm Dismissed)");
-
-            if (sbClient && pendingFallData) {
-                sbClient.from('fall_events').insert({
-                    person_id: 1,
-                    severity: pendingFallData.severity,
-                    fall_score: roundNumber(pendingFallData.score, 2),
-                    duration_down: (Date.now() - pendingFallData.time) / 1000,
-                    status: 'CANCELLED_BY_RESIDENT',
-                    notes: 'Self-Dismissed: Resident pressed I Am OK'
-                }).then(() => loadFallHistory());
-            }
-
-            fsmFallState = FSM_IDLE;
-            fallConfirmationCounter = 0;
-            fallConfirmed = false;
-            const vChip = document.getElementById('hud-verification-chip');
-            if (vChip) vChip.style.display = 'none';
+            resetEmergencyState();
         }
 
-        // Backward compatibility
         function cancelEmergencyAlert() {
-            dismissAlertByResident();
+            resetEmergencyState();
         }
 
         function immediateEmergencyDispatch() {
-            if (emergencyCountdownTimer) {
-                clearInterval(emergencyCountdownTimer);
-                emergencyCountdownTimer = null;
+            if (pendingFallData) {
+                triggerConfirmedFall(pendingFallData.score, pendingFallData.severity, pendingFallData.customNotes);
             }
-            stopEmergencyAudioSiren();
-            document.getElementById('emergency-modal').style.display = 'none';
-            dispatchConfirmedEmergency();
-        }
-
-        async function dispatchConfirmedEmergency() {
-            const data = pendingFallData || { score: 0.95, severity: 'SEVERE', customNotes: 'Immediate Dispatch' };
-            await triggerConfirmedFall(data.score, data.severity, data.customNotes);
         }
 
         function showReassuranceBanner(msg) {
             const banner = document.getElementById('reassurance-banner');
-            banner.textContent = msg;
-            banner.style.display = 'block';
-            setTimeout(() => { banner.style.display = 'none'; }, 6000);
+            if (banner) {
+                banner.textContent = msg;
+                banner.style.display = 'block';
+                setTimeout(() => { banner.style.display = 'none'; }, 6000);
+            }
         }
 
-        // Accessibility shortcut: Spacebar or Escape dismisses false alarm
+        // Accessibility shortcut: Spacebar or Escape resets active alert
         window.addEventListener('keydown', (e) => {
             if (e.code === 'Space' || e.key === 'Escape') {
-                if (emergencyCountdownTimer) {
+                if (fsmFallState !== FSM_IDLE) {
                     e.preventDefault();
-                    dismissAlertByResident();
+                    resetEmergencyState();
                 }
             }
         });
@@ -2018,7 +1903,7 @@
         async function sendDirectTelegramAlert(severity, score, snapshotBlob, snapshotUrl) {
             const timeStr = new Date().toLocaleTimeString();
             const sourceDesc = (currentSourceType === 'upload') ? `Uploaded Video (${activeFileName || 'Test'})` : ((currentSourceType === 'webcam') ? 'Live Webcam' : 'AI Fall Detection System');
-            const text = `🚨 <b>EMERGENCY: FALL DETECTED!</b>\n━━━━━━━━━━━━━━━━━━━\n👤 <b>Person:</b> #1\n⚠️ <b>Severity:</b> ${severity}\n📊 <b>Confidence Score:</b> ${(score * 100).toFixed(0)}%\n🕒 <b>Time:</b> ${timeStr}\n🌐 <b>Source:</b> ${sourceDesc}\n━━━━━━━━━━━━━━━━━━━\n<i>Immediate caregiver attention required! Check dashboard now.</i>`;
+            const text = `🚨 <b>EMERGENCY: FALL DETECTED!</b>\n━━━━━━━━━━━━━━━━━━━\n👤 <b>Person:</b> #1\n⚠️ <b>Severity:</b> ${severity}\n📊 <b>Confidence Score:</b> ${(score * 100).toFixed(0)}%\n⏱️ <b>Duration Down:</b> 5.0s (No Recovery)\n🕒 <b>Time:</b> ${timeStr}\n🌐 <b>Source:</b> ${sourceDesc}\n━━━━━━━━━━━━━━━━━━━\n<i>Immediate caregiver attention required! Check dashboard now.</i>`;
             
             // Priority 1: Direct Multipart FormData upload with image blob (guarantees photo upload)
             if (snapshotBlob) {
@@ -2128,7 +2013,7 @@
                             person_id: 1,
                             severity: severity,
                             fall_score: roundNumber(fallScore, 2),
-                            duration_down: 2.0,
+                            duration_down: 5.0,
                             snapshot_url: snapshotUrl,
                             notes: notesText
                         })
@@ -2696,34 +2581,62 @@
                 if (fsmFallState === FSM_IDLE) {
                     fsmFallState = FSM_VERIFYING;
                     fsmVerificationStartTime = performance.now();
+                    const sev = fallProbability > 0.82 ? 'SEVERE' : (fallProbability > 0.65 ? 'MODERATE' : 'MILD');
+                    pendingFallData = {
+                        score: fallProbability,
+                        severity: sev,
+                        customNotes: (currentSourceType === 'upload') ? `Uploaded File: ${activeFileName || 'Test Video'}` : 'Live Webcam Feed',
+                        time: Date.now()
+                    };
                     const vChip = document.getElementById('hud-verification-chip');
                     if (vChip) {
-                        vChip.textContent = '⚠️ VERIFYING POSTURE... (2.0s Inactivity Window)';
+                        vChip.textContent = '⚠️ FALL DETECTED: Awaiting Recovery (5.0s before Telegram Alert)...';
+                        vChip.style.background = 'rgba(245, 158, 11, 0.92)';
+                        vChip.style.color = '#0b0f19';
                         vChip.style.display = 'block';
                     }
                 } else if (fsmFallState === FSM_VERIFYING) {
                     const elapsed = performance.now() - fsmVerificationStartTime;
-                    const remaining = Math.max(0, ((FSM_VERIFICATION_WINDOW_MS - elapsed) / 1000)).toFixed(1);
+                    const remaining = Math.max(0, ((FSM_NON_RECOVERY_WINDOW_MS - elapsed) / 1000)).toFixed(1);
                     const vChip = document.getElementById('hud-verification-chip');
                     if (vChip) {
-                        vChip.textContent = `⚠️ VERIFYING INACTIVITY... (${remaining}s remaining)`;
+                        vChip.textContent = `⚠️ FALL DETECTED — Subject Down (${remaining}s remaining before Telegram Dispatch)`;
+                        vChip.style.background = 'rgba(245, 158, 11, 0.92)';
+                        vChip.style.color = '#0b0f19';
+                        vChip.style.display = 'block';
                     }
 
-                    if (elapsed >= FSM_VERIFICATION_WINDOW_MS && fsmFallState === FSM_VERIFYING) {
+                    if (elapsed >= FSM_NON_RECOVERY_WINDOW_MS && fsmFallState === FSM_VERIFYING) {
                         fsmFallState = FSM_FALL_CONFIRMED;
-                        if (vChip) vChip.style.display = 'none';
-                        const sev = fallProbability > 0.82 ? 'SEVERE' : (fallProbability > 0.65 ? 'MODERATE' : 'MILD');
-                        startEmergencyCountdown(fallProbability, sev);
+                        fallConfirmed = true;
+
+                        if (vChip) {
+                            vChip.textContent = '🚨 FALL CONFIRMED (>5s Non-Recovery) — Alert Dispatched to Telegram!';
+                            vChip.style.background = 'rgba(239, 68, 68, 0.95)';
+                            vChip.style.color = '#ffffff';
+                            vChip.style.display = 'block';
+                        }
+
+                        startEmergencyAudioSiren();
+                        speakAlert("Emergency alert: Fall confirmed. Person has not recovered. Dispatching alert to Telegram.");
+
+                        // Directly dispatch alert details to Telegram and Supabase!
+                        const sev = (pendingFallData && pendingFallData.severity) || (fallProbability > 0.82 ? 'SEVERE' : (fallProbability > 0.65 ? 'MODERATE' : 'MILD'));
+                        const score = (pendingFallData && pendingFallData.score) || fallProbability;
+                        const notes = (pendingFallData && pendingFallData.customNotes) || 'Fall (>5s Inactivity)';
+                        triggerConfirmedFall(score, sev, notes);
                     }
                 }
             } else {
                 // Posture is NOT a fall candidate
                 if (fsmFallState === FSM_VERIFYING) {
-                    // Subject stood back up before 2.0s window expired -> Recovery / Bending!
+                    // Subject stood back up before 5.0s window expired -> Recovery!
                     triggerRecoveryDetected();
                 } else if (fsmFallState === FSM_FALL_CONFIRMED && torsoAngle < 30 && (hipFlex3D > 135 || kneeAngle3D > 140)) {
                     fsmFallState = FSM_IDLE;
                     fallConfirmed = false;
+                    stopEmergencyAudioSiren();
+                    triggerRecoveryDetected();
                 }
             }
 
@@ -2776,7 +2689,22 @@
         }
 
         async function simulateFallTest() {
-            startEmergencyCountdown(0.95, 'SEVERE', 'Test Fall Simulation');
+            speakAlert("Simulating emergency fall test. Monitoring 5 seconds of non-recovery before direct Telegram dispatch.");
+            fsmFallState = FSM_VERIFYING;
+            fsmVerificationStartTime = performance.now();
+            pendingFallData = {
+                score: 0.95,
+                severity: 'SEVERE',
+                customNotes: 'Simulation Test (>5s Non-Recovery)',
+                time: Date.now()
+            };
+            const vChip = document.getElementById('hud-verification-chip');
+            if (vChip) {
+                vChip.textContent = '⚠️ SIMULATING FALL: 5.0s Non-Recovery Window Active...';
+                vChip.style.background = 'rgba(245, 158, 11, 0.92)';
+                vChip.style.color = '#0b0f19';
+                vChip.style.display = 'block';
+            }
         }
 
         function openLightbox(url) {
