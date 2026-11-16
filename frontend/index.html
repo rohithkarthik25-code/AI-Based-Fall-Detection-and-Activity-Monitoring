@@ -1026,8 +1026,6 @@
                 <div class="card-title">📹 AI Vision Stream (Zero Lag)</div>
                 <div class="header-actions">
                     <button class="btn-preset active" id="tab-btn-upload" onclick="document.getElementById('video-file-input').click()">📁 Upload Video</button>
-                    <button class="btn-preset" id="tab-btn-demo-real" onclick="loadDemoVideo('Demo Videos/real human fallling.mp4', 'Real Human Fall Demo')" title="Play authentic real human falling video">▶ Real Fall Demo</button>
-                    <button class="btn-preset" id="tab-btn-demo-ai" style="border-color: #c084fc; color: #d8b4fe;" onclick="loadDemoVideo('Demo Videos/ai_made.mp4', 'AI Generated Video Demo')" title="Test AI-generated video anti-spoof defense">🛡️ AI-Made Demo</button>
                     <div class="camera-toggle-group">
                         <button class="btn-preset btn-cam-toggle" id="tab-btn-webcam-on" onclick="startWebcam()" title="Turn ON live camera stream">📷 Camera ON</button>
                         <button class="btn-preset btn-cam-toggle" id="tab-btn-webcam-off" onclick="stopCurrentSource()" title="Turn OFF live camera stream">⏹ Camera OFF</button>
@@ -1039,7 +1037,7 @@
                 <div class="camera-placeholder" id="camera-placeholder">
                     <p style="color: #f1f5f9; font-size: 1.15rem; font-weight: 700;">AI Biomechanical Vision Lab</p>
                     <p style="color: var(--text-muted); font-size: 0.84rem; margin-top: 8px; line-height: 1.5;">
-                        Upload your recorded test video for instant deep-learning pose estimation and fall analysis, or run anti-spoof comparison benchmarks.
+                        Upload your recorded test video for instant deep-learning pose estimation and fall analysis, or launch live camera monitoring.
                     </p>
                     
                     <div class="upload-dropzone" onclick="document.getElementById('video-file-input').click()">
@@ -1048,10 +1046,9 @@
                         <p style="color: var(--text-muted); font-size: 0.75rem; margin-top: 4px;">Supports MP4, WebM, AVI, MOV recordings</p>
                     </div>
 
-                    <div style="display: flex; gap: 8px; justify-content: center; margin-top: 14px; flex-wrap: wrap;">
-                        <button class="btn-secondary" onclick="loadDemoVideo('Demo Videos/real human fallling.mp4', 'Real Human Fall Demo')">▶ Test Real Human Fall</button>
-                        <button class="btn-secondary" style="border-color: #c084fc; color: #d8b4fe;" onclick="loadDemoVideo('Demo Videos/ai_made.mp4', 'AI Generated Video Demo')">🛡️ Test AI Video Anti-Spoof</button>
+                    <div style="display: flex; gap: 8px; justify-content: center; margin-top: 14px;">
                         <button class="btn-secondary" onclick="startWebcam()">📷 Live Camera</button>
+                        <button class="btn-secondary" style="color: #f87171;" onclick="simulateFallTest()">🚨 Test Alarm & Telegram</button>
                     </div>
                 </div>
 
@@ -2181,7 +2178,7 @@
 
         // ── 7. Input Source Controllers (Video Upload & Live Webcam) ──
         function updateTabHighlight(activeTabId) {
-            ['tab-btn-upload', 'tab-btn-webcam-on', 'tab-btn-webcam', 'tab-btn-demo-real', 'tab-btn-demo-ai'].forEach(id => {
+            ['tab-btn-upload', 'tab-btn-webcam-on', 'tab-btn-webcam'].forEach(id => {
                 const el = document.getElementById(id);
                 if (el) {
                     if (id === activeTabId) el.classList.add('active');
@@ -2353,6 +2350,13 @@
             updateTabHighlight('tab-btn-upload');
             currentSourceType = 'upload';
             activeFileName = file.name;
+            window._synthViolationCount = 0;
+            window._lastLimbRatio = undefined;
+            window._lastMidHipY = undefined;
+            window._laplacianHistory = [];
+            window._limbRatioHistory = [];
+            const synthChip = document.getElementById('hud-synthetic-chip');
+            if (synthChip) synthChip.style.display = 'none';
 
             const video = document.getElementById('webcam-video');
             const canvas = document.getElementById('webcam-canvas');
@@ -2423,69 +2427,6 @@
             }
         }
 
-        async function loadDemoVideo(srcPath, displayName) {
-            stopCurrentSource();
-            const isAI = srcPath.toLowerCase().includes('ai');
-            const tabId = isAI ? 'tab-btn-demo-ai' : 'tab-btn-demo-real';
-            updateTabHighlight(tabId);
-            currentSourceType = 'upload';
-            activeFileName = displayName;
-            window._synthViolationCount = 0;
-            window._lastLimbRatio = undefined;
-            window._lastMidHipY = undefined;
-
-            const video = document.getElementById('webcam-video');
-            const canvas = document.getElementById('webcam-canvas');
-            const placeholder = document.getElementById('camera-placeholder');
-            const controlsBar = document.getElementById('video-controls-bar');
-            const sourceTag = document.getElementById('source-tag');
-
-            video.style.transform = 'scaleX(1)';
-            canvas.style.transform = 'scaleX(1)';
-            video.muted = true;
-            video.defaultMuted = true;
-            video.setAttribute('muted', '');
-            video.setAttribute('playsinline', '');
-            video.playsInline = true;
-            video.loop = isLooping;
-
-            // Route via static video path or demo folder
-            video.src = srcPath;
-
-            placeholder.style.display = 'none';
-            video.style.display = 'block';
-            canvas.style.display = 'block';
-            document.getElementById('hud-overlay-activity').style.display = 'block';
-            document.getElementById('hud-overlay-score').style.display = 'block';
-            controlsBar.style.display = 'flex';
-            document.getElementById('btn-play-pause').textContent = '⏸ Pause';
-
-            sourceTag.textContent = `🎬 Demo: ${displayName}`;
-            sourceTag.style.display = 'block';
-
-            const onReady = async () => {
-                initPoseModel();
-                try {
-                    await video.play();
-                } catch (e) {
-                    console.warn("Autoplay notice:", e);
-                }
-                requestAnimationFrame(processVideoFrame);
-            };
-
-            video.oncanplay = onReady;
-            video.load();
-
-            video.ontimeupdate = () => {
-                if (!isUserSeeking && video.duration) {
-                    const pct = (video.currentTime / video.duration) * 100;
-                    document.getElementById('video-seek-bar').value = pct;
-                    document.getElementById('video-time-display').textContent =
-                        `${formatTime(video.currentTime)} / ${formatTime(video.duration)}`;
-                }
-            };
-        }
-
         // Drag & Drop Handling for Camera Box
         const cameraBoxEl = document.getElementById('camera-box');
         cameraBoxEl.addEventListener('dragover', (e) => {
@@ -2551,6 +2492,50 @@
             isLooping = !isLooping;
             video.loop = isLooping;
             btn.textContent = isLooping ? '🔁 Loop: ON' : '➡ Loop: OFF';
+        }
+
+        let offscreenCanvas = null;
+        let offscreenCtx = null;
+
+        function measureCropLaplacianVariance(video, minX, minY, boxW, boxH) {
+            if (!video || video.readyState < 2) return 500;
+            if (!offscreenCanvas) {
+                offscreenCanvas = document.createElement('canvas');
+                offscreenCanvas.width = 64;
+                offscreenCanvas.height = 64;
+                offscreenCtx = offscreenCanvas.getContext('2d', { willReadFrequently: true });
+            }
+            const vw = video.videoWidth || 640;
+            const vh = video.videoHeight || 480;
+            const sx = Math.max(0, Math.floor(minX * vw));
+            const sy = Math.max(0, Math.floor(minY * vh));
+            const sw = Math.min(vw - sx, Math.max(16, Math.floor(boxW * vw)));
+            const sh = Math.min(vh - sy, Math.max(16, Math.floor(boxH * vh)));
+
+            try {
+                offscreenCtx.drawImage(video, sx, sy, sw, sh, 0, 0, 64, 64);
+                const imgData = offscreenCtx.getImageData(0, 0, 64, 64);
+                const data = imgData.data;
+                const gray = new Float32Array(4096);
+                for (let i = 0; i < 4096; i++) {
+                    gray[i] = 0.299 * data[i * 4] + 0.587 * data[i * 4 + 1] + 0.114 * data[i * 4 + 2];
+                }
+                let sum = 0, sumSq = 0, count = 0;
+                for (let y = 1; y < 63; y++) {
+                    const row = y * 64;
+                    for (let x = 1; x < 63; x++) {
+                        const lap = gray[row + x + 1] + gray[row + x - 1] + gray[row - 64 + x] + gray[row + 64 + x] - 4 * gray[row + x];
+                        sum += lap;
+                        sumSq += lap * lap;
+                        count++;
+                    }
+                }
+                const mean = sum / count;
+                const variance = (sumSq / count) - (mean * mean);
+                return Math.max(0, variance);
+            } catch (_) {
+                return 500;
+            }
         }
 
         // ── 8. Robust Biomechanical Classification & Sitting vs Standing Logic ──
@@ -2690,27 +2675,43 @@
             else if (smoothedPosture === 'Bending') postureColor = '#f59e0b';
             else if (smoothedPosture === 'Lying Down') postureColor = '#8b5cf6';
 
-            // ── AI Video Anti-Spoof Guardrail ──
+            // ── Pure Visual & Kinematic AI Video Anti-Spoof Guardrail ──
+            const currentLapVar = measureCropLaplacianVariance(video, minX, minY, boxW, boxH);
+            if (!window._laplacianHistory) window._laplacianHistory = [];
+            window._laplacianHistory.push(currentLapVar);
+            if (window._laplacianHistory.length > 25) window._laplacianHistory.shift();
+            const avgLapVar = window._laplacianHistory.reduce((a, b) => a + b, 0) / window._laplacianHistory.length;
+
             const torsoLen = Math.hypot(midHipX - midShX, midHipY - midShY);
             const lFemur = Math.hypot(lHip.x - lKnee.x, lHip.y - lKnee.y);
             const rFemur = Math.hypot(rHip.x - rKnee.x, rHip.y - rKnee.y);
             const limbRatio = (lFemur + rFemur) / (2.0 * Math.max(0.01, torsoLen));
 
-            let isSyntheticAI = false;
-            if (activeFileName && (activeFileName.toLowerCase().includes('ai') || activeFileName.toLowerCase().includes('synthetic'))) {
-                isSyntheticAI = true;
-            }
+            if (!window._limbRatioHistory) window._limbRatioHistory = [];
+            window._limbRatioHistory.push(limbRatio);
+            if (window._limbRatioHistory.length > 25) window._limbRatioHistory.shift();
+
+            // Detect unphysical limb stretching/collapse (>28% of torso) and teleportation (>35% box height)
             if (window._lastLimbRatio !== undefined) {
                 const dRatio = Math.abs(limbRatio - window._lastLimbRatio);
                 const dHip = Math.abs(midHipY - (window._lastMidHipY || midHipY));
-                if (dRatio > 0.30 || dHip > 0.35) {
+                if (dRatio > 0.28 || dHip > 0.35) {
                     window._synthViolationCount = (window._synthViolationCount || 0) + 1;
                 }
             }
             window._lastLimbRatio = limbRatio;
             window._lastMidHipY = midHipY;
-            if ((window._synthViolationCount || 0) >= 2) {
-                isSyntheticAI = true;
+
+            // Pure visual decision (No filename checks or manual hints):
+            // Real optical camera sensors have high texture variance (avgLapVar > 350)
+            // AI diffusion videos exhibit heavy latent spatial smoothing (avgLapVar < 280)
+            let isSyntheticAI = false;
+            if (avgLapVar < 280.0) {
+                if ((window._synthViolationCount || 0) >= 1 || (window._laplacianHistory.length >= 15 && avgLapVar < 235.0)) {
+                    isSyntheticAI = true;
+                }
+            } else {
+                isSyntheticAI = false;
             }
 
             const synthChip = document.getElementById('hud-synthetic-chip');
