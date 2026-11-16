@@ -739,6 +739,8 @@
                     <span class="group-label">Input Source:</span>
                     <select class="source-select" id="sourceSelector" onchange="changeSource(this.value)">
                         <option value="0">Webcam 0 (Live)</option>
+                        <option value="Demo Videos/real human fallling.mp4">Demo: Real Human Fall</option>
+                        <option value="Demo Videos/ai_made.mp4">Demo: AI-Made Video (Anti-Spoof Test)</option>
                         <option value="output_fall_detected_weighted.mp4">Demo: output_fall_detected_weighted.mp4</option>
                     </select>
                     <button class="btn btn-danger" onclick="triggerTestAlert()">🚨 Test Alarm</button>
@@ -1573,7 +1575,15 @@
 
             banner.className = "status-banner " + (data.fall_active ? "fall" : (data.overall_status ? data.overall_status.toLowerCase().replace(" ", "") : "normal"));
             
-            if (data.fall_active) {
+            if (data.is_synthetic) {
+                badge.className = "status-badge warning";
+                badge.style.backgroundColor = "rgba(168, 85, 247, 0.25)";
+                badge.style.borderColor = "#c084fc";
+                badge.style.color = "#d8b4fe";
+                badge.innerText = "🛡️ AI SYNTHETIC";
+                desc.innerText = "AI-generated video simulation detected. Emergency fall dispatch suppressed.";
+                stopSiren();
+            } else if (data.fall_active) {
                 badge.className = "status-badge fall";
                 badge.innerText = "FALL DETECTED";
                 desc.innerText = `EMERGENCY: Confirmed fall incident active! Immediate assistance required.`;

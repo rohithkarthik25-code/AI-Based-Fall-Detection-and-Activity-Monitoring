@@ -26,6 +26,7 @@ from activity_monitor import ActivityMonitor
 from visualizer_3d import SkeletonVisualizer3D
 from pipeline_profiler import PipelineProfiler
 from alert_dispatcher import AlertDispatcher
+from synthetic_video_detector import SyntheticVideoDetector, SyntheticDetectionResult
 
 
 SEVERITY_RANK = {"NONE": 0, "MILD": 1, "MODERATE": 2, "SEVERE": 3}
@@ -56,6 +57,7 @@ class FallDetector:
         self.dashboard = Dashboard()
         self.alarm = AlarmSystem()
         self.alert_dispatcher = AlertDispatcher(config_path=alert_config_path, enabled=enable_alerts)
+        self.synthetic_detector = SyntheticVideoDetector()
 
         self.enable_3d = enable_3d
         self.enable_activity = enable_activity
@@ -143,6 +145,12 @@ class FallDetector:
         poses_computed_this_frame = 0
         max_steady_poses_per_frame = 2
 
+        # ── Global Initial Synthetic Scan ──
+        synth_result = self.synthetic_detector.analyze_frame(frame, tracked)
+        self.dashboard.is_synthetic = synth_result.is_synthetic
+        self.dashboard.synthetic_score = synth_result.synthetic_score
+        self.dashboard.synthetic_reasons = synth_result.reasons
+
         for person_id, box, state in tracked:
             is_emergency = bool(state.get("fall_detected", False) or state.get("candidate_frames", 0) > 0)
             has_last_pose = state.get("last_pose") is not None
@@ -228,27 +236,42 @@ class FallDetector:
 
             prev_fall_detected = state.get("fall_detected", False)
 
+            # ── 8.5. Multi-Modal Synthetic / AI Video Verification Guardrail ──
+            synth_result = self.synthetic_detector.analyze_frame(frame, tracked)
+            self.dashboard.is_synthetic = synth_result.is_synthetic
+            self.dashboard.synthetic_score = synth_result.synthetic_score
+            self.dashboard.synthetic_reasons = synth_result.reasons
+
             # ── 9. State Machine ──
             transition = self.state_machine.update(state, score_result, now_t=now)
 
             # ── 10. Alarm + dashboard on confirmed fall ──
             if transition.confirmed_fall:
-                state["fall_start_time"] = now
-                self.dashboard.update_fall(score_result.severity)
-                self.alarm.trigger()
-                self.alert_dispatcher.dispatch_fall_alert(
-                    frame=frame,
-                    person_id=person_id,
-                    severity=score_result.severity,
-                    score=score_result.score,
-                    duration=0.0,
-                    activity=state.get("activity_label", "Unknown"),
-                )
+                if synth_result.is_synthetic:
+                    # AI-generated video spoof detected: suppress alarm, alert dispatcher, and incident logging
+                    print(
+                        f"[SyntheticGuardrail] 🛡️ AI GENERATED VIDEO DETECTED (Score: {synth_result.synthetic_score:.2f}). "
+                        f"Suppressing false emergency alert for Person {person_id}."
+                    )
+                    state["fall_detected"] = False
+                    state["is_synthetic_spoof"] = True
+                else:
+                    state["fall_start_time"] = now
+                    self.dashboard.update_fall(score_result.severity)
+                    self.alarm.trigger()
+                    self.alert_dispatcher.dispatch_fall_alert(
+                        frame=frame,
+                        person_id=person_id,
+                        severity=score_result.severity,
+                        score=score_result.score,
+                        duration=0.0,
+                        activity=state.get("activity_label", "Unknown"),
+                    )
 
             # ── 11. Duration tracking + CSV logging ──
             if state["fall_detected"] and state.get("fall_start_time") is not None:
                 state["fall_duration"] = time.time() - state["fall_start_time"]
-                if transition.confirmed_fall:
+                if transition.confirmed_fall and not synth_result.is_synthetic:
                     self.logger.log(
                         frame,
                         person_id,
@@ -257,7 +280,7 @@ class FallDetector:
                         score=score_result.score,
                     )
 
-            if state["fall_detected"] and state.get("fall_duration", 0) >= 5.0:
+            if state["fall_detected"] and state.get("fall_duration", 0) >= 5.0 and not synth_result.is_synthetic:
                 self.alarm.escalate()
 
             # ── 12. Alarm reset when person recovers ──
@@ -367,7 +390,9 @@ class FallDetector:
         self.profiler.end_stage("visualizer_3d")
 
         overall_status = "NORMAL"
-        if self.dashboard.fall_active:
+        if synth_result.is_synthetic:
+            overall_status = "AI GENERATED VIDEO (SPOOF REJECTED)"
+        elif self.dashboard.fall_active:
             overall_status = "FALL DETECTED"
         elif any(p[2].get("candidate_frames", 0) > 0 for p in tracked):
             overall_status = "WARNING"
@@ -397,6 +422,11 @@ class FallDetector:
             "focus_person_id": focus_person_id,
             "focus_world_landmarks": _serialize_world_landmarks(focus_world_landmarks),
             "overall_status": overall_status,
+            "is_synthetic": bool(synth_result.is_synthetic),
+            "synthetic_score": float(synth_result.synthetic_score),
+            "synthetic_label": str(synth_result.status_label),
+            "synthetic_reasons": list(synth_result.reasons),
+            "synthetic_metrics": synth_result.metrics,
             "camera_frame": frame,
             "frame_width": w_f,
             "frame_height": h_f,

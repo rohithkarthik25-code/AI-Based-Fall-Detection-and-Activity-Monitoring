@@ -29,6 +29,7 @@ STATUS_NORMAL_COLOR   = (80, 210, 60)    # Emerald Green
 STATUS_WARNING_COLOR  = (0, 215, 255)    # Amber Yellow
 STATUS_FALL_COLOR     = (40, 50, 240)    # Crimson Red
 STATUS_RECOVERY_COLOR = (245, 160, 45)   # Cerulean Blue
+STATUS_SYNTHETIC_COLOR = (200, 100, 240) # Violet / Magenta (AI Guardrail)
 
 STATE_COLORS = {
     "NORMAL":    STATUS_NORMAL_COLOR,
@@ -36,6 +37,7 @@ STATE_COLORS = {
     "CANDIDATE": STATUS_WARNING_COLOR,
     "FALLEN":    STATUS_FALL_COLOR,
     "RECOVERY":  STATUS_RECOVERY_COLOR,
+    "SYNTHETIC": STATUS_SYNTHETIC_COLOR,
 }
 
 SEVERITY_COLORS = {
@@ -87,6 +89,9 @@ class Dashboard:
         self.fall_active: bool = False
         self.fall_lost_frames: int = 0
         self.frame_times: deque = deque(maxlen=10)
+        self.is_synthetic: bool = False
+        self.synthetic_score: float = 0.0
+        self.synthetic_reasons: List[str] = []
 
     def update_fall(self, severity: str = "NONE") -> None:
         """Records confirmed fall incident timestamp and increments counter."""
@@ -127,7 +132,10 @@ class Dashboard:
             if cand > 0 or sc > 0.40:
                 is_warning = True
 
-        if is_fall:
+        if self.is_synthetic:
+            status_text = "AI SYNTHETIC"
+            status_color = STATUS_SYNTHETIC_COLOR
+        elif is_fall:
             status_text = "FALL DETECTED"
             status_color = STATUS_FALL_COLOR
         elif is_recovery:
@@ -267,7 +275,15 @@ class Dashboard:
                 cv2.putText(frame, breakdown, (card_x + 95, y_r6), cv2.FONT_HERSHEY_SIMPLEX, 0.38, COLOR_TEXT_DIM, 1, cv2.LINE_AA)
 
         # ── 3. Emergency Status Indicators & Banners (Step 5) ──
-        if is_fall:
+        if self.is_synthetic:
+            pid_str = f"P{summary_state.get('person_id', 1)}" if summary_state else "P1"
+            if is_fall or (summary_state and summary_state.get("fall_detected")):
+                banner_text = f"🛡️ AI VIDEO SPOOF REJECTED — {pid_str} FALL SUPPRESSED (Score: {self.synthetic_score:.2f})"
+            else:
+                banner_text = f"🛡️ AI GENERATED VIDEO DETECTED — {pid_str} (Score: {self.synthetic_score:.2f}) [MONITORING]"
+            self._draw_emergency_banner(frame, banner_text, STATUS_SYNTHETIC_COLOR)
+
+        elif is_fall:
             pid_str = f"P{summary_state.get('person_id', 1)}" if summary_state else "P1"
             sev_str = summary_state.get("severity", "SEVERE") if summary_state else "SEVERE"
             dur_val = summary_state.get("fall_duration", 0.0) if summary_state else 0.0

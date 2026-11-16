@@ -79,6 +79,10 @@ if not os.path.exists("fall_logs"):
     os.makedirs("fall_logs", exist_ok=True)
 app.mount("/fall_logs", StaticFiles(directory="fall_logs"), name="fall_logs")
 
+if os.path.exists("Demo Videos"):
+    app.mount("/Demo Videos", StaticFiles(directory="Demo Videos"), name="demo_videos_space")
+    app.mount("/demo_videos", StaticFiles(directory="Demo Videos"), name="demo_videos")
+
 
 # ------------------------------------------------------------------
 # Routes & Endpoints

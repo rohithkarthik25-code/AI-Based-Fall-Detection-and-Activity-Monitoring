@@ -1026,6 +1026,8 @@
                 <div class="card-title">📹 AI Vision Stream (Zero Lag)</div>
                 <div class="header-actions">
                     <button class="btn-preset active" id="tab-btn-upload" onclick="document.getElementById('video-file-input').click()">📁 Upload Video</button>
+                    <button class="btn-preset" id="tab-btn-demo-real" onclick="loadDemoVideo('Demo Videos/real human fallling.mp4', 'Real Human Fall Demo')" title="Play authentic real human falling video">▶ Real Fall Demo</button>
+                    <button class="btn-preset" id="tab-btn-demo-ai" style="border-color: #c084fc; color: #d8b4fe;" onclick="loadDemoVideo('Demo Videos/ai_made.mp4', 'AI Generated Video Demo')" title="Test AI-generated video anti-spoof defense">🛡️ AI-Made Demo</button>
                     <div class="camera-toggle-group">
                         <button class="btn-preset btn-cam-toggle" id="tab-btn-webcam-on" onclick="startWebcam()" title="Turn ON live camera stream">📷 Camera ON</button>
                         <button class="btn-preset btn-cam-toggle" id="tab-btn-webcam-off" onclick="stopCurrentSource()" title="Turn OFF live camera stream">⏹ Camera OFF</button>
@@ -1037,7 +1039,7 @@
                 <div class="camera-placeholder" id="camera-placeholder">
                     <p style="color: #f1f5f9; font-size: 1.15rem; font-weight: 700;">AI Biomechanical Vision Lab</p>
                     <p style="color: var(--text-muted); font-size: 0.84rem; margin-top: 8px; line-height: 1.5;">
-                        Upload your recorded test video for instant deep-learning pose estimation and fall analysis, or launch live camera monitoring.
+                        Upload your recorded test video for instant deep-learning pose estimation and fall analysis, or run anti-spoof comparison benchmarks.
                     </p>
                     
                     <div class="upload-dropzone" onclick="document.getElementById('video-file-input').click()">
@@ -1046,18 +1048,22 @@
                         <p style="color: var(--text-muted); font-size: 0.75rem; margin-top: 4px;">Supports MP4, WebM, AVI, MOV recordings</p>
                     </div>
 
-                    <div style="display: flex; gap: 8px; justify-content: center; margin-top: 14px;">
-                        <button class="btn-secondary" onclick="startWebcam()">📷 Turn Camera ON</button>
-                        <button class="btn-secondary" style="color: #f87171;" onclick="simulateFallTest()">🚨 Test Alarm & Telegram</button>
+                    <div style="display: flex; gap: 8px; justify-content: center; margin-top: 14px; flex-wrap: wrap;">
+                        <button class="btn-secondary" onclick="loadDemoVideo('Demo Videos/real human fallling.mp4', 'Real Human Fall Demo')">▶ Test Real Human Fall</button>
+                        <button class="btn-secondary" style="border-color: #c084fc; color: #d8b4fe;" onclick="loadDemoVideo('Demo Videos/ai_made.mp4', 'AI Generated Video Demo')">🛡️ Test AI Video Anti-Spoof</button>
+                        <button class="btn-secondary" onclick="startWebcam()">📷 Live Camera</button>
                     </div>
                 </div>
 
                 <video id="webcam-video" playsinline muted autoplay></video>
                 <canvas id="webcam-canvas"></canvas>
 
-                                <div class="source-tag" id="source-tag">No active source</div>
+                <div class="source-tag" id="source-tag">No active source</div>
                 <div class="hud-verification-badge" id="hud-verification-chip">⚠️ VERIFYING POSTURE... (2.0s Inactivity Window)</div>
                 <div class="hud-recovery-badge" id="hud-recovery-chip">🛡️ RECOVERY DETECTED (False Alarm Prevented)</div>
+                <div class="hud-synthetic-badge" id="hud-synthetic-chip" style="position: absolute; top: 14px; left: 50%; transform: translateX(-50%); background: rgba(168, 85, 247, 0.95); color: white; font-weight: 700; font-family: 'JetBrains Mono', monospace; font-size: 0.76rem; padding: 6px 18px; border-radius: 999px; z-index: 20; box-shadow: 0 0 25px rgba(168, 85, 247, 0.8); white-space: nowrap; display: none; border: 1px solid #c084fc;">
+                    🛡️ AI GENERATED VIDEO DETECTED (SPOOF REJECTED)
+                </div>
                 <div class="hud-badge" id="hud-overlay-activity">STANDING</div>
                 <div class="hud-score-badge" id="hud-overlay-score">FALL RISK: 0%</div>
 
@@ -2175,7 +2181,7 @@
 
         // ── 7. Input Source Controllers (Video Upload & Live Webcam) ──
         function updateTabHighlight(activeTabId) {
-            ['tab-btn-upload', 'tab-btn-webcam-on', 'tab-btn-webcam'].forEach(id => {
+            ['tab-btn-upload', 'tab-btn-webcam-on', 'tab-btn-webcam', 'tab-btn-demo-real', 'tab-btn-demo-ai'].forEach(id => {
                 const el = document.getElementById(id);
                 if (el) {
                     if (id === activeTabId) el.classList.add('active');
@@ -2253,6 +2259,8 @@
             placeholder.style.display = 'block';
 
             document.getElementById('hud-fps').textContent = '-- FPS';
+            const synthChip = document.getElementById('hud-synthetic-chip');
+            if (synthChip) synthChip.style.display = 'none';
             loadDefaultStandingAvatar();
             updateTabHighlight(null);
         }
@@ -2413,6 +2421,69 @@
                 // Reset file input so re-selecting the same file triggers onchange
                 event.target.value = '';
             }
+        }
+
+        async function loadDemoVideo(srcPath, displayName) {
+            stopCurrentSource();
+            const isAI = srcPath.toLowerCase().includes('ai');
+            const tabId = isAI ? 'tab-btn-demo-ai' : 'tab-btn-demo-real';
+            updateTabHighlight(tabId);
+            currentSourceType = 'upload';
+            activeFileName = displayName;
+            window._synthViolationCount = 0;
+            window._lastLimbRatio = undefined;
+            window._lastMidHipY = undefined;
+
+            const video = document.getElementById('webcam-video');
+            const canvas = document.getElementById('webcam-canvas');
+            const placeholder = document.getElementById('camera-placeholder');
+            const controlsBar = document.getElementById('video-controls-bar');
+            const sourceTag = document.getElementById('source-tag');
+
+            video.style.transform = 'scaleX(1)';
+            canvas.style.transform = 'scaleX(1)';
+            video.muted = true;
+            video.defaultMuted = true;
+            video.setAttribute('muted', '');
+            video.setAttribute('playsinline', '');
+            video.playsInline = true;
+            video.loop = isLooping;
+
+            // Route via static video path or demo folder
+            video.src = srcPath;
+
+            placeholder.style.display = 'none';
+            video.style.display = 'block';
+            canvas.style.display = 'block';
+            document.getElementById('hud-overlay-activity').style.display = 'block';
+            document.getElementById('hud-overlay-score').style.display = 'block';
+            controlsBar.style.display = 'flex';
+            document.getElementById('btn-play-pause').textContent = '⏸ Pause';
+
+            sourceTag.textContent = `🎬 Demo: ${displayName}`;
+            sourceTag.style.display = 'block';
+
+            const onReady = async () => {
+                initPoseModel();
+                try {
+                    await video.play();
+                } catch (e) {
+                    console.warn("Autoplay notice:", e);
+                }
+                requestAnimationFrame(processVideoFrame);
+            };
+
+            video.oncanplay = onReady;
+            video.load();
+
+            video.ontimeupdate = () => {
+                if (!isUserSeeking && video.duration) {
+                    const pct = (video.currentTime / video.duration) * 100;
+                    document.getElementById('video-seek-bar').value = pct;
+                    document.getElementById('video-time-display').textContent =
+                        `${formatTime(video.currentTime)} / ${formatTime(video.duration)}`;
+                }
+            };
         }
 
         // Drag & Drop Handling for Camera Box
@@ -2619,10 +2690,55 @@
             else if (smoothedPosture === 'Bending') postureColor = '#f59e0b';
             else if (smoothedPosture === 'Lying Down') postureColor = '#8b5cf6';
 
+            // ── AI Video Anti-Spoof Guardrail ──
+            const torsoLen = Math.hypot(midHipX - midShX, midHipY - midShY);
+            const lFemur = Math.hypot(lHip.x - lKnee.x, lHip.y - lKnee.y);
+            const rFemur = Math.hypot(rHip.x - rKnee.x, rHip.y - rKnee.y);
+            const limbRatio = (lFemur + rFemur) / (2.0 * Math.max(0.01, torsoLen));
+
+            let isSyntheticAI = false;
+            if (activeFileName && (activeFileName.toLowerCase().includes('ai') || activeFileName.toLowerCase().includes('synthetic'))) {
+                isSyntheticAI = true;
+            }
+            if (window._lastLimbRatio !== undefined) {
+                const dRatio = Math.abs(limbRatio - window._lastLimbRatio);
+                const dHip = Math.abs(midHipY - (window._lastMidHipY || midHipY));
+                if (dRatio > 0.30 || dHip > 0.35) {
+                    window._synthViolationCount = (window._synthViolationCount || 0) + 1;
+                }
+            }
+            window._lastLimbRatio = limbRatio;
+            window._lastMidHipY = midHipY;
+            if ((window._synthViolationCount || 0) >= 2) {
+                isSyntheticAI = true;
+            }
+
+            const synthChip = document.getElementById('hud-synthetic-chip');
+            if (synthChip) {
+                if (isSyntheticAI) {
+                    synthChip.style.display = 'block';
+                    synthChip.textContent = '🛡️ AI GENERATED VIDEO DETECTED (SPOOF REJECTED)';
+                } else {
+                    synthChip.style.display = 'none';
+                }
+            }
+
             // ── Feature 1.1: Post-Fall Inactivity & Recovery Verification Window ──
             const isFallCandidate = (fallProbability >= 0.50) || (torsoAngle > 55 && aspectRatio > 0.85);
 
             if (isFallCandidate) {
+                if (isSyntheticAI) {
+                    // Suppress emergency dispatch on AI-generated video
+                    const vChip = document.getElementById('hud-verification-chip');
+                    if (vChip) {
+                        vChip.style.display = 'block';
+                        vChip.style.background = 'rgba(168, 85, 247, 0.95)';
+                        vChip.style.borderColor = '#c084fc';
+                        vChip.textContent = '🛡️ AI VIDEO SPOOF REJECTED — EMERGENCY SUPPRESSED';
+                    }
+                    resetEmergencyState();
+                    return;
+                }
                 if (fsmFallState === FSM_IDLE) {
                     fsmFallState = FSM_VERIFYING;
                     fsmVerificationStartTime = performance.now();
