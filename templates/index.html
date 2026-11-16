@@ -1709,6 +1709,7 @@
         let sirenGain = null;
         let sirenActive = false;
         let sirenMuted = false;
+        let sirenAutoStopTimer = null;
 
         function initAudio() {
             if (!audioCtx) {
@@ -1743,9 +1744,19 @@
                 sirenOsc.frequency.exponentialRampToValueAtTime(target, audioCtx.currentTime + 0.3);
                 high = !high;
             }, 350);
+
+            // Auto shutoff after 10 seconds
+            if (sirenAutoStopTimer) clearTimeout(sirenAutoStopTimer);
+            sirenAutoStopTimer = setTimeout(() => {
+                stopSiren();
+            }, 10000);
         }
 
         function stopSiren() {
+            if (sirenAutoStopTimer) {
+                clearTimeout(sirenAutoStopTimer);
+                sirenAutoStopTimer = null;
+            }
             if (!sirenActive) return;
             if (sirenOsc) {
                 clearInterval(sirenOsc.timer);

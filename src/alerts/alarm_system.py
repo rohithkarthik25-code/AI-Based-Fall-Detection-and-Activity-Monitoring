@@ -46,10 +46,11 @@ _ALERT = {
     "repeats": 1,
 }
 
-# Phase 2 — continuous rapid high-pitch: "person still on ground"
+# Phase 2 — continuous rapid high-pitch: "person still on ground" (capped at 10s max duration)
 _CRITICAL = {
     "pattern": [(1400, 100, 60)],
-    "repeats": 999,          # loops until reset() is called
+    "repeats": 65,           # ~10 seconds of beeping
+    "max_duration_s": 10.0,  # Auto-cutoff after 10 seconds
 }
 
 
@@ -86,11 +87,13 @@ def _gap(ms, stop_event):
 
 
 def _play(profile, stop_event):
-    for _ in range(profile["repeats"]):
-        if stop_event.is_set():
+    max_duration = profile.get("max_duration_s", 10.0)
+    start_time = time.time()
+    for _ in range(profile.get("repeats", 1)):
+        if stop_event.is_set() or (time.time() - start_time >= max_duration):
             return
         for freq, dur, gap in profile["pattern"]:
-            if stop_event.is_set():
+            if stop_event.is_set() or (time.time() - start_time >= max_duration):
                 return
             _beep(freq, dur, stop_event)
             if gap > 0:

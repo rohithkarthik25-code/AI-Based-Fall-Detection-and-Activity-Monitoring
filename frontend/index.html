@@ -1536,6 +1536,7 @@
         let sirenGain = null;
         let sirenAudioCtx = null;
         let sirenTimer = null;
+        let sirenAutoStopTimeout = null;
 
         function playEmergencyTone() {
             try {
@@ -1576,10 +1577,19 @@
                         high = !high;
                     } catch (_) {}
                 }, 500);
+
+                // Auto-shutoff: Limit emergency siren beep sound to maximum 10 seconds
+                sirenAutoStopTimeout = setTimeout(() => {
+                    stopEmergencyAudioSiren();
+                }, 10000);
             } catch (_) {}
         }
 
         function stopEmergencyAudioSiren() {
+            if (sirenAutoStopTimeout) {
+                clearTimeout(sirenAutoStopTimeout);
+                sirenAutoStopTimeout = null;
+            }
             if (sirenTimer) {
                 clearInterval(sirenTimer);
                 sirenTimer = null;
