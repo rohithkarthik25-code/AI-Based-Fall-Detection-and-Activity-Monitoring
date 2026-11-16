@@ -982,6 +982,19 @@
         </div>
         <button class="btn-resolve" onclick="resolveCurrentFall()">Acknowledge & Resolve</button>
     </div>
+    <!-- WebGL Browser Shield & Hardware Acceleration Notice Banner -->
+    <div id="webgl-troubleshoot-banner" style="display: none; background: rgba(245, 158, 11, 0.12); border: 1px solid rgba(245, 158, 11, 0.4); border-radius: 8px; padding: 10px 16px; margin: 12px 28px; color: #f8fafc; font-size: 0.85rem; z-index: 99;">
+        <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px;">
+            <div style="display: flex; align-items: center; gap: 10px;">
+                <span style="font-size: 1.25rem;">🦁</span>
+                <span>
+                    <strong style="color: #fbbf24;">Browser WebGL / Hardware Acceleration Notice:</strong>
+                    <span style="color: #cbd5e1; margin-left: 4px;">If you see WebGL warnings in Brave or Chrome, click the <strong>Brave Lion Shield icon</strong> in your address bar and set <em>Fingerprinting protection</em> to Standard/OFF, or enable <em>"Use graphics acceleration"</em> in browser Settings. The 3D Kinematic Viewport is running in high-compatibility mode.</span>
+                </span>
+            </div>
+            <button onclick="document.getElementById('webgl-troubleshoot-banner').style.display='none'" style="background: none; border: none; color: #94a3b8; font-size: 1.2rem; cursor: pointer; padding: 0 6px;" title="Dismiss">✕</button>
+        </div>
+    </div>
 
     <!-- Real-Time Activity Analytics Ribbon -->
     <div class="analytics-bar">
@@ -1216,7 +1229,21 @@
 
     <script>
         // =========================================================================
-        // 0. EXPLICIT GLOBAL BUTTON HANDLERS & STATE DECLARATIONS
+        // 0. INTERCEPT NATIVE ALERT FOR MEDIAPIPE TO PREVENT MODAL POPUPS
+        // =========================================================================
+        const _nativeAlert = window.alert;
+        window.alert = function(msg) {
+            if (typeof msg === 'string' && (msg.includes('Failed to create WebGL') || msg.includes('WebGL canvas context'))) {
+                console.warn("[MediaPipe WebGL Notice Handled Gracefully]:", msg);
+                const b = document.getElementById('webgl-troubleshoot-banner');
+                if (b) b.style.display = 'block';
+                return;
+            }
+            return _nativeAlert.apply(this, arguments);
+        };
+
+        // =========================================================================
+        // 1. EXPLICIT GLOBAL BUTTON HANDLERS & STATE DECLARATIONS
         // Guarantee immediate availability on window so buttons NEVER fail with ReferenceError
         // =========================================================================
 
@@ -1234,6 +1261,10 @@
         let camera = null;
         let renderer = null;
         let controls = null;
+        let isUsing2DFallback = false;
+        let canvas2D = null;
+        let ctx2D = null;
+
         const JOINT_COUNT = 33;
         const joints = [];
         const boneLines = [];
@@ -1244,9 +1275,11 @@
         let boneMatSit = null;
         let boneMatFall = null;
 
-        // Target coordinates for smooth 60 FPS lerping
+        // Current & Target 3D coordinates for smooth 60 FPS lerping
+        const currentJointPositions = [];
         const targetPositions = [];
         for (let i = 0; i < JOINT_COUNT; i++) {
+            currentJointPositions.push({ x: 0, y: 0, z: 0 });
             targetPositions.push({ x: 0, y: 0, z: 0 });
         }
 
@@ -1313,10 +1346,85 @@
         let lastFpsUpdate = performance.now();
         let lastFrameProcessTime = 0;
 
+        // Perspective 2D Engine Camera State
+        const perspectiveCam = {
+            azimuth: 0,
+            elevation: 0.12,
+            distance: 3.2,
+            targetY: 0.80,
+            isDragging: false,
+            prevX: 0,
+            prevY: 0
+        };
+
         // =========================================================================
-        // 1. BUILT-IN INTERACTIVE ORBIT CONTROLS FALLBACK
-        // Guarantees 3D skeleton rotation/zooming even if external CDN OrbitControls fails
+        // 2. DEFAULT STANDING AVATAR INITIALIZATION (Immediate Run)
         // =========================================================================
+
+        function loadDefaultStandingAvatar() {
+            const defaultLandmarks = [
+                {x: 0, y: 1.62, z: 0},       // 0: head
+                {x: 0, y: 1.62, z: 0}, {x: 0, y: 1.62, z: 0}, {x: 0, y: 1.62, z: 0}, {x: 0, y: 1.62, z: 0},
+                {x: 0, y: 1.62, z: 0}, {x: 0, y: 1.62, z: 0}, {x: 0, y: 1.62, z: 0}, {x: 0, y: 1.62, z: 0},
+                {x: 0, y: 1.62, z: 0}, {x: 0, y: 1.62, z: 0},
+                {x: -0.22, y: 1.40, z: 0},   // 11: left shoulder
+                {x: 0.22, y: 1.40, z: 0},    // 12: right shoulder
+                {x: -0.32, y: 1.10, z: 0},   // 13: left elbow
+                {x: 0.32, y: 1.10, z: 0},    // 14: right elbow
+                {x: -0.34, y: 0.80, z: 0},   // 15: left wrist
+                {x: 0.34, y: 0.80, z: 0},    // 16: right wrist
+                {x: 0, y: 0, z: 0}, {x: 0, y: 0, z: 0}, {x: 0, y: 0, z: 0}, {x: 0, y: 0, z: 0}, {x: 0, y: 0, z: 0}, {x: 0, y: 0, z: 0},
+                {x: -0.15, y: 0.88, z: 0},   // 23: left hip
+                {x: 0.15, y: 0.88, z: 0},    // 24: right hip
+                {x: -0.16, y: 0.46, z: 0},   // 25: left knee
+                {x: 0.16, y: 0.46, z: 0},    // 26: right knee
+                {x: -0.16, y: 0.05, z: 0},   // 27: left ankle
+                {x: 0.16, y: 0.05, z: 0},    // 28: right ankle
+                {x: -0.16, y: 0.05, z: 0}, {x: 0.16, y: 0.05, z: 0},
+                {x: -0.16, y: 0.05, z: 0.1}, {x: 0.16, y: 0.05, z: 0.1}
+            ];
+
+            for (let i = 0; i < JOINT_COUNT; i++) {
+                const pt = defaultLandmarks[i] || { x: 0, y: 0, z: 0 };
+                if (targetPositions[i]) {
+                    targetPositions[i].x = pt.x;
+                    targetPositions[i].y = pt.y;
+                    targetPositions[i].z = pt.z;
+                }
+                if (currentJointPositions[i]) {
+                    currentJointPositions[i].x = pt.x;
+                    currentJointPositions[i].y = pt.y;
+                    currentJointPositions[i].z = pt.z;
+                }
+                if (joints[i]) {
+                    joints[i].position.set(pt.x, pt.y, pt.z);
+                    if (jointMatNormal) joints[i].material = jointMatNormal;
+                }
+            }
+            BONE_CONNECTIONS.forEach(([a, b], idx) => {
+                if (boneLines[idx] && joints[a] && joints[b]) {
+                    boneLines[idx].geometry.setFromPoints([joints[a].position, joints[b].position]);
+                    if (boneMatNormal) boneLines[idx].material = boneMatNormal;
+                }
+            });
+        }
+
+        // Initialize target positions immediately so data is never empty zeroes
+        loadDefaultStandingAvatar();
+
+        // =========================================================================
+        // 3. THREE.JS 3D VIEWPORT & ZERO-DEPENDENCY 3D PERSPECTIVE ENGINE
+        // Guarantees 100% visible 3D skeleton even if browser blocks WebGL / Brave Shields
+        // =========================================================================
+
+        function checkWebGlSupported() {
+            try {
+                const c = document.createElement('canvas');
+                return !!(window.WebGLRenderingContext && (c.getContext('webgl') || c.getContext('experimental-webgl')));
+            } catch (_) {
+                return false;
+            }
+        }
 
         function createFallbackControls(cam, domElement, target) {
             let isDragging = false;
@@ -1371,23 +1479,19 @@
             };
         }
 
-        // =========================================================================
-        // 2. THREE.JS 3D VIEWPORT SETUP (Decoupled 60 FPS Render Loop)
-        // =========================================================================
-
         function initThreeScene() {
             const container = document.getElementById('viewport-3d');
             if (!container) return;
 
-            // Check if Three.js library is loaded
-            if (typeof THREE === 'undefined') {
-                console.warn("Three.js library is not loaded. Activating 2D kinematics canvas fallback.");
-                render2DFallbackViewport(container);
+            // Check if WebGL is available and supported without throwing
+            const hasWebGl = checkWebGlSupported() && typeof THREE !== 'undefined';
+            if (!hasWebGl) {
+                console.warn("WebGL not supported or blocked by browser. Activating 3D Perspective Canvas Engine.");
+                initPerspectiveCanvasScene(container);
                 return;
             }
 
             try {
-                // Remove any pre-existing canvas
                 const oldCanvas = container.querySelector('canvas');
                 if (oldCanvas) oldCanvas.remove();
 
@@ -1400,7 +1504,12 @@
                 camera = new THREE.PerspectiveCamera(50, width / height, 0.1, 100);
                 camera.position.set(0, 1.35, 3.2);
 
-                renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, powerPreference: "high-performance" });
+                renderer = new THREE.WebGLRenderer({
+                    antialias: false,
+                    alpha: true,
+                    powerPreference: "default",
+                    failIfMajorPerformanceCaveat: false
+                });
                 renderer.setSize(width, height);
                 renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5));
                 renderer.setClearColor(0x06080e, 1.0);
@@ -1409,7 +1518,7 @@
                 renderer.domElement.style.display = 'block';
                 container.appendChild(renderer.domElement);
 
-                // OrbitControls initialization with guaranteed fallback
+                // OrbitControls initialization with fallback
                 if (typeof THREE.OrbitControls === 'function') {
                     try {
                         controls = new THREE.OrbitControls(camera, renderer.domElement);
@@ -1417,11 +1526,9 @@
                         controls.dampingFactor = 0.08;
                         controls.target.set(0, 0.80, 0);
                     } catch (ctrlErr) {
-                        console.warn("OrbitControls initialization failed, using built-in controls:", ctrlErr);
                         controls = createFallbackControls(camera, renderer.domElement, new THREE.Vector3(0, 0.80, 0));
                     }
                 } else {
-                    console.warn("THREE.OrbitControls not found on window, using built-in controls.");
                     controls = createFallbackControls(camera, renderer.domElement, new THREE.Vector3(0, 0.80, 0));
                 }
 
@@ -1433,7 +1540,7 @@
                 dirLight.position.set(2, 4, 3);
                 scene.add(dirLight);
 
-                // High-visibility ground grid
+                // Ground grid
                 const gridHelper = new THREE.GridHelper(4.0, 16, 0x06b6d4, 0x1f293d);
                 gridHelper.position.y = 0;
                 scene.add(gridHelper);
@@ -1454,7 +1561,6 @@
                 for (let i = 0; i < JOINT_COUNT; i++) {
                     const geo = (i === 0) ? headGeo : jointGeo;
                     const m = new THREE.Mesh(geo, jointMatNormal);
-                    // Show head, upper body, and legs
                     m.visible = (i === 0 || (i >= 11 && i <= 16) || (i >= 23 && i <= 28));
                     scene.add(m);
                     joints.push(m);
@@ -1469,23 +1575,17 @@
                     boneLines.push(line);
                 }
 
-                // Load initial standing avatar coordinates
                 loadDefaultStandingAvatar();
-
-                // Synchronous first-frame render
                 renderer.render(scene, camera);
 
-                // Update status badge
                 const st = document.getElementById('3d-status');
                 if (st) {
                     st.textContent = 'Three.js WebGL (60 FPS)';
                     st.style.color = '#10b981';
                 }
 
-                // Start decoupled 60 FPS animation loop
                 animate();
 
-                // Window & container resize observation
                 window.addEventListener('resize', handleViewportResize);
                 if (window.ResizeObserver) {
                     const ro = new ResizeObserver(() => handleViewportResize());
@@ -1493,8 +1593,207 @@
                 }
 
             } catch (err) {
-                console.error("Three.js setup error:", err);
-                render2DFallbackViewport(container);
+                console.error("Three.js WebGL setup failed, falling back to 3D Perspective Canvas Engine:", err);
+                initPerspectiveCanvasScene(container);
+            }
+        }
+
+        // =========================================================================
+        // 4. ZERO-DEPENDENCY 3D PERSPECTIVE CANVAS ENGINE
+        // Renders complete 3D rotatable skeleton & ground grid even with WebGL disabled
+        // =========================================================================
+
+        function initPerspectiveCanvasScene(container) {
+            isUsing2DFallback = true;
+            const oldCanvas = container.querySelector('canvas');
+            if (oldCanvas) oldCanvas.remove();
+
+            canvas2D = document.createElement('canvas');
+            canvas2D.width = container.clientWidth || 500;
+            canvas2D.height = container.clientHeight || 480;
+            canvas2D.style.width = '100%';
+            canvas2D.style.height = '100%';
+            canvas2D.style.display = 'block';
+            canvas2D.style.cursor = 'grab';
+            container.appendChild(canvas2D);
+
+            ctx2D = canvas2D.getContext('2d');
+
+            // Interactive mouse rotation and wheel zooming
+            canvas2D.addEventListener('mousedown', (e) => {
+                perspectiveCam.isDragging = true;
+                perspectiveCam.prevX = e.clientX;
+                perspectiveCam.prevY = e.clientY;
+                canvas2D.style.cursor = 'grabbing';
+            });
+
+            window.addEventListener('mouseup', () => {
+                perspectiveCam.isDragging = false;
+                if (canvas2D) canvas2D.style.cursor = 'grab';
+            });
+
+            canvas2D.addEventListener('mousemove', (e) => {
+                if (!perspectiveCam.isDragging) return;
+                const dx = e.clientX - perspectiveCam.prevX;
+                const dy = e.clientY - perspectiveCam.prevY;
+                perspectiveCam.prevX = e.clientX;
+                perspectiveCam.prevY = e.clientY;
+                perspectiveCam.azimuth -= dx * 0.008;
+                perspectiveCam.elevation = Math.max(-Math.PI / 4, Math.min(Math.PI / 2.1, perspectiveCam.elevation + dy * 0.008));
+            });
+
+            canvas2D.addEventListener('wheel', (e) => {
+                e.preventDefault();
+                perspectiveCam.distance = Math.max(1.4, Math.min(6.5, perspectiveCam.distance + e.deltaY * 0.003));
+            }, { passive: false });
+
+            window.addEventListener('resize', () => {
+                if (canvas2D && container) {
+                    canvas2D.width = container.clientWidth || 500;
+                    canvas2D.height = container.clientHeight || 480;
+                }
+            });
+
+            const st = document.getElementById('3d-status');
+            if (st) {
+                st.textContent = '3D Kinematics (Canvas Perspective)';
+                st.style.color = '#38bdf8';
+            }
+
+            // Start 60 FPS perspective canvas render loop
+            animatePerspectiveCanvas();
+        }
+
+        function project3D(x, y, z, width, height) {
+            const tx = 0.0, ty = perspectiveCam.targetY, tz = 0.0;
+            const dx = x - tx;
+            const dy = y - ty;
+            const dz = z - tz;
+
+            // Azimuth rotation around Y
+            const cosA = Math.cos(perspectiveCam.azimuth);
+            const sinA = Math.sin(perspectiveCam.azimuth);
+            const x1 = dx * cosA - dz * sinA;
+            const z1 = dx * sinA + dz * cosA;
+
+            // Elevation rotation around X
+            const cosE = Math.cos(perspectiveCam.elevation);
+            const sinE = Math.sin(perspectiveCam.elevation);
+            const y2 = dy * cosE - z1 * sinE;
+            const z2 = dy * sinE + z1 * cosE;
+
+            const depth = Math.max(0.2, z2 + perspectiveCam.distance);
+            const focal = height * 1.15;
+            const cx = width / 2.0;
+            const cy = height / 2.0 + 35.0;
+
+            const sx = cx + (x1 * focal / depth);
+            const sy = cy - (y2 * focal / depth);
+            return { sx, sy, depth };
+        }
+
+        function animatePerspectiveCanvas() {
+            if (!isUsing2DFallback || !ctx2D || !canvas2D) return;
+            requestAnimationFrame(animatePerspectiveCanvas);
+
+            const w = canvas2D.width;
+            const h = canvas2D.height;
+
+            // Clear background
+            ctx2D.fillStyle = '#06080e';
+            ctx2D.fillRect(0, 0, w, h);
+
+            // 1. Draw 3D Ground Grid
+            ctx2D.lineWidth = 1;
+            ctx2D.strokeStyle = '#161f30';
+            const gridRange = 2.0;
+            const gridSteps = 10;
+            const step = (gridRange * 2) / gridSteps;
+
+            for (let i = -gridRange; i <= gridRange + 0.01; i += step) {
+                const p1 = project3D(i, 0, -gridRange, w, h);
+                const p2 = project3D(i, 0, gridRange, w, h);
+                if (p1.depth > 0.2 && p2.depth > 0.2) {
+                    ctx2D.beginPath();
+                    ctx2D.moveTo(p1.sx, p1.sy);
+                    ctx2D.lineTo(p2.sx, p2.sy);
+                    ctx2D.stroke();
+                }
+
+                const p3 = project3D(-gridRange, 0, i, w, h);
+                const p4 = project3D(gridRange, 0, i, w, h);
+                if (p3.depth > 0.2 && p4.depth > 0.2) {
+                    ctx2D.beginPath();
+                    ctx2D.moveTo(p3.sx, p3.sy);
+                    ctx2D.lineTo(p4.sx, p4.sy);
+                    ctx2D.stroke();
+                }
+            }
+
+            // Ground Center Cross
+            ctx2D.strokeStyle = 'rgba(6, 182, 212, 0.4)';
+            ctx2D.lineWidth = 1.5;
+            const cX1 = project3D(-0.8, 0, 0, w, h);
+            const cX2 = project3D(0.8, 0, 0, w, h);
+            if (cX1.depth > 0.2 && cX2.depth > 0.2) {
+                ctx2D.beginPath();
+                ctx2D.moveTo(cX1.sx, cX1.sy);
+                ctx2D.lineTo(cX2.sx, cX2.sy);
+                ctx2D.stroke();
+            }
+
+            // 2. Lerp joint positions smoothly
+            for (let i = 0; i < JOINT_COUNT; i++) {
+                if (currentJointPositions[i] && targetPositions[i]) {
+                    currentJointPositions[i].x += (targetPositions[i].x - currentJointPositions[i].x) * 0.35;
+                    currentJointPositions[i].y += (targetPositions[i].y - currentJointPositions[i].y) * 0.35;
+                    currentJointPositions[i].z += (targetPositions[i].z - currentJointPositions[i].z) * 0.35;
+                }
+            }
+
+            // Determine active posture color
+            const postEl = document.getElementById('hud-posture');
+            const posture = postEl ? postEl.textContent : 'Standing';
+            const boneColor = (posture === 'FALLEN') ? '#ef4444' : ((posture === 'Sitting') ? '#34d399' : '#38bdf8');
+            const jointColor = (posture === 'FALLEN') ? '#f87171' : ((posture === 'Sitting') ? '#10b981' : '#06b6d4');
+
+            // 3. Draw Connecting 3D Bones
+            ctx2D.strokeStyle = boneColor;
+            BONE_CONNECTIONS.forEach(([a, b]) => {
+                const jA = currentJointPositions[a];
+                const jB = currentJointPositions[b];
+                if (jA && jB) {
+                    const pA = project3D(jA.x, jA.y, jA.z, w, h);
+                    const pB = project3D(jB.x, jB.y, jB.z, w, h);
+                    if (pA.depth > 0.2 && pB.depth > 0.2) {
+                        ctx2D.lineWidth = Math.max(1.5, Math.min(4.5, 8.0 / ((pA.depth + pB.depth) / 2)));
+                        ctx2D.beginPath();
+                        ctx2D.moveTo(pA.sx, pA.sy);
+                        ctx2D.lineTo(pB.sx, pB.sy);
+                        ctx2D.stroke();
+                    }
+                }
+            });
+
+            // 4. Draw 3D Spherical Joints
+            for (let i = 0; i < JOINT_COUNT; i++) {
+                if (i === 0 || (i >= 11 && i <= 16) || (i >= 23 && i <= 28)) {
+                    const jPt = currentJointPositions[i];
+                    if (jPt) {
+                        const proj = project3D(jPt.x, jPt.y, jPt.z, w, h);
+                        if (proj.depth > 0.2) {
+                            const radius = Math.max(2.5, Math.min(16, (i === 0 ? 18.0 : 9.0) / proj.depth));
+                            ctx2D.beginPath();
+                            ctx2D.arc(proj.sx, proj.sy, radius, 0, 2 * Math.PI);
+                            ctx2D.fillStyle = jointColor;
+                            ctx2D.fill();
+
+                            ctx2D.lineWidth = 1;
+                            ctx2D.strokeStyle = '#ffffff';
+                            ctx2D.stroke();
+                        }
+                    }
+                }
             }
         }
 
@@ -1509,111 +1808,15 @@
             if (scene) renderer.render(scene, camera);
         }
 
-        function render2DFallbackViewport(container) {
-            const canvas = document.createElement('canvas');
-            canvas.width = container.clientWidth || 500;
-            canvas.height = container.clientHeight || 480;
-            canvas.style.width = '100%';
-            canvas.style.height = '100%';
-            canvas.style.display = 'block';
-            container.appendChild(canvas);
-
-            const ctx = canvas.getContext('2d');
-            function draw2D() {
-                ctx.fillStyle = '#06080e';
-                ctx.fillRect(0, 0, canvas.width, canvas.height);
-                
-                // Ground grid
-                ctx.strokeStyle = '#1e293b';
-                ctx.lineWidth = 1;
-                for (let y = canvas.height - 40; y <= canvas.height; y += 10) {
-                    ctx.beginPath();
-                    ctx.moveTo(0, y);
-                    ctx.lineTo(canvas.width, y);
-                    ctx.stroke();
-                }
-
-                // Draw stick avatar in 2D
-                const cx = canvas.width / 2;
-                const cy = canvas.height / 2;
-                const scale = canvas.height / 2.4;
-
-                ctx.strokeStyle = '#38bdf8';
-                ctx.lineWidth = 3;
-                BONE_CONNECTIONS.forEach(([a, b]) => {
-                    const pA = targetPositions[a];
-                    const pB = targetPositions[b];
-                    if (pA && pB) {
-                        ctx.beginPath();
-                        ctx.moveTo(cx + pA.x * scale, (cy + 60) - pA.y * scale);
-                        ctx.lineTo(cx + pB.x * scale, (cy + 60) - pB.y * scale);
-                        ctx.stroke();
-                    }
-                });
-
-                ctx.fillStyle = '#06b6d4';
-                targetPositions.forEach((pt, idx) => {
-                    if (idx === 0 || (idx >= 11 && idx <= 16) || (idx >= 23 && idx <= 28)) {
-                        ctx.beginPath();
-                        ctx.arc(cx + pt.x * scale, (cy + 60) - pt.y * scale, idx === 0 ? 8 : 4, 0, 2 * Math.PI);
-                        ctx.fill();
-                    }
-                });
-
-                requestAnimationFrame(draw2D);
-            }
-            draw2D();
-            const st = document.getElementById('3d-status');
-            if (st) {
-                st.textContent = '2D Kinematics Mode';
-                st.style.color = '#f59e0b';
-            }
-        }
-
-        function loadDefaultStandingAvatar() {
-            const defaultLandmarks = [
-                {x: 0, y: 1.62, z: 0},       // 0: head
-                {x: 0, y: 1.62, z: 0}, {x: 0, y: 1.62, z: 0}, {x: 0, y: 1.62, z: 0}, {x: 0, y: 1.62, z: 0},
-                {x: 0, y: 1.62, z: 0}, {x: 0, y: 1.62, z: 0}, {x: 0, y: 1.62, z: 0}, {x: 0, y: 1.62, z: 0},
-                {x: 0, y: 1.62, z: 0}, {x: 0, y: 1.62, z: 0},
-                {x: -0.22, y: 1.40, z: 0},   // 11: left shoulder
-                {x: 0.22, y: 1.40, z: 0},    // 12: right shoulder
-                {x: -0.32, y: 1.10, z: 0},   // 13: left elbow
-                {x: 0.32, y: 1.10, z: 0},    // 14: right elbow
-                {x: -0.34, y: 0.80, z: 0},   // 15: left wrist
-                {x: 0.34, y: 0.80, z: 0},    // 16: right wrist
-                {x: 0, y: 0, z: 0}, {x: 0, y: 0, z: 0}, {x: 0, y: 0, z: 0}, {x: 0, y: 0, z: 0}, {x: 0, y: 0, z: 0}, {x: 0, y: 0, z: 0},
-                {x: -0.15, y: 0.88, z: 0},   // 23: left hip
-                {x: 0.15, y: 0.88, z: 0},    // 24: right hip
-                {x: -0.16, y: 0.46, z: 0},   // 25: left knee
-                {x: 0.16, y: 0.46, z: 0},    // 26: right knee
-                {x: -0.16, y: 0.05, z: 0},   // 27: left ankle
-                {x: 0.16, y: 0.05, z: 0},    // 28: right ankle
-                {x: -0.16, y: 0.05, z: 0}, {x: 0.16, y: 0.05, z: 0},
-                {x: -0.16, y: 0.05, z: 0.1}, {x: 0.16, y: 0.05, z: 0.1}
-            ];
-
-            for (let i = 0; i < JOINT_COUNT; i++) {
-                const pt = defaultLandmarks[i] || { x: 0, y: 0, z: 0 };
-                if (targetPositions[i]) {
-                    targetPositions[i].x = pt.x;
-                    targetPositions[i].y = pt.y;
-                    targetPositions[i].z = pt.z;
-                }
-                if (joints[i]) {
-                    joints[i].position.set(pt.x, pt.y, pt.z);
-                    if (jointMatNormal) joints[i].material = jointMatNormal;
-                }
-            }
-            BONE_CONNECTIONS.forEach(([a, b], idx) => {
-                if (boneLines[idx] && joints[a] && joints[b]) {
-                    boneLines[idx].geometry.setFromPoints([joints[a].position, joints[b].position]);
-                    if (boneMatNormal) boneLines[idx].material = boneMatNormal;
-                }
-            });
-        }
-
         function setCameraPreset(view) {
+            if (isUsing2DFallback) {
+                if (view === 'front') { perspectiveCam.azimuth = 0; perspectiveCam.elevation = 0.12; perspectiveCam.distance = 3.2; }
+                else if (view === 'side') { perspectiveCam.azimuth = Math.PI / 2; perspectiveCam.elevation = 0.12; perspectiveCam.distance = 3.2; }
+                else if (view === 'top') { perspectiveCam.azimuth = 0; perspectiveCam.elevation = Math.PI / 2.05; perspectiveCam.distance = 3.4; }
+                else if (view === 'iso') { perspectiveCam.azimuth = Math.PI / 4; perspectiveCam.elevation = 0.35; perspectiveCam.distance = 3.2; }
+                return;
+            }
+
             if (!camera) return;
             if (view === 'front') { 
                 camera.position.set(0, 1.0, 2.8); 
@@ -1633,8 +1836,8 @@
             if (renderer && scene) renderer.render(scene, camera);
         }
 
-        // 60 FPS Decoupled Smooth Interpolation Loop
         function animate() {
+            if (isUsing2DFallback) return;
             requestAnimationFrame(animate);
             if (!renderer || !scene || !camera) return;
 
@@ -1642,7 +1845,6 @@
                 controls.update();
             }
 
-            // Smoothly lerp all 33 joints towards target positions
             for (let i = 0; i < JOINT_COUNT; i++) {
                 if (joints[i] && targetPositions[i]) {
                     joints[i].position.x += (targetPositions[i].x - joints[i].position.x) * 0.35;
@@ -1651,7 +1853,6 @@
                 }
             }
 
-            // Update bone connecting lines
             BONE_CONNECTIONS.forEach(([a, b], idx) => {
                 if (boneLines[idx] && joints[a] && joints[b]) {
                     boneLines[idx].geometry.setFromPoints([joints[a].position, joints[b].position]);
@@ -1667,7 +1868,6 @@
             const currentJointMat = isFallen ? jointMatFall : (isSitting ? jointMatSit : jointMatNormal);
             const currentBoneMat = isFallen ? boneMatFall : (isSitting ? boneMatSit : boneMatNormal);
 
-            // Anchor lowest foot point to ground level (Y = 0.05)
             const ankleY1 = wlm[27] ? wlm[27].y : 0.8;
             const ankleY2 = wlm[28] ? wlm[28].y : 0.8;
             const lowestY = Math.max(ankleY1, ankleY2, 0.4);
@@ -1675,7 +1875,6 @@
             for (let i = 0; i < JOINT_COUNT; i++) {
                 const pt = wlm[i];
                 if (pt) {
-                    // Mirrored for webcam, un-mirrored for uploaded test video
                     const posX = (currentSourceType === 'webcam') ? -pt.x : pt.x;
                     const posY = -(pt.y - lowestY) + 0.05;
                     const posZ = -pt.z;
@@ -1699,7 +1898,7 @@
         }
 
         // =========================================================================
-        // 3. SUPABASE CLIENT & CLOUD INCIDENT REPOSITORY
+        // 5. SUPABASE CLIENT & CLOUD INCIDENT REPOSITORY
         // =========================================================================
 
         function initSupabaseClient() {
@@ -1845,7 +2044,7 @@
         }
 
         // =========================================================================
-        // 4. AUDIO SYNTHESIZER & SPEECH ENGINE (10s Auto-Shutoff Siren)
+        // 6. AUDIO SYNTHESIZER & SPEECH ENGINE (10s Auto-Shutoff Siren)
         // =========================================================================
 
         function playEmergencyTone() {
@@ -1888,7 +2087,6 @@
                     } catch (_) {}
                 }, 500);
 
-                // Auto-shutoff: Limit emergency siren beep sound to maximum 10 seconds
                 sirenAutoStopTimeout = setTimeout(() => {
                     stopEmergencyAudioSiren();
                 }, 10000);
@@ -1923,7 +2121,7 @@
         }
 
         // =========================================================================
-        // 5. BIOMECHANICAL FALL STATE MACHINE & 5-SECOND NON-RECOVERY DISPATCH
+        // 7. BIOMECHANICAL FALL STATE MACHINE & 5-SECOND NON-RECOVERY DISPATCH
         // =========================================================================
 
         function triggerRecoveryDetected() {
@@ -1984,7 +2182,6 @@
             }
         }
 
-        // Accessibility shortcut: Spacebar or Escape resets active alert
         window.addEventListener('keydown', (e) => {
             if (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA')) return;
             if (e.code === 'Space' || e.key === 'Escape') {
@@ -2001,7 +2198,7 @@
         });
 
         // =========================================================================
-        // 6. CONTINUOUS ADL (ACTIVITIES OF DAILY LIVING) & SEDENTARY ANALYTICS
+        // 8. CONTINUOUS ADL (ACTIVITIES OF DAILY LIVING) & SEDENTARY ANALYTICS
         // =========================================================================
 
         function updateADLAnalytics() {
@@ -2009,7 +2206,6 @@
             const postEl = document.getElementById('hud-posture');
             const posture = postEl ? postEl.textContent : 'Unknown';
 
-            // Track posture transitions
             if (posture !== adlStats.lastPosture && posture !== 'Unknown' && posture !== 'FALLEN') {
                 if (
                     (adlStats.lastPosture === 'Sitting' && (posture === 'Standing' || posture === 'Walking')) ||
@@ -2037,7 +2233,6 @@
                 adlStats.continuousInactiveSec = 0;
             }
 
-            // Sync with ribbon standing/sitting timers
             standingSec = adlStats.standingSec + adlStats.walkingSec;
             sittingSec = adlStats.sittingSec;
             const standEl = document.getElementById('hud-stand-time');
@@ -2045,7 +2240,6 @@
             const sitEl = document.getElementById('hud-sit-time');
             if (sitEl) sitEl.textContent = sittingSec + 's';
 
-            // Calculate active vs sedentary split
             const activeSec = adlStats.walkingSec + adlStats.standingSec + adlStats.bendingSec;
             const sedentarySec = adlStats.sittingSec + adlStats.lyingSec;
             const totalSec = Math.max(1, activeSec + sedentarySec);
@@ -2075,13 +2269,11 @@
             const lyingPctEl = document.getElementById('adl-lying-pct');
             if (lyingPctEl) lyingPctEl.textContent = `${lyingPct}%`;
 
-            // Continuous Inactivity timer
             const inactMins = Math.floor(adlStats.continuousInactiveSec / 60);
             const inactSecs = adlStats.continuousInactiveSec % 60;
             const inactEl = document.getElementById('adl-inactive-duration');
             if (inactEl) inactEl.textContent = `${inactMins < 10 ? '0' : ''}${inactMins}:${inactSecs < 10 ? '0' : ''}${inactSecs}`;
 
-            // Sedentary Alert threshold
             const chip = document.getElementById('sedentary-status-chip');
             if (chip) {
                 if (adlStats.continuousInactiveSec >= 45) {
@@ -2102,7 +2294,6 @@
                 }
             }
 
-            // Posture transitions & mobility score
             const transEl = document.getElementById('adl-transitions-count');
             if (transEl) transEl.textContent = adlStats.transitions;
             const activeRatio = activeSec / totalSec;
@@ -2111,7 +2302,6 @@
             const mobEl = document.getElementById('adl-mobility-index');
             if (mobEl) mobEl.textContent = `Mobility: ${mobLabel} (${mobilityScore}/100)`;
 
-            // Proportional split bar
             const activePct = Math.round((activeSec / totalSec) * 100);
             const sedPct = 100 - activePct;
             const splitAct = document.getElementById('adl-split-active');
@@ -2154,7 +2344,7 @@
         }
 
         // =========================================================================
-        // 7. SNAPSHOT CAPTURE & TELEGRAM DISPATCH
+        // 9. SNAPSHOT CAPTURE & TELEGRAM DISPATCH
         // =========================================================================
 
         async function captureCurrentSnapshotBlob() {
@@ -2181,7 +2371,6 @@
                     console.warn("Video canvas draw notice:", e);
                 }
             } else {
-                // High-visibility emergency diagnostics snapshot
                 snapCtx.fillStyle = '#0f172a';
                 snapCtx.fillRect(0, 0, w, h);
                 snapCtx.fillStyle = '#ef4444';
@@ -2197,14 +2386,12 @@
                 snapCtx.strokeRect(10, 10, w - 20, h - 20);
             }
 
-            // Overlay 2D skeleton pose if available
             if (overlayCanvas && overlayCanvas.width > 0 && overlayCanvas.height > 0) {
                 try {
                     snapCtx.drawImage(overlayCanvas, 0, 0, w, h);
                 } catch (_) {}
             }
 
-            // Timestamp ribbon
             snapCtx.fillStyle = 'rgba(15, 23, 42, 0.85)';
             snapCtx.fillRect(0, h - 36, w, 36);
             snapCtx.fillStyle = '#38bdf8';
@@ -2219,7 +2406,6 @@
             const sourceDesc = (currentSourceType === 'upload') ? `Uploaded Video (${activeFileName || 'Test'})` : ((currentSourceType === 'webcam') ? 'Live Webcam' : 'AI Fall Detection System');
             const text = `🚨 <b>EMERGENCY: FALL DETECTED!</b>\n━━━━━━━━━━━━━━━━━━━\n👤 <b>Person:</b> #1\n⚠️ <b>Severity:</b> ${severity}\n📊 <b>Confidence Score:</b> ${(score * 100).toFixed(0)}%\n⏱️ <b>Duration Down:</b> 5.0s (No Recovery)\n🕒 <b>Time:</b> ${timeStr}\n🌐 <b>Source:</b> ${sourceDesc}\n━━━━━━━━━━━━━━━━━━━\n<i>Immediate caregiver attention required! Check dashboard now.</i>`;
             
-            // Priority 1: Direct Multipart FormData upload with image blob
             if (snapshotBlob) {
                 try {
                     const formData = new FormData();
@@ -2242,7 +2428,6 @@
                 }
             }
 
-            // Priority 2: Fallback to public URL if available
             if (snapshotUrl && snapshotUrl.startsWith('http')) {
                 try {
                     const resp = await fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendPhoto`, {
@@ -2265,7 +2450,6 @@
                 }
             }
 
-            // Priority 3: Fallback to text message
             try {
                 await fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`, {
                     method: 'POST',
@@ -2289,11 +2473,9 @@
 
             playEmergencyTone();
 
-            // 1. Capture snapshot blob immediately
             const snapshotBlob = await captureCurrentSnapshotBlob();
             let snapshotUrl = null;
 
-            // 2. Upload snapshot blob to Supabase Storage
             if (snapshotBlob && sbClient) {
                 try {
                     const filename = `web_fall_${Date.now()}.jpg`;
@@ -2306,6 +2488,8 @@
                             .from('fall-snapshots')
                             .getPublicUrl(filename);
                         snapshotUrl = publicUrlData?.publicUrl || null;
+                    } else {
+                        console.warn("Supabase storage upload note:", uploadErr);
                     }
                 } catch (e) {
                     console.warn("Snapshot storage upload error:", e);
@@ -2314,7 +2498,6 @@
 
             const notesText = (currentSourceType === 'upload') ? `Uploaded File: ${activeFileName || 'Test Video'}` : ((currentSourceType === 'webcam') ? 'Live Webcam Feed' : customNotes);
 
-            // 3. Insert record into Supabase fall_events table
             if (sbClient) {
                 try {
                     const { data: insertedData, error: insertError } = await sbClient
@@ -2337,10 +2520,7 @@
                 }
             }
 
-            // 4. Send Telegram Alert directly with photo blob attached
             await sendDirectTelegramAlert(severity, fallScore, snapshotBlob, snapshotUrl);
-
-            // 5. Reload Cloud Ledger
             loadFallHistory();
         }
 
@@ -2356,8 +2536,10 @@
         }
 
         // =========================================================================
-        // 8. MEDIAPIPE IN-BROWSER POSE MODEL & FRAME PROCESSING
+        // 10. MEDIAPIPE IN-BROWSER POSE MODEL & SAFE FRAME DISPATCH
         // =========================================================================
+
+        let mediaPipeFailedCount = 0;
 
         function initPoseModel() {
             if (!poseModel) {
@@ -2388,7 +2570,6 @@
             const video = document.getElementById('webcam-video');
             const now = performance.now();
 
-            // Self-healing timeout if pose processing flag ever hangs
             if (isProcessingFrame && (now - lastFrameProcessTime > 1500)) {
                 isProcessingFrame = false;
             }
@@ -2397,11 +2578,22 @@
                 isProcessingFrame = true;
                 lastFrameProcessTime = now;
                 poseModel.send({ image: video })
-                    .catch(e => console.warn("Pose frame skipped:", e))
-                    .finally(() => { isProcessingFrame = false; });
+                    .then(() => {
+                        mediaPipeFailedCount = 0;
+                    })
+                    .catch(e => {
+                        console.warn("Pose frame skipped/context note:", e);
+                        mediaPipeFailedCount++;
+                        if (mediaPipeFailedCount >= 5) {
+                            const b = document.getElementById('webgl-troubleshoot-banner');
+                            if (b) b.style.display = 'block';
+                        }
+                    })
+                    .finally(() => { 
+                        isProcessingFrame = false; 
+                    });
             }
 
-            // Calculate live throughput FPS
             fpsCounter++;
             if (now - lastFpsUpdate >= 1000) {
                 const fpsEl = document.getElementById('hud-fps');
@@ -2414,7 +2606,7 @@
         }
 
         // =========================================================================
-        // 9. INPUT SOURCE CONTROLLERS (Video Upload & Live Webcam)
+        // 11. INPUT SOURCE CONTROLLERS (Video Upload & Live Webcam)
         // =========================================================================
 
         function updateTabHighlight(activeTabId) {
@@ -2542,7 +2734,6 @@
             const controlsBar = document.getElementById('video-controls-bar');
             const sourceTag = document.getElementById('source-tag');
 
-            // Mirrored view for live selfie webcam
             if (video) video.style.transform = 'scaleX(-1)';
             if (canvas) canvas.style.transform = 'scaleX(-1)';
 
@@ -2634,7 +2825,6 @@
             const controlsBar = document.getElementById('video-controls-bar');
             const sourceTag = document.getElementById('source-tag');
 
-            // Normal un-mirrored perspective for pre-recorded video files
             if (video) {
                 video.style.transform = 'scaleX(1)';
                 video.muted = true;
@@ -2732,7 +2922,6 @@
             }
         }
 
-        // ── Video Playback Controls ──
         function togglePlayPause() {
             const video = document.getElementById('webcam-video');
             const btn = document.getElementById('btn-play-pause');
@@ -2789,7 +2978,7 @@
         }
 
         // =========================================================================
-        // 10. ROBUST BIOMECHANICAL CLASSIFICATION & POSE RESULTS HANDLER
+        // 12. ROBUST BIOMECHANICAL CLASSIFICATION & POSE RESULTS HANDLER
         // =========================================================================
 
         function onPoseResults(results) {
@@ -2856,7 +3045,7 @@
             const kneesOccludedOrLow = (lKnee.y > 0.88 || rKnee.y > 0.88 || (lKnee.visibility < 0.45 && rKnee.visibility < 0.45));
             const isDeskSeated = (kneesOccludedOrLow && midHipY > 0.60 && torsoAngle < 30 && aspectRatio > 0.48);
 
-            // ── Biomechanical Fall Scoring ──
+            // Biomechanical Fall Scoring
             let fallProbability = 0.0;
             if (torsoAngle > 35) {
                 fallProbability += 0.45 * Math.min(1.0, (torsoAngle - 35) / 30.0);
@@ -2875,13 +3064,12 @@
                 fallProbability = Math.max(fallProbability, 0.92);
             }
 
-            // Zero-out fall probability if upright sitting or standing
             if (torsoAngle < 28 && (hipFlex3D < 135 || hipFlex3D > 155)) {
                 fallProbability = Math.min(fallProbability, 0.05);
             }
             fallProbability = Math.min(1.0, Math.max(0.0, fallProbability));
 
-            // ── Accurate Sitting vs Standing Distinction ──
+            // Accurate Sitting vs Standing Distinction
             let rawPosture = "Standing";
             let postureColor = "#38bdf8";
 
@@ -2929,10 +3117,9 @@
             else if (smoothedPosture === 'Bending') postureColor = '#f59e0b';
             else if (smoothedPosture === 'Lying Down') postureColor = '#8b5cf6';
 
-            // ── Feature 1.1: Post-Fall Inactivity & Recovery Verification Window ──
             const isFallCandidate = (fallProbability >= 0.50) || (torsoAngle > 55 && aspectRatio > 0.85);
 
-            // ── Feature 5.0: AI Video Authenticity & Fraud Prevention ──
+            // AI Video Authenticity & Fraud Prevention
             const isSyntheticAiMedia = (activeFileName && /(ai|fake|synth|deepfake)/i.test(activeFileName));
             if (isSyntheticAiMedia) {
                 const authBadge = document.getElementById('hud-overlay-authenticity');
@@ -2949,7 +3136,7 @@
                         vChip.style.color = '#ffffff';
                         vChip.style.display = 'block';
                     }
-                    return; // Prevent emergency siren and dispatch on synthetic media
+                    return;
                 }
             }
 
@@ -2996,7 +3183,6 @@
                         startEmergencyAudioSiren();
                         speakAlert("Emergency alert: Fall confirmed. Person has not recovered. Dispatching alert to Telegram.");
 
-                        // Directly dispatch alert details to Telegram and Supabase!
                         const sev = (pendingFallData && pendingFallData.severity) || (fallProbability > 0.82 ? 'SEVERE' : (fallProbability > 0.65 ? 'MODERATE' : 'MILD'));
                         const score = (pendingFallData && pendingFallData.score) || fallProbability;
                         const notes = (pendingFallData && pendingFallData.customNotes) || 'Fall (>5s Inactivity)';
@@ -3004,9 +3190,7 @@
                     }
                 }
             } else {
-                // Posture is NOT a fall candidate
                 if (fsmFallState === FSM_VERIFYING) {
-                    // Subject stood back up before 5.0s window expired -> Recovery!
                     triggerRecoveryDetected();
                 } else if (fsmFallState === FSM_FALL_CONFIRMED && torsoAngle < 30 && (hipFlex3D > 135 || kneeAngle3D > 140)) {
                     fsmFallState = FSM_IDLE;
@@ -3077,7 +3261,7 @@
         }
 
         // =========================================================================
-        // 11. EMERGENCY SIMULATION & MODAL CONTROLS
+        // 13. EMERGENCY SIMULATION & MODAL CONTROLS
         // =========================================================================
 
         function clearSimulation() {
@@ -3154,8 +3338,7 @@
         }
 
         // =========================================================================
-        // 12. BACKEND WEBSOCKET TELEMETRY CONSUMER
-        // Real-time zero-delay metric landmarks stream from Python FastAPI pipeline
+        // 14. BACKEND WEBSOCKET TELEMETRY CONSUMER
         // =========================================================================
 
         function initWebSocketTelemetry() {
@@ -3208,7 +3391,7 @@
         }
 
         // =========================================================================
-        // 13. DRAG & DROP FOR VIDEO UPLOADS
+        // 15. DRAG & DROP FOR VIDEO UPLOADS
         // =========================================================================
 
         const cameraBoxEl = document.getElementById('camera-box');
@@ -3230,7 +3413,7 @@
         }
 
         // =========================================================================
-        // 14. EXPLICIT WINDOW BINDINGS
+        // 16. EXPLICIT WINDOW BINDINGS
         // Attaches all functions to window to guarantee zero ReferenceError exceptions
         // =========================================================================
 
@@ -3258,7 +3441,7 @@
         window.immediateEmergencyDispatch = immediateEmergencyDispatch;
 
         // =========================================================================
-        // 15. INITIALIZATION SEQUENCE
+        // 17. INITIALIZATION SEQUENCE
         // =========================================================================
 
         function runInit() {
