@@ -83,6 +83,9 @@ if os.path.exists("Demo Videos"):
     app.mount("/Demo Videos", StaticFiles(directory="Demo Videos"), name="demo_videos_space")
     app.mount("/demo_videos", StaticFiles(directory="Demo Videos"), name="demo_videos")
 
+if os.path.exists("frontend"):
+    app.mount("/frontend", StaticFiles(directory="frontend", html=True), name="frontend")
+
 
 # ------------------------------------------------------------------
 # Routes & Endpoints

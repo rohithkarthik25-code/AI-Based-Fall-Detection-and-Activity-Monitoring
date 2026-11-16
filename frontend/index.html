@@ -961,7 +961,7 @@
                 <svg viewBox="0 0 24 24" fill="white" width="22" height="22"><path d="M12 2a3 3 0 100 6 3 3 0 000-6zm3 8H9a3 3 0 00-3 3v4h2v5h3v-5h2v5h3v-5h2v-4a3 3 0 00-3-3z"/></svg>
             </div>
             <div class="brand-text">
-                <h1>AI Fall Detection & 3D Kinematics</h1>
+                <h1>AI FALL DETECTION & BIOMECHANICAL MONITOR</h1>
                 <p>Cloud Assisted Living Platform • Vercel & Supabase</p>
             </div>
         </div>
@@ -1046,6 +1046,7 @@
 
                 <video id="webcam-video" playsinline muted autoplay></video>
                 <canvas id="webcam-canvas"></canvas>
+                <img id="backend-stream-img" src="/video_feed?mode=camera" alt="Server Video Stream" style="display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: contain; z-index: 1;">
 
                                 <div class="source-tag" id="source-tag">No active source</div>
                 <div class="hud-verification-badge" id="hud-verification-chip">⚠️ VERIFYING POSTURE... (2.0s Inactivity Window)</div>
@@ -1644,6 +1645,7 @@
         let pendingFallData = null;
 
         function triggerRecoveryDetected() {
+            clearSimulation();
             fsmFallState = FSM_IDLE;
             fsmVerificationStartTime = 0;
             pendingFallData = null;
@@ -1664,6 +1666,7 @@
         }
 
         function resetEmergencyState() {
+            clearSimulation();
             stopEmergencyAudioSiren();
             fsmFallState = FSM_IDLE;
             fsmVerificationStartTime = 0;
@@ -2058,19 +2061,28 @@
         // ── 6. Zero-Lag Frame Processing Loop ──
         let fpsCounter = 0;
         let lastFpsUpdate = performance.now();
+        let lastFrameProcessTime = 0;
 
         function initPoseModel() {
             if (!poseModel) {
-                poseModel = new Pose({
-                    locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${file}`
-                });
-                poseModel.setOptions({
-                    modelComplexity: 1,
-                    smoothLandmarks: true,
-                    minDetectionConfidence: 0.45,
-                    minTrackingConfidence: 0.45
-                });
-                poseModel.onResults(onPoseResults);
+                if (typeof Pose === 'undefined') {
+                    console.warn("MediaPipe Pose library is loading or unavailable.");
+                    return;
+                }
+                try {
+                    poseModel = new Pose({
+                        locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${file}`
+                    });
+                    poseModel.setOptions({
+                        modelComplexity: 1,
+                        smoothLandmarks: true,
+                        minDetectionConfidence: 0.45,
+                        minTrackingConfidence: 0.45
+                    });
+                    poseModel.onResults(onPoseResults);
+                } catch (e) {
+                    console.error("Failed to initialize MediaPipe Pose:", e);
+                }
             }
         }
 
@@ -2078,8 +2090,16 @@
             if (currentSourceType === 'none') return;
 
             const video = document.getElementById('webcam-video');
+            const now = performance.now();
+
+            // Self-healing timeout if pose processing flag ever hangs
+            if (isProcessingFrame && (now - lastFrameProcessTime > 1500)) {
+                isProcessingFrame = false;
+            }
+
             if (poseModel && !isProcessingFrame && video.readyState >= 2 && video.videoWidth > 0 && !video.paused && !video.ended) {
                 isProcessingFrame = true;
+                lastFrameProcessTime = now;
                 poseModel.send({ image: video })
                     .catch(e => console.warn("Pose frame skipped:", e))
                     .finally(() => { isProcessingFrame = false; });
@@ -2087,7 +2107,6 @@
 
             // Calculate live throughput FPS
             fpsCounter++;
-            const now = performance.now();
             if (now - lastFpsUpdate >= 1000) {
                 document.getElementById('hud-fps').textContent = fpsCounter + ' FPS';
                 fpsCounter = 0;
@@ -2145,13 +2164,16 @@
                 rafId = null;
             }
             if (cameraStream) {
-                cameraStream.getTracks().forEach(t => t.stop());
+                try {
+                    cameraStream.getTracks().forEach(t => t.stop());
+                } catch (_) {}
                 cameraStream = null;
             }
             if (currentObjectUrl) {
-                URL.revokeObjectURL(currentObjectUrl);
+                try { URL.revokeObjectURL(currentObjectUrl); } catch (_) {}
                 currentObjectUrl = null;
             }
+            isProcessingFrame = false;
             resetEmergencyState();
 
             const video = document.getElementById('webcam-video');
@@ -2164,6 +2186,11 @@
             try { video.pause(); } catch (_) {}
             video.srcObject = null;
             video.removeAttribute('src');
+
+            if (canvas) {
+                const ctx = canvas.getContext('2d');
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+            }
 
             currentSourceType = 'none';
             activeFileName = '';
@@ -2197,7 +2224,7 @@
                     : null;
 
             if (!getMedia) {
-                alert("Camera API requires a secure HTTPS connection (or localhost) or is not supported by your browser.");
+                alert("Camera API requires a secure HTTPS connection or localhost, and a compatible browser.");
                 updateTabHighlight(null);
                 return;
             }
@@ -2231,12 +2258,6 @@
                 video.playsInline = true;
                 video.autoplay = true;
 
-                try {
-                    await video.play();
-                } catch (playErr) {
-                    console.warn("Camera video play notice:", playErr);
-                }
-
                 placeholder.style.display = 'none';
                 video.style.display = 'block';
                 canvas.style.display = 'block';
@@ -2257,15 +2278,31 @@
                 sourceTag.style.display = 'block';
 
                 initPoseModel();
-                if (rafId) cancelAnimationFrame(rafId);
-                rafId = requestAnimationFrame(processVideoFrame);
+
+                const onCamReady = async () => {
+                    try {
+                        await video.play();
+                    } catch (playErr) {
+                        console.warn("Camera video play notice:", playErr);
+                    }
+                    if (rafId) cancelAnimationFrame(rafId);
+                    rafId = requestAnimationFrame(processVideoFrame);
+                };
+
+                video.onloadedmetadata = onCamReady;
+                if (video.readyState >= 1) {
+                    onCamReady();
+                }
             } catch (err) {
                 stopCurrentSource();
                 console.error("Camera getUserMedia error:", err);
                 const isDenied = err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError';
+                const isBusy = err.name === 'NotReadableError' || err.name === 'TrackStartError';
                 const msg = isDenied
                     ? "Camera permission was denied. Please click the camera/lock icon in your browser address bar and choose 'Allow' camera access."
-                    : ("Could not access camera: " + err.message);
+                    : (isBusy 
+                        ? "Camera is currently in use by another app. Please close other camera apps and try again."
+                        : ("Could not access camera: " + err.message));
                 alert(msg);
             }
         }
@@ -2322,16 +2359,25 @@
             sourceTag.style.display = 'block';
 
             const onReady = async () => {
+                video.oncanplay = null;
+                video.onloadeddata = null;
                 initPoseModel();
                 try {
                     await video.play();
+                    document.getElementById('btn-play-pause').textContent = '⏸ Pause';
                 } catch (e) {
                     console.warn("Autoplay notice:", e);
+                    document.getElementById('btn-play-pause').textContent = '▶ Play';
                 }
-                requestAnimationFrame(processVideoFrame);
+                if (rafId) cancelAnimationFrame(rafId);
+                rafId = requestAnimationFrame(processVideoFrame);
             };
 
             video.oncanplay = onReady;
+            video.onloadeddata = onReady;
+            if (video.readyState >= 2) {
+                onReady();
+            }
             video.load();
 
             video.ontimeupdate = () => {
@@ -2346,6 +2392,8 @@
                 if (isLooping) {
                     video.currentTime = 0;
                     video.play().catch(() => {});
+                } else {
+                    document.getElementById('btn-play-pause').textContent = '▶ Play';
                 }
             };
         }
@@ -2381,8 +2429,9 @@
             const video = document.getElementById('webcam-video');
             const btn = document.getElementById('btn-play-pause');
             if (video.paused) {
-                video.play();
-                btn.textContent = '⏸ Pause';
+                video.play().then(() => {
+                    btn.textContent = '⏸ Pause';
+                }).catch(e => console.warn(e));
             } else {
                 video.pause();
                 btn.textContent = '▶ Play';
@@ -2392,8 +2441,9 @@
         function restartVideo() {
             const video = document.getElementById('webcam-video');
             video.currentTime = 0;
-            video.play();
-            document.getElementById('btn-play-pause').textContent = '⏸ Pause';
+            video.play().then(() => {
+                document.getElementById('btn-play-pause').textContent = '⏸ Pause';
+            }).catch(e => console.warn(e));
         }
 
         function onSeekInput(e) {
@@ -2698,7 +2748,22 @@
             ctx.restore();
         }
 
+        let simulationTimer = null;
+        let simulationCountdownInterval = null;
+
+        function clearSimulation() {
+            if (simulationTimer) {
+                clearTimeout(simulationTimer);
+                simulationTimer = null;
+            }
+            if (simulationCountdownInterval) {
+                clearInterval(simulationCountdownInterval);
+                simulationCountdownInterval = null;
+            }
+        }
+
         async function simulateFallTest() {
+            clearSimulation();
             speakAlert("Simulating emergency fall test. Monitoring 5 seconds of non-recovery before direct Telegram dispatch.");
             fsmFallState = FSM_VERIFYING;
             fsmVerificationStartTime = performance.now();
@@ -2715,6 +2780,36 @@
                 vChip.style.color = '#0b0f19';
                 vChip.style.display = 'block';
             }
+
+            let countdown = 5;
+            simulationCountdownInterval = setInterval(() => {
+                countdown -= 1;
+                if (fsmFallState !== FSM_VERIFYING) {
+                    clearInterval(simulationCountdownInterval);
+                    return;
+                }
+                if (countdown > 0 && vChip) {
+                    vChip.textContent = `⚠️ SIMULATING FALL: ${countdown}s Non-Recovery Remaining...`;
+                } else {
+                    clearInterval(simulationCountdownInterval);
+                }
+            }, 1000);
+
+            simulationTimer = setTimeout(() => {
+                if (fsmFallState === FSM_VERIFYING) {
+                    fsmFallState = FSM_FALL_CONFIRMED;
+                    fallConfirmed = true;
+                    if (vChip) {
+                        vChip.textContent = '🚨 FALL CONFIRMED (>5s Non-Recovery) — Alert Dispatched to Telegram!';
+                        vChip.style.background = 'rgba(239, 68, 68, 0.95)';
+                        vChip.style.color = '#ffffff';
+                        vChip.style.display = 'block';
+                    }
+                    startEmergencyAudioSiren();
+                    speakAlert("Emergency alert: Fall confirmed. Person has not recovered. Dispatching alert to Telegram.");
+                    triggerConfirmedFall(0.95, 'SEVERE', 'Simulation Test (>5s Non-Recovery)');
+                }
+            }, 5000);
         }
 
         function openLightbox(url) {
