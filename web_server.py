@@ -29,12 +29,21 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
 
+from src.alerts.email_alert_service import (
+    claim_and_send_email_alert,
+    AuthPermissionError,
+    SSRFValidationError,
+)
+
 from web_pipeline import WebVideoPipeline
 
 
 # ------------------------------------------------------------------
 # Request & Response Models
 # ------------------------------------------------------------------
+
+class EmailAlertRequest(BaseModel):
+    event_id: str
 
 class FocusRequest(BaseModel):
     person_id: Optional[int] = None
@@ -228,6 +237,33 @@ async def test_alarm():
         activity="Manual Web Test",
     )
     return {"status": "ok", "message": "Test alert successfully triggered across notification channels!"}
+
+
+@app.post("/api/alerts/send-email")
+async def send_email_alert_endpoint(req: EmailAlertRequest, request: Request):
+    """
+    Receives { event_id } from the authenticated frontend to trigger an emergency email alert.
+    Validates JWT server-side via Supabase Auth, executes atomic DB claim, verifies ownership,
+    fetches snapshot safely from Supabase Storage API, and dispatches email via SMTP.
+    """
+    auth_header = request.headers.get("Authorization")
+    if not auth_header:
+        raise HTTPException(status_code=401, detail="Missing Authorization header")
+
+    try:
+        result = claim_and_send_email_alert(
+            event_id=req.event_id,
+            auth_token=auth_header
+        )
+        return result
+    except AuthPermissionError as e:
+        status_code = 403 if "Forbidden" in str(e) else 401
+        raise HTTPException(status_code=status_code, detail=str(e))
+    except SSRFValidationError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        print(f"[send_email_alert_endpoint] Server error: {e}")
+        raise HTTPException(status_code=500, detail=f"Internal email service error: {e}")
 
 
 # ------------------------------------------------------------------

@@ -403,6 +403,66 @@ class AlertDispatcher:
         except Exception as e:
             print(f"[AlertDispatcher] Email dispatch failed: {e}")
 
+    def send_email_alert(
+        self,
+        recipient_email: str,
+        event_id: str,
+        person_id: int,
+        severity: str,
+        fall_score: float,
+        duration_down: float,
+        event_time: str,
+        snapshot_bytes: Optional[bytes] = None
+    ) -> bool:
+        """Sends an emergency alert email directly to the specified recipient."""
+        if getattr(self, "simulation_mode", False):
+            print(f"[AlertDispatcher - SIMULATION] Email alert to {recipient_email} for Person #{person_id}")
+            return True
+
+        host = getattr(self, "smtp_host", None) or os.environ.get("SMTP_HOST", "smtp.gmail.com")
+        port = int(getattr(self, "smtp_port", None) or os.environ.get("SMTP_PORT", 587))
+        user = getattr(self, "smtp_user", None) or os.environ.get("SMTP_USER", "")
+        password = getattr(self, "smtp_pass", None) or os.environ.get("SMTP_APP_PASSWORD", "")
+        from_name = getattr(self, "from_name", None) or os.environ.get("ALERT_FROM_NAME", "FallGuard AI")
+        use_tls = getattr(self, "use_tls", True) if getattr(self, "use_tls", None) is not None else (port == 587)
+
+        msg = MIMEMultipart("related")
+        msg["Subject"] = f"🚨 [EMERGENCY ALERT] Fall Detected: Person #{person_id} ({severity})"
+        msg["From"] = f"{from_name} <{user}>" if user else from_name
+        msg["To"] = recipient_email
+
+        score_str = f"{fall_score * 100:.0f}%" if fall_score <= 1.0 else f"{fall_score:.1f}%"
+        html = f"""
+        <html><body>
+        <h2>EMERGENCY ALERT: Fall Detected</h2>
+        <p>Person #{person_id} | Severity: {severity} | Score: {score_str}</p>
+        <p>Dispatched to: {recipient_email}</p>
+        </body></html>
+        """
+        msg.attach(MIMEText(html, "html"))
+
+        if snapshot_bytes:
+            img = MIMEImage(snapshot_bytes, _subtype="jpeg", name="snapshot.jpg")
+            img.add_header("Content-ID", "<snapshot_img>")
+            msg.attach(img)
+
+        s = smtplib.SMTP(host, port, timeout=10)
+        try:
+            if use_tls:
+                s.starttls(context=ssl.create_default_context())
+            if user and password:
+                try:
+                    s.login(user, password)
+                except Exception:
+                    pass
+            s.sendmail(user or "alert@localhost", recipient_email, msg.as_string())
+            return True
+        finally:
+            try:
+                s.quit()
+            except Exception:
+                pass
+
     def _send_recovery_worker(self, person_id: int, duration: float, timestamp_str: str) -> None:
         """Worker for sending recovery notifications."""
         sim_mode = self.config.get("simulation_mode", False)
