@@ -30,23 +30,30 @@ class TestWebServer(unittest.TestCase):
         if cls.pipeline:
             cls.pipeline.stop()
 
-    def test_index_page_returns_html(self):
-        """Verify that GET / returns the modern monitoring dashboard."""
+    def test_index_page_returns_hero_html(self):
+        """Verify that GET / immediately returns the marketing hero page (Home Portal)."""
         response = self.client.get("/")
         self.assertEqual(response.status_code, 200)
-        self.assertIn("AI FALL DETECTION & BIOMECHANICAL MONITOR", response.text)
-        self.assertIn("/video_feed", response.text)
+        self.assertIn("Detect falls in seconds", response.text)
+        self.assertIn("Interactive 3D Skeleton Viewport", response.text)
 
     def test_home_page_returns_hero_html(self):
-        """Verify that GET /home returns the new marketing hero page."""
+        """Verify that GET /home returns the marketing hero page."""
         response = self.client.get("/home")
         self.assertEqual(response.status_code, 200)
         self.assertIn("Detect falls in seconds", response.text)
         self.assertIn("Interactive 3D Skeleton Viewport", response.text)
 
     def test_dashboard_route(self):
-        """Verify that GET /dashboard alias returns the monitoring dashboard."""
+        """Verify that GET /dashboard returns the interactive monitoring dashboard."""
         response = self.client.get("/dashboard")
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("AI FALL DETECTION & BIOMECHANICAL MONITOR", response.text)
+        self.assertIn("/video_feed", response.text)
+
+    def test_monitor_route(self):
+        """Verify that GET /monitor alias returns the monitoring dashboard."""
+        response = self.client.get("/monitor")
         self.assertEqual(response.status_code, 200)
         self.assertIn("AI FALL DETECTION & BIOMECHANICAL MONITOR", response.text)
 

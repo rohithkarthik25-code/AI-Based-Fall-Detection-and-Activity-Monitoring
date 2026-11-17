@@ -2,10 +2,11 @@
   "version": 2,
   "cleanUrls": true,
   "rewrites": [
-    { "source": "/home", "destination": "/home.html" },
-    { "source": "/landing", "destination": "/home.html" },
-    { "source": "/dashboard", "destination": "/index.html" },
-    { "source": "/monitor", "destination": "/index.html" }
+    { "source": "/home", "destination": "/index.html" },
+    { "source": "/landing", "destination": "/index.html" },
+    { "source": "/dashboard", "destination": "/dashboard.html" },
+    { "source": "/monitor", "destination": "/dashboard.html" },
+    { "source": "/app", "destination": "/dashboard.html" }
   ],
   "headers": [
     {
@@ -27,4 +28,3 @@
     }
   ]
 }
-

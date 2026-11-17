@@ -20,12 +20,12 @@ const APP_CONFIG = {
         description: "Real-time pose estimation, a live 3D biomechanical skeleton and instant Telegram alerts, backed by a cloud incident ledger for every event.",
         ctaPrimary: {
             text: "Launch live monitor",
-            href: "/#screen-live-monitor",
+            href: "/dashboard#screen-live-monitor",
             title: "Launch real-time camera monitoring and pose estimation"
         },
         ctaSecondary: {
             text: "Upload a video",
-            href: "/#screen-live-monitor?action=upload",
+            href: "/dashboard#screen-live-monitor?action=upload",
             title: "Upload a recorded video test file for fall detection"
         },
         notes: [
@@ -45,10 +45,10 @@ const APP_CONFIG = {
     },
     nav: {
         links: [
-            { label: "Live Monitor", href: "/#screen-live-monitor", targetScreen: "screen-live-monitor" },
-            { label: "ADL Analytics", href: "/#screen-adl-analytics", targetScreen: "screen-adl-analytics" },
-            { label: "Incident Ledger", href: "/#screen-incident-ledger", targetScreen: "screen-incident-ledger" },
-            { label: "3D Viewer", href: "/#screen-skeleton-viewer", targetScreen: "screen-skeleton-viewer" }
+            { label: "Live Monitor", href: "/dashboard#screen-live-monitor", targetScreen: "screen-live-monitor" },
+            { label: "ADL Analytics", href: "/dashboard#screen-adl-analytics", targetScreen: "screen-adl-analytics" },
+            { label: "Incident Ledger", href: "/dashboard#screen-incident-ledger", targetScreen: "screen-incident-ledger" },
+            { label: "3D Viewer", href: "/dashboard#screen-skeleton-viewer", targetScreen: "screen-skeleton-viewer" }
         ],
         signInBtn: {
             text: "Sign in",
@@ -56,7 +56,7 @@ const APP_CONFIG = {
         },
         dashboardBtn: {
             text: "Open dashboard",
-            href: "/"
+            href: "/dashboard"
         }
     },
     demoCards: {
@@ -92,28 +92,28 @@ const APP_CONFIG = {
             chipColor: "blue",
             title: "Pose estimation",
             desc: "Live posture and fall probability",
-            href: "/#screen-live-monitor"
+            href: "/dashboard#screen-live-monitor"
         },
         {
             id: "balance",
             chipColor: "purple",
             title: "3D balance analysis",
             desc: "Centre of mass and stability margin",
-            href: "/#screen-skeleton-viewer"
+            href: "/dashboard#screen-skeleton-viewer"
         },
         {
             id: "adl",
             chipColor: "orange",
             title: "ADL analytics",
             desc: "Active vs sedentary time",
-            href: "/#screen-adl-analytics"
+            href: "/dashboard#screen-adl-analytics"
         },
         {
             id: "ledger",
             chipColor: "red",
             title: "Incident ledger",
             desc: "Snapshots, severity, resolve",
-            href: "/#screen-incident-ledger"
+            href: "/dashboard#screen-incident-ledger"
         }
     ]
 };

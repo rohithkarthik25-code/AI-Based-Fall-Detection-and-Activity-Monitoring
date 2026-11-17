@@ -1332,16 +1332,16 @@
 
             <!-- Center Navigation Links -->
             <ul class="nav-center-menu" role="menubar">
-                <li role="none"><a href="/#screen-live-monitor" class="nav-item-link" role="menuitem">Live Monitor</a></li>
-                <li role="none"><a href="/#screen-adl-analytics" class="nav-item-link" role="menuitem">ADL Analytics</a></li>
-                <li role="none"><a href="/#screen-incident-ledger" class="nav-item-link" role="menuitem">Incident Ledger</a></li>
-                <li role="none"><a href="/#screen-skeleton-viewer" class="nav-item-link" role="menuitem">3D Viewer</a></li>
+                <li role="none"><a href="/dashboard#screen-live-monitor" class="nav-item-link" role="menuitem">Live Monitor</a></li>
+                <li role="none"><a href="/dashboard#screen-adl-analytics" class="nav-item-link" role="menuitem">ADL Analytics</a></li>
+                <li role="none"><a href="/dashboard#screen-incident-ledger" class="nav-item-link" role="menuitem">Incident Ledger</a></li>
+                <li role="none"><a href="/dashboard#screen-skeleton-viewer" class="nav-item-link" role="menuitem">3D Viewer</a></li>
             </ul>
 
             <!-- Right Action Buttons -->
             <div class="nav-actions">
                 <button type="button" class="btn btn-white" onclick="openSignInModal()" aria-haspopup="dialog">Sign in</button>
-                <a href="/" class="btn btn-primary" id="nav-btn-dashboard">Open dashboard</a>
+                <a href="/dashboard" class="btn btn-primary" id="nav-btn-dashboard">Open dashboard</a>
             </div>
 
             <!-- Mobile Hamburger Toggle Button -->
@@ -1356,13 +1356,13 @@
 
         <!-- Mobile Slide-down Panel -->
         <div class="mobile-nav-panel" id="mobile-nav-panel" aria-hidden="true">
-            <a href="/#screen-live-monitor" class="nav-item-link" onclick="closeMobileNav()">Live Monitor</a>
-            <a href="/#screen-adl-analytics" class="nav-item-link" onclick="closeMobileNav()">ADL Analytics</a>
-            <a href="/#screen-incident-ledger" class="nav-item-link" onclick="closeMobileNav()">Incident Ledger</a>
-            <a href="/#screen-skeleton-viewer" class="nav-item-link" onclick="closeMobileNav()">3D Viewer</a>
+            <a href="/dashboard#screen-live-monitor" class="nav-item-link" onclick="closeMobileNav()">Live Monitor</a>
+            <a href="/dashboard#screen-adl-analytics" class="nav-item-link" onclick="closeMobileNav()">ADL Analytics</a>
+            <a href="/dashboard#screen-incident-ledger" class="nav-item-link" onclick="closeMobileNav()">Incident Ledger</a>
+            <a href="/dashboard#screen-skeleton-viewer" class="nav-item-link" onclick="closeMobileNav()">3D Viewer</a>
             <div class="mobile-nav-actions">
                 <button type="button" class="btn btn-white" style="width: 100%;" onclick="closeMobileNav(); openSignInModal();">Sign in</button>
-                <a href="/" class="btn btn-primary" style="width: 100%;">Open dashboard</a>
+                <a href="/dashboard" class="btn btn-primary" style="width: 100%;">Open dashboard</a>
             </div>
         </div>
     </header>
@@ -1394,10 +1394,10 @@
 
                     <!-- CTA Buttons -->
                     <div class="hero-cta-group">
-                        <a href="/#screen-live-monitor" class="btn btn-cta-primary" id="cta-primary-btn">
+                        <a href="/dashboard#screen-live-monitor" class="btn btn-cta-primary" id="cta-primary-btn">
                             Launch live monitor
                         </a>
-                        <a href="/#screen-live-monitor?action=upload" class="btn btn-cta-secondary" id="cta-secondary-btn">
+                        <a href="/dashboard#screen-live-monitor?action=upload" class="btn btn-cta-secondary" id="cta-secondary-btn">
                             Upload a video
                         </a>
                     </div>
@@ -1562,7 +1562,7 @@
             <div class="features-grid">
                 
                 <!-- Feature 1: Pose Estimation -->
-                <a href="/#screen-live-monitor" class="feature-card">
+                <a href="/dashboard#screen-live-monitor" class="feature-card">
                     <div class="feature-chip chip-blue" aria-hidden="true">
                         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                             <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>
@@ -1575,7 +1575,7 @@
                 </a>
 
                 <!-- Feature 2: 3D Balance Analysis -->
-                <a href="/#screen-skeleton-viewer" class="feature-card">
+                <a href="/dashboard#screen-skeleton-viewer" class="feature-card">
                     <div class="feature-chip chip-purple" aria-hidden="true">
                         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                             <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path>
@@ -1590,7 +1590,7 @@
                 </a>
 
                 <!-- Feature 3: ADL Analytics -->
-                <a href="/#screen-adl-analytics" class="feature-card">
+                <a href="/dashboard#screen-adl-analytics" class="feature-card">
                     <div class="feature-chip chip-orange" aria-hidden="true">
                         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                             <circle cx="12" cy="12" r="10"></circle>
@@ -1604,7 +1604,7 @@
                 </a>
 
                 <!-- Feature 4: Incident Ledger -->
-                <a href="/#screen-incident-ledger" class="feature-card">
+                <a href="/dashboard#screen-incident-ledger" class="feature-card">
                     <div class="feature-chip chip-red" aria-hidden="true">
                         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                             <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
@@ -1630,9 +1630,9 @@
             &copy; 2026 <strong id="footer-brand">AegisMotion AI</strong>. Built with Integrated Computer Graphics.
         </div>
         <div class="footer-links">
-            <a href="/#screen-help-support" class="footer-link">Help & Support</a>
-            <a href="/#screen-settings" class="footer-link">Settings</a>
-            <a href="/" class="footer-link">Live Dashboard</a>
+            <a href="/dashboard#screen-help-support" class="footer-link">Help & Support</a>
+            <a href="/dashboard#screen-settings" class="footer-link">Settings</a>
+            <a href="/dashboard" class="footer-link">Live Dashboard</a>
         </div>
     </footer>
 
@@ -1761,7 +1761,7 @@
         // Demo Sign-In Action -> Redirect to Dashboard
         function handleDemoSignIn(e) {
             e.preventDefault();
-            window.location.href = '/';
+            window.location.href = '/dashboard';
         }
     </script>
 </body>

@@ -98,23 +98,21 @@ if os.path.exists("frontend"):
 # ------------------------------------------------------------------
 
 @app.get("/", response_class=HTMLResponse)
-async def index_page(request: Request):
-    """Serves the main interactive monitoring dashboard."""
-    return templates.TemplateResponse(request=request, name="index.html")
-
-
 @app.get("/home", response_class=HTMLResponse)
+@app.get("/home.html", response_class=HTMLResponse)
 @app.get("/landing", response_class=HTMLResponse)
 async def home_page(request: Request):
-    """Serves the public marketing landing & hero page."""
-    return templates.TemplateResponse(request=request, name="home.html")
+    """Serves the public marketing landing & hero page (Home Portal)."""
+    return templates.TemplateResponse(request=request, name="index.html")
 
 
 @app.get("/dashboard", response_class=HTMLResponse)
+@app.get("/dashboard.html", response_class=HTMLResponse)
 @app.get("/monitor", response_class=HTMLResponse)
+@app.get("/app", response_class=HTMLResponse)
 async def dashboard_page(request: Request):
     """Serves the main interactive monitoring dashboard."""
-    return templates.TemplateResponse(request=request, name="index.html")
+    return templates.TemplateResponse(request=request, name="dashboard.html")
 
 
 @app.get("/config.js")
