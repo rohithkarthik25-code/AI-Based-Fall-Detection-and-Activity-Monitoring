@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI FALL DETECTION & BIOMECHANICAL MONITOR — Cloud Dashboard</title>
+    <title>AegisMotion — AI FALL DETECTION & BIOMECHANICAL MONITOR</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Outfit:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -589,7 +589,7 @@
             border-radius: 0 0 var(--radius-card) var(--radius-card);
         }
 
-        #webcam-video, #webcam-canvas {
+        #webcam-video {
             position: absolute;
             top: 0;
             left: 0;
@@ -597,9 +597,19 @@
             height: 100%;
             object-fit: contain;
             display: none;
-            background: #0F172A;
+            background: #000000;
+            z-index: 1;
         }
+
         #webcam-canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+            display: none;
+            background: transparent !important;
             pointer-events: none;
             z-index: 2;
         }
@@ -1414,7 +1424,7 @@
                 <div class="brand-logo-box">
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a3 3 0 100 6 3 3 0 000-6zm3 8H9a3 3 0 00-3 3v4h2v5h3v-5h2v5h3v-5h2v-4a3 3 0 00-3-3z"/></svg>
                 </div>
-                <div class="brand-title">FallGuard AI</div>
+                <div class="brand-title">AegisMotion</div>
             </div>
 
             <div class="user-profile-widget">
@@ -1905,7 +1915,7 @@
                                     <h4 style="font-size: 1rem; font-weight: 700; margin-bottom: 12px; color: var(--text-primary);">Telegram Bot Integration</h4>
                                     <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 12px;">
                                         <span class="chip-status-green">● Bot Connected</span>
-                                        <span style="font-size: 0.82rem; color: var(--text-muted);">@FallGuardAlertBot</span>
+                                        <span style="font-size: 0.82rem; color: var(--text-muted);">@AegisMotionAlertBot</span>
                                     </div>
                                     <p style="font-size: 0.84rem; color: var(--text-muted); line-height: 1.5;">
                                         Instant photo snapshot evidence, resident identifier, fall severity classification, and GPS coordinates are broadcasted automatically to caregiver channels upon 5-second unconfirmed posture.
