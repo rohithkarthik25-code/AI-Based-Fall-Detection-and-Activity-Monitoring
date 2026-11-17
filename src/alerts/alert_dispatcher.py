@@ -42,8 +42,34 @@ DEFAULT_CONFIG: Dict[str, Any] = {
         "sender_email": "",
         "sender_password": "",
         "recipient_email": "",
+        "from_name": "FallGuard AI",
     },
 }
+
+
+def _load_dotenv(filepath: str = ".env") -> None:
+    """Lightweight zero-dependency .env loader."""
+    candidates = [
+        filepath,
+        os.path.join(os.path.dirname(__file__), "..", "..", ".env"),
+        os.path.join(os.getcwd(), ".env"),
+    ]
+    for cp in candidates:
+        if os.path.exists(cp):
+            try:
+                with open(cp, "r", encoding="utf-8") as f:
+                    for line in f:
+                        line = line.strip()
+                        if not line or line.startswith("#") or "=" not in line:
+                            continue
+                        k, v = line.split("=", 1)
+                        k = k.strip()
+                        v = v.strip().strip("'\"")
+                        if k and k not in os.environ:
+                            os.environ[k] = v
+                break
+            except Exception:
+                pass
 
 
 class AlertDispatcher:
@@ -62,6 +88,17 @@ class AlertDispatcher:
         self.cooldown_seconds = cooldown_seconds
         self.config = self._load_config(config_path)
 
+        # Check if caller explicitly passed a custom config file (e.g. in tests)
+        custom_sim = None
+        if config_path and os.path.exists(config_path) and config_path != "alert_config.json":
+            try:
+                with open(config_path, "r", encoding="utf-8") as f:
+                    custom_sim = json.load(f).get("simulation_mode")
+            except Exception:
+                pass
+
+        _load_dotenv()
+
         # Environment variable overrides
         if os.getenv("TELEGRAM_BOT_TOKEN") and os.getenv("TELEGRAM_CHAT_ID"):
             self.config["telegram"]["enabled"] = True
@@ -69,12 +106,26 @@ class AlertDispatcher:
             self.config["telegram"]["chat_id"] = os.getenv("TELEGRAM_CHAT_ID")
             self.config["simulation_mode"] = False
 
-        if os.getenv("SMTP_EMAIL") and os.getenv("SMTP_PASSWORD") and os.getenv("ALERT_RECIPIENT_EMAIL"):
+        # Support both SMTP_EMAIL/SMTP_PASSWORD and SMTP_USER/SMTP_APP_PASSWORD
+        smtp_user = os.getenv("SMTP_USER") or os.getenv("SMTP_EMAIL")
+        smtp_pass = os.getenv("SMTP_APP_PASSWORD") or os.getenv("SMTP_PASSWORD")
+        smtp_host = os.getenv("SMTP_HOST") or "smtp.gmail.com"
+        smtp_port = int(os.getenv("SMTP_PORT") or 587)
+        alert_recipient = os.getenv("ALERT_RECIPIENT_EMAIL") or smtp_user
+        from_name = os.getenv("ALERT_FROM_NAME") or "FallGuard AI"
+
+        if smtp_user and smtp_pass and alert_recipient:
             self.config["email"]["enabled"] = True
-            self.config["email"]["sender_email"] = os.getenv("SMTP_EMAIL")
-            self.config["email"]["sender_password"] = os.getenv("SMTP_PASSWORD")
-            self.config["email"]["recipient_email"] = os.getenv("ALERT_RECIPIENT_EMAIL")
+            self.config["email"]["smtp_server"] = smtp_host
+            self.config["email"]["smtp_port"] = smtp_port
+            self.config["email"]["sender_email"] = smtp_user
+            self.config["email"]["sender_password"] = smtp_pass
+            self.config["email"]["recipient_email"] = alert_recipient
+            self.config["email"]["from_name"] = from_name
             self.config["simulation_mode"] = False
+
+        if custom_sim is not None:
+            self.config["simulation_mode"] = custom_sim
 
         self.last_alert_time: Dict[int, float] = {}
         self.executor = ThreadPoolExecutor(max_workers=2, thread_name_prefix="AlertDispatcher")
@@ -290,9 +341,10 @@ class AlertDispatcher:
         use_tls = cfg.get("use_tls", True)
 
         try:
+            from_name = cfg.get("from_name", "FallGuard AI")
             msg = MIMEMultipart("related")
             msg["Subject"] = f"🚨 [CRITICAL ALERT] Fall Detected: Person #{person_id} ({severity})"
-            msg["From"] = sender
+            msg["From"] = f"{from_name} <{sender}>" if from_name else sender
             msg["To"] = recipient
 
             # HTML Body
