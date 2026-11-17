@@ -60,6 +60,49 @@ class TestSupabaseDispatcher(unittest.TestCase):
         )
         self.assertTrue(mock_urlopen.called)
 
+    @patch("urllib.request.urlopen")
+    def test_upload_snapshot_uses_uuid_filename(self, mock_urlopen):
+        """Filename must satisfy the storage policy / insert trigger '<uuid>.jpg' regex."""
+        mock_resp = MagicMock()
+        mock_resp.status = 200
+        mock_urlopen.return_value.__enter__.return_value = mock_resp
+
+        frame = np.zeros((50, 50, 3), dtype=np.uint8)
+        url1 = self.dispatcher.upload_snapshot(frame, person_id=1)
+        url2 = self.dispatcher.upload_snapshot(frame, person_id=1)
+
+        pattern = (
+            r"^https://mockproject\.supabase\.co/storage/v1/object/public/fall-snapshots/"
+            r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.jpg$"
+        )
+        self.assertRegex(url1, pattern)
+        self.assertRegex(url2, pattern)
+        self.assertNotEqual(url1, url2)
+
+        upload_req = mock_urlopen.call_args_list[0][0][0]
+        self.assertEqual(upload_req.get_header("X-upsert"), "false")
+
+    @patch("src.alerts.supabase_dispatcher._load_dotenv")
+    def test_key_resolution_prefers_service_role_env(self, _mock_dotenv):
+        with patch.dict("os.environ", {"SUPABASE_SERVICE_ROLE_KEY": "svc-role-test"}):
+            d = SupabaseDispatcher(supabase_url="https://mockproject.supabase.co")
+        self.assertEqual(d.supabase_key, "svc-role-test")
+        self.assertEqual(d._headers["Authorization"], "Bearer svc-role-test")
+
+    @patch("src.alerts.supabase_dispatcher._load_dotenv")
+    def test_key_resolution_explicit_key_wins(self, mock_dotenv):
+        with patch.dict("os.environ", {"SUPABASE_SERVICE_ROLE_KEY": "svc-role-test"}):
+            d = SupabaseDispatcher(supabase_url="https://mockproject.supabase.co", supabase_key="explicit")
+        self.assertEqual(d.supabase_key, "explicit")
+        mock_dotenv.assert_not_called()
+
+    @patch("src.alerts.supabase_dispatcher._load_dotenv")
+    def test_key_resolution_falls_back_to_anon(self, _mock_dotenv):
+        from src.alerts import supabase_dispatcher as mod
+        with patch.dict("os.environ", {}, clear=True):
+            d = SupabaseDispatcher(supabase_url="https://mockproject.supabase.co")
+        self.assertEqual(d.supabase_key, mod.DEFAULT_SUPABASE_KEY)
+
     @patch("threading.Thread")
     def test_dispatch_fall_spawns_thread(self, mock_thread):
         self.dispatcher.dispatch_fall(

@@ -10,28 +10,54 @@ import json
 import os
 import threading
 import time
+import uuid
 from datetime import datetime, timezone
 import urllib.request
 import urllib.error
 import cv2
 import numpy as np
 
+from src.alerts.alert_dispatcher import _load_dotenv
+
 DEFAULT_SUPABASE_URL = os.environ.get("SUPABASE_URL", "https://qbzuwqanxnkpeuioiiao.supabase.co")
+# Public anon key (safe to ship). Only used as a last-resort fallback: since the
+# auth-roles migration, RLS rejects anon inserts into fall_events and storage.
 DEFAULT_SUPABASE_KEY = os.environ.get(
     "SUPABASE_ANON_KEY",
     "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFienV3cWFueG5rcGV1aW9paWFvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTQ2MjYxMzMsImV4cCI6MjExMDIwMjEzM30.cC9AZlgWMe3doYp2DtxjYRUGdDVn5L7YmTHpiKjRP0Q"
 )
 
 
+def resolve_edge_supabase_key(explicit_key: str | None = None) -> str:
+    """
+    Resolve the key used by the edge camera pipeline.
+
+    Precedence: explicit argument > SUPABASE_SERVICE_ROLE_KEY (env or .env) > anon key.
+    The edge camera has no end-user session, so inserts must use the service role
+    to pass the fall_events / storage RLS policies. The key value is never logged.
+    """
+    if explicit_key:
+        return explicit_key
+    _load_dotenv()
+    service_key = os.environ.get("SUPABASE_SERVICE_ROLE_KEY", "").strip()
+    if service_key:
+        return service_key
+    print(
+        "[SupabaseDispatcher] Warning: SUPABASE_SERVICE_ROLE_KEY is not set; falling back to the "
+        "anon key. Edge camera inserts will be rejected by RLS until it is added to .env."
+    )
+    return DEFAULT_SUPABASE_KEY
+
+
 class SupabaseDispatcher:
     def __init__(
         self,
         supabase_url: str = DEFAULT_SUPABASE_URL,
-        supabase_key: str = DEFAULT_SUPABASE_KEY,
+        supabase_key: str | None = None,
         camera_id: str = "camera-edge-01"
     ) -> None:
         self.supabase_url = supabase_url.rstrip("/")
-        self.supabase_key = supabase_key
+        self.supabase_key = resolve_edge_supabase_key(supabase_key)
         self.camera_id = camera_id
         self._headers = {
             "apikey": self.supabase_key,
@@ -52,15 +78,15 @@ class SupabaseDispatcher:
                 return None
 
             jpeg_bytes = buffer.tobytes()
-            timestamp_str = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
-            filename = f"incident_{self.camera_id}_p{person_id}_{timestamp_str}.jpg"
+            # Storage policy and fall_events trigger both require '<uuid>.jpg' names.
+            filename = f"{uuid.uuid4()}.jpg"
 
             upload_url = f"{self.supabase_url}/storage/v1/object/fall-snapshots/{filename}"
             upload_headers = {
                 "apikey": self.supabase_key,
                 "Authorization": f"Bearer {self.supabase_key}",
                 "Content-Type": "image/jpeg",
-                "x-upsert": "true"
+                "x-upsert": "false"
             }
 
             req = urllib.request.Request(upload_url, data=jpeg_bytes, headers=upload_headers, method="POST")
