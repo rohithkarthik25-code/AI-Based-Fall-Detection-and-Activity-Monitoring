@@ -1,6 +1,12 @@
 {
   "version": 2,
   "cleanUrls": true,
+  "rewrites": [
+    { "source": "/home", "destination": "/home.html" },
+    { "source": "/landing", "destination": "/home.html" },
+    { "source": "/dashboard", "destination": "/index.html" },
+    { "source": "/monitor", "destination": "/index.html" }
+  ],
   "headers": [
     {
       "source": "/(.*)",

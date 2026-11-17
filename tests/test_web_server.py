@@ -37,6 +37,25 @@ class TestWebServer(unittest.TestCase):
         self.assertIn("AI FALL DETECTION & BIOMECHANICAL MONITOR", response.text)
         self.assertIn("/video_feed", response.text)
 
+    def test_home_page_returns_hero_html(self):
+        """Verify that GET /home returns the new marketing hero page."""
+        response = self.client.get("/home")
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("Detect falls in seconds", response.text)
+        self.assertIn("Interactive 3D Skeleton Viewport", response.text)
+
+    def test_dashboard_route(self):
+        """Verify that GET /dashboard alias returns the monitoring dashboard."""
+        response = self.client.get("/dashboard")
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("AI FALL DETECTION & BIOMECHANICAL MONITOR", response.text)
+
+    def test_config_js_endpoint(self):
+        """Verify that GET /config.js returns the branding configuration file."""
+        response = self.client.get("/config.js")
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("APP_CONFIG", response.text)
+
     def test_telemetry_endpoint(self):
         """Verify that GET /api/telemetry returns valid JSON metrics including 3D landmarks."""
         response = self.client.get("/api/telemetry")

@@ -24,7 +24,7 @@ for _p in [_ROOT, _SRC, _SRC / "core", _SRC / "web", _SRC / "alerts", _SRC / "vi
 import uvicorn
 from fastapi import FastAPI, HTTPException, Request, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import HTMLResponse, StreamingResponse
+from fastapi.responses import FileResponse, HTMLResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
@@ -101,6 +101,37 @@ if os.path.exists("frontend"):
 async def index_page(request: Request):
     """Serves the main interactive monitoring dashboard."""
     return templates.TemplateResponse(request=request, name="index.html")
+
+
+@app.get("/home", response_class=HTMLResponse)
+@app.get("/landing", response_class=HTMLResponse)
+async def home_page(request: Request):
+    """Serves the public marketing landing & hero page."""
+    return templates.TemplateResponse(request=request, name="home.html")
+
+
+@app.get("/dashboard", response_class=HTMLResponse)
+@app.get("/monitor", response_class=HTMLResponse)
+async def dashboard_page(request: Request):
+    """Serves the main interactive monitoring dashboard."""
+    return templates.TemplateResponse(request=request, name="index.html")
+
+
+@app.get("/config.js")
+async def config_js():
+    """Serves the central marketing & branding configuration script."""
+    candidates = [
+        Path("frontend/config.js"),
+        Path("templates/config.js"),
+        _ROOT / "frontend" / "config.js",
+        _ROOT / "templates" / "config.js",
+        _ROOT.parent.parent / "frontend" / "config.js",
+        _ROOT.parent.parent / "templates" / "config.js",
+    ]
+    for candidate in candidates:
+        if candidate.exists():
+            return FileResponse(str(candidate.resolve()), media_type="application/javascript")
+    raise HTTPException(status_code=404, detail="config.js not found")
 
 
 @app.get("/video_feed")
