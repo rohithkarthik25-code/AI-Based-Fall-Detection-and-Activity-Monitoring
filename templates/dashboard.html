@@ -1,9 +1,11 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" class="auth-pending">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>AegisMotion — AI FALL DETECTION & BIOMECHANICAL MONITOR</title>
+    <!-- Hide protected UI until the Supabase session check passes (see initSupabaseClient) -->
+    <style>html.auth-pending body { visibility: hidden; }</style>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Outfit:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -152,6 +154,79 @@
             font-size: 0.90rem;
             font-weight: 700;
             color: var(--text-primary);
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .user-meta {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .user-avatar img {
+            width: 100%;
+            height: 100%;
+            border-radius: 50%;
+            object-fit: cover;
+        }
+
+        .user-role-badge {
+            display: inline-block;
+            margin-top: 3px;
+            padding: 1px 8px;
+            border-radius: 999px;
+            font-size: 0.64rem;
+            font-weight: 800;
+            letter-spacing: 0.4px;
+            text-transform: uppercase;
+            background: #DBEAFE;
+            color: #1D4ED8;
+        }
+
+        .user-role-badge[hidden] {
+            display: none;
+        }
+
+        .user-role-badge.role-admin {
+            background: #EDE9FE;
+            color: #6D28D9;
+        }
+
+        .btn-signout {
+            flex-shrink: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 30px;
+            height: 30px;
+            border-radius: 8px;
+            border: none;
+            background: transparent;
+            color: var(--text-muted);
+            cursor: pointer;
+        }
+
+        .btn-signout:hover {
+            background: #FEE2E2;
+            color: #DC2626;
+        }
+
+        /* Admin-only controls are hidden unless public.user_roles says 'admin'.
+           This is UI only; RLS on the database is the actual enforcement. */
+        [data-admin-only][hidden] {
+            display: none !important;
+        }
+
+        .admin-role-notice {
+            margin: 0 0 16px 0;
+            padding: 10px 14px;
+            border-radius: 12px;
+            background: #FFFBEB;
+            border: 1px solid #FDE68A;
+            color: #92400E;
+            font-size: 0.82rem;
+            font-weight: 600;
         }
 
         .nav-section-title {
@@ -2219,13 +2294,17 @@
             </a>
 
             <div class="user-profile-widget">
-                <div class="user-avatar">
+                <div class="user-avatar" id="user-avatar">
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
                 </div>
                 <div class="user-meta">
                     <div class="user-sub">Welcome</div>
-                    <div class="user-name">Rohith</div>
+                    <div class="user-name" id="user-name">Signing in…</div>
+                    <span class="user-role-badge" id="user-role-badge" hidden>User</span>
                 </div>
+                <button type="button" class="btn-signout" onclick="signOutUser()" title="Sign out" aria-label="Sign out">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+                </button>
             </div>
 
             <nav class="sidebar-nav">
@@ -2269,6 +2348,12 @@
                 <button class="sidebar-nav-item sidebar-nav-btn" data-screen="screen-help-support" onclick="switchDashboardScreen('screen-help-support')">
                     <span class="nav-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 015.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg></span>
                     <span>Help & Support</span>
+                </button>
+
+                <div class="nav-section-title" data-admin-only hidden>ADMIN</div>
+                <button class="sidebar-nav-item sidebar-nav-btn" data-admin-only hidden data-screen="screen-admin-console" onclick="switchDashboardScreen('screen-admin-console')">
+                    <span class="nav-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg></span>
+                    <span>Admin Console</span>
                 </button>
             </nav>
         </aside>
@@ -2319,6 +2404,7 @@
 
             <!-- Dashboard Screens Container -->
             <div class="screens-container">
+                <div id="admin-role-notice" class="admin-role-notice" role="status" hidden></div>
 
                 <!-- ═════════════════════════════════════════════════════════════ -->
                 <!-- SCREEN 1: LIVE MONITOR (Image B)                             -->
@@ -2793,6 +2879,44 @@
                                     </div>
                                 </div>
                             </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- ═════════════════════════════════════════════════════════════ -->
+                <!-- ADMIN CONSOLE (visible only when user_roles.role = 'admin')  -->
+                <!-- ═════════════════════════════════════════════════════════════ -->
+                <section id="screen-admin-console" class="dashboard-screen" data-admin-only hidden>
+                    <div class="dashboard-card incident-table-card">
+                        <div class="card-header">
+                            <div class="card-title">
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+                                <span>Registered Users, Roles & Email Alerts</span>
+                            </div>
+                            <div class="card-actions">
+                                <button class="btn-secondary" onclick="loadAdminConsole()">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/></svg> Refresh
+                                </button>
+                            </div>
+                        </div>
+                        <div style="padding: 0 24px 8px 24px; font-size: 0.82rem; color: var(--text-muted);" id="admin-summary">
+                            As an admin you can see every user's incidents in the Incident Ledger, including edge-camera events with no owner.
+                        </div>
+                        <div class="table-container">
+                            <table class="incident-table">
+                                <thead>
+                                    <tr>
+                                        <th>Email</th>
+                                        <th>User ID</th>
+                                        <th>Role</th>
+                                        <th>Email Alerts</th>
+                                        <th>Joined</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="admin-users-tbody">
+                                    <tr><td colspan="5" style="text-align: center; color: var(--text-muted); padding: 32px;">Loading users…</td></tr>
+                                </tbody>
+                            </table>
                         </div>
                     </div>
                 </section>
@@ -3631,6 +3755,11 @@
         // Keeps video and pose processing alive while smoothly switching viewports
         // =========================================================================
         function switchDashboardScreen(screenId) {
+            // Non-admins cannot open admin-only screens (UI guard; RLS enforces data access).
+            const requested = document.getElementById(screenId);
+            if (requested && requested.hasAttribute('data-admin-only') && currentUserRole !== 'admin') {
+                screenId = 'screen-live-monitor';
+            }
             const screens = document.querySelectorAll('.dashboard-screen');
             screens.forEach(s => s.classList.remove('active-screen'));
             const target = document.getElementById(screenId);
@@ -3649,7 +3778,8 @@
                 'screen-alerts-telegram': { title: 'Alerts & Telegram', subtitle: 'Automated notification and emergency broadcast channels' },
                 'screen-reports': { title: 'Reports & Clinical Export', subtitle: 'Biomechanical gait logs and exportable healthcare telemetry' },
                 'screen-settings': { title: 'System Settings', subtitle: 'Detection thresholds, video hardware, and platform controls' },
-                'screen-help-support': { title: 'Help & Support Centre', subtitle: 'Technical documentation, clinical guides, FAQ & customer support portal' }
+                'screen-help-support': { title: 'Help & Support Centre', subtitle: 'Technical documentation, clinical guides, FAQ & customer support portal' },
+                'screen-admin-console': { title: 'Admin Console', subtitle: 'Registered users, access roles and email alert preferences' }
             };
             const meta = titles[screenId] || titles['screen-live-monitor'];
             const tEl = document.getElementById('topbar-title');
@@ -3659,6 +3789,10 @@
 
             if (screenId === 'screen-help-support' && typeof updateSupportSystemStatus === 'function') {
                 updateSupportSystemStatus();
+            }
+
+            if (screenId === 'screen-admin-console') {
+                loadAdminConsole();
             }
 
             // Trigger Three.js resize if moving back to 3D Viewport
@@ -4099,6 +4233,8 @@
         const TELEGRAM_BOT_TOKEN = "9062818901:AAGIXsLlOJ-6V70_Wp_kTIAbIPSSD4-PFao";
         const TELEGRAM_CHAT_ID = "6666395760";
         let sbClient = null;
+        let currentSession = null;      // Supabase Auth session (Google OAuth)
+        let currentUserRole = 'user';   // From public.user_roles; 'admin' unlocks admin UI
         let activeFallEvent = null;
         let cachedFallEvents = [];
 
@@ -5145,11 +5281,247 @@
         // 5. SUPABASE CLIENT & CLOUD INCIDENT REPOSITORY
         // =========================================================================
 
-        function initSupabaseClient() {
+        // ---- Auth helpers --------------------------------------------------------
+
+        function redirectToLogin(errorMessage) {
+            // Remember the requested dashboard screen so we can return to it after sign-in.
+            try {
+                if (window.location.hash && !/access_token|error/.test(window.location.hash)) {
+                    sessionStorage.setItem('fg_post_login_hash', window.location.hash);
+                }
+            } catch (_) { /* optional */ }
+            const params = new URLSearchParams({ action: 'signin' });
+            if (errorMessage) params.set('auth_error', errorMessage);
+            window.location.replace(`/?${params.toString()}`);
+        }
+
+        function revealAuthenticatedUI() {
+            document.documentElement.classList.remove('auth-pending');
+        }
+
+        // Strip OAuth artefacts (?code=, ?error=) from the address bar and restore any saved screen hash.
+        function cleanAuthRedirectUrl() {
+            try {
+                const url = new URL(window.location.href);
+                const hadAuthParams = ['code', 'error', 'error_code', 'error_description', 'state']
+                    .some(k => url.searchParams.has(k));
+                let savedHash = null;
+                try {
+                    savedHash = sessionStorage.getItem('fg_post_login_hash');
+                    sessionStorage.removeItem('fg_post_login_hash');
+                } catch (_) { /* optional */ }
+                if (hadAuthParams || savedHash) {
+                    ['code', 'error', 'error_code', 'error_description', 'state'].forEach(k => url.searchParams.delete(k));
+                    const hash = savedHash || (url.hash && !/access_token/.test(url.hash) ? url.hash : '');
+                    window.history.replaceState(null, '', url.pathname + url.search + hash);
+                }
+            } catch (_) { /* non-critical */ }
+        }
+
+        function renderUserProfile(user, role) {
+            const meta = (user && user.user_metadata) || {};
+            const displayName = meta.full_name || meta.name || user.email || 'Signed-in user';
+            const avatarUrl = meta.avatar_url || meta.picture || '';
+
+            const nameEl = document.getElementById('user-name');
+            if (nameEl) {
+                nameEl.textContent = displayName;
+                nameEl.title = user.email || displayName;
+            }
+
+            const avatarEl = document.getElementById('user-avatar');
+            if (avatarEl) {
+                const initials = String(displayName).trim().split(/\s+/).slice(0, 2)
+                    .map(p => p.charAt(0).toUpperCase()).join('') || '?';
+                const showInitials = () => { avatarEl.textContent = initials; };
+                if (avatarUrl && /^https:\/\//i.test(avatarUrl)) {
+                    const img = document.createElement('img');
+                    img.alt = '';
+                    img.referrerPolicy = 'no-referrer';   // Google avatar CDN rejects some referrers
+                    img.onerror = showInitials;
+                    img.src = avatarUrl;
+                    avatarEl.replaceChildren(img);
+                } else {
+                    showInitials();
+                }
+            }
+
+            const isAdmin = role === 'admin';
+            const badge = document.getElementById('user-role-badge');
+            if (badge) {
+                badge.textContent = isAdmin ? 'Admin' : 'User';
+                badge.classList.toggle('role-admin', isAdmin);
+                badge.hidden = false;
+            }
+
+            document.querySelectorAll('[data-admin-only]').forEach(el => { el.hidden = !isAdmin; });
+
+            // If the person chose "Continue as Admin" but their account is not the admin account, say so.
+            let requestedRole = null;
+            try {
+                requestedRole = sessionStorage.getItem('fg_requested_role');
+                sessionStorage.removeItem('fg_requested_role');
+            } catch (_) { /* optional */ }
+            const notice = document.getElementById('admin-role-notice');
+            if (notice) {
+                if (requestedRole === 'admin' && !isAdmin) {
+                    notice.textContent = `${user.email || 'This account'} does not have admin access, so you are signed in with standard user access.`;
+                    notice.hidden = false;
+                } else {
+                    notice.hidden = true;
+                }
+            }
+        }
+
+        async function fetchUserRole(userId) {
+            try {
+                const { data, error } = await sbClient
+                    .from('user_roles')
+                    .select('role')
+                    .eq('user_id', userId)
+                    .maybeSingle();
+                if (error) {
+                    console.warn('Could not read user role; defaulting to user:', error.message);
+                    return 'user';
+                }
+                return data && data.role === 'admin' ? 'admin' : 'user';
+            } catch (e) {
+                console.warn('Role lookup failed; defaulting to user:', e);
+                return 'user';
+            }
+        }
+
+        // Always returns a fresh (auto-refreshed) session, or null if signed out.
+        async function getActiveSession() {
+            if (!sbClient) return null;
+            try {
+                const { data, error } = await sbClient.auth.getSession();
+                if (error) return null;
+                currentSession = data.session || null;
+                return currentSession;
+            } catch (_) {
+                return null;
+            }
+        }
+
+        async function signOutUser() {
+            try {
+                if (sbClient) await sbClient.auth.signOut();
+            } catch (e) {
+                console.warn('Sign-out error:', e);
+            }
+            window.location.replace('/');
+        }
+
+        async function loadAdminConsole() {
+            const tbody = document.getElementById('admin-users-tbody');
+            if (!tbody || !sbClient || currentUserRole !== 'admin') return;
+
+            const setMessage = (msg, color) => {
+                const tr = document.createElement('tr');
+                const td = document.createElement('td');
+                td.colSpan = 5;
+                td.style.cssText = `text-align: center; padding: 32px; color: ${color || 'var(--text-muted)'};`;
+                td.textContent = msg;
+                tr.appendChild(td);
+                tbody.replaceChildren(tr);
+            };
+
+            try {
+                // RLS: admins can read every row in both tables; anyone else only sees their own.
+                const [rolesRes, settingsRes] = await Promise.all([
+                    sbClient.from('user_roles').select('user_id, role, created_at').order('created_at', { ascending: true }),
+                    sbClient.from('user_alert_settings').select('user_id, email, email_alerts_enabled')
+                ]);
+                if (rolesRes.error) {
+                    setMessage(`Error loading users: ${rolesRes.error.message}`, '#ef4444');
+                    return;
+                }
+                const settingsById = new Map((settingsRes.data || []).map(s => [s.user_id, s]));
+                const rows = rolesRes.data || [];
+                if (rows.length === 0) {
+                    setMessage('No registered users yet.');
+                    return;
+                }
+
+                const summary = document.getElementById('admin-summary');
+                if (summary) {
+                    const admins = rows.filter(r => r.role === 'admin').length;
+                    summary.textContent = `${rows.length} registered user(s), ${admins} admin(s). As an admin you see every user's incidents in the Incident Ledger, including edge-camera events with no owner.`;
+                }
+
+                // Built with textContent (no innerHTML) so user-controlled values cannot inject markup.
+                const frag = document.createDocumentFragment();
+                rows.forEach(r => {
+                    const s = settingsById.get(r.user_id);
+                    const tr = document.createElement('tr');
+                    const cells = [
+                        s ? s.email : '—',
+                        `${String(r.user_id).slice(0, 8)}…`,
+                        null,
+                        s ? (s.email_alerts_enabled ? 'Enabled' : 'Disabled') : '—',
+                        r.created_at ? new Date(r.created_at).toLocaleDateString() : '—'
+                    ];
+                    cells.forEach((val, i) => {
+                        const td = document.createElement('td');
+                        if (i === 2) {
+                            const b = document.createElement('span');
+                            b.className = 'user-role-badge' + (r.role === 'admin' ? ' role-admin' : '');
+                            b.textContent = r.role === 'admin' ? 'Admin' : 'User';
+                            td.appendChild(b);
+                        } else {
+                            td.textContent = val;
+                            if (i === 1) {
+                                td.title = r.user_id;
+                                td.style.fontFamily = 'JetBrains Mono, monospace';
+                            }
+                        }
+                        tr.appendChild(td);
+                    });
+                    frag.appendChild(tr);
+                });
+                tbody.replaceChildren(frag);
+            } catch (e) {
+                setMessage('Unexpected error loading users.', '#ef4444');
+                console.error('loadAdminConsole error:', e);
+            }
+        }
+
+        // ---- Client init + auth gate ---------------------------------------------
+
+        async function initSupabaseClient() {
             try {
                 if (window.supabase && typeof window.supabase.createClient === 'function') {
-                    sbClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-                    console.log("Supabase client initialized successfully.");
+                    sbClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+                        auth: { flowType: 'pkce', persistSession: true, autoRefreshToken: true, detectSessionInUrl: true }
+                    });
+
+                    // OAuth provider errors come back as ?error=...&error_description=...
+                    const qs = new URLSearchParams(window.location.search);
+                    if (qs.get('error')) {
+                        redirectToLogin(qs.get('error_description') || 'Google sign-in was cancelled or failed.');
+                        return;
+                    }
+
+                    // getSession() waits for the PKCE ?code= exchange when returning from Google.
+                    const session = await getActiveSession();
+                    if (!session || !session.user) {
+                        redirectToLogin(qs.has('code') ? 'Sign-in could not be completed. Please try again.' : undefined);
+                        return;
+                    }
+                    cleanAuthRedirectUrl();
+
+                    currentUserRole = await fetchUserRole(session.user.id);
+                    renderUserProfile(session.user, currentUserRole);
+                    revealAuthenticatedUI();
+                    console.log("Supabase session verified.");
+
+                    sbClient.auth.onAuthStateChange((event, newSession) => {
+                        currentSession = newSession || null;
+                        if (event === 'SIGNED_OUT' || !newSession) {
+                            redirectToLogin();
+                        }
+                    });
 
                     sbClient
                         .channel('realtime_fall_events')
@@ -5171,11 +5543,18 @@
                         .subscribe();
 
                     loadFallHistory();
+                    if (currentUserRole === 'admin') loadAdminConsole();
                 } else {
-                    console.warn("Supabase library not yet loaded on window.");
+                    console.warn("Supabase library not loaded; cannot verify session.");
+                    redirectToLogin('The sign-in service failed to load. Check your connection and try again.');
                 }
             } catch (e) {
                 console.error("Supabase init error:", e);
+                // Only bounce to login if the session check itself failed; a later realtime/history
+                // error for an already-verified user should not log them out.
+                if (!currentSession) {
+                    redirectToLogin('Could not verify your session. Please sign in again.');
+                }
             }
         }
 
@@ -5728,12 +6107,16 @@
             const snapshotBlob = await captureCurrentSnapshotBlob();
             let snapshotUrl = null;
 
-            if (snapshotBlob && sbClient) {
+            // Fresh session: RLS requires an authenticated user for storage + fall_events writes.
+            const session = await getActiveSession();
+
+            if (snapshotBlob && sbClient && session) {
                 try {
-                    const filename = `web_fall_${Date.now()}.jpg`;
+                    // Storage policy + insert trigger only accept '<uuid>.jpg' names.
+                    const filename = `${crypto.randomUUID()}.jpg`;
                     const { error: uploadErr } = await sbClient.storage
                         .from('fall-snapshots')
-                        .upload(filename, snapshotBlob, { contentType: 'image/jpeg', upsert: true });
+                        .upload(filename, snapshotBlob, { contentType: 'image/jpeg', upsert: false });
 
                     if (!uploadErr) {
                         const { data: publicUrlData } = sbClient.storage
@@ -5750,11 +6133,12 @@
 
             const notesText = (currentSourceType === 'upload') ? `Uploaded File: ${activeFileName || 'Test Video'}` : ((currentSourceType === 'webcam') ? 'Live Webcam Feed' : customNotes);
 
-            if (sbClient) {
+            if (sbClient && session) {
                 try {
                     const { data: insertedData, error: insertError } = await sbClient
                         .from('fall_events')
                         .insert({
+                            user_id: session.user.id,
                             person_id: 1,
                             severity: severity,
                             fall_score: roundNumber(fallScore, 2),
@@ -5764,16 +6148,49 @@
                         })
                         .select();
 
-                    if (!insertError && insertedData && insertedData[0]) {
+                    if (insertError) {
+                        console.warn("fall_events insert rejected:", insertError.message);
+                    } else if (insertedData && insertedData[0]) {
                         activeFallEvent = insertedData[0];
+                        // Fire the email alert right away without delaying the Telegram path below.
+                        sendFallEmailAlert(insertedData[0].id, session.access_token);
                     }
                 } catch (e) {
                     console.error("Database insert error:", e);
                 }
+            } else if (!session) {
+                console.warn("No active session; fall event not saved to Supabase.");
             }
 
             await sendDirectTelegramAlert(severity, fallScore, snapshotBlob, snapshotUrl);
             loadFallHistory();
+        }
+
+        // POST /api/alerts/send-email — server verifies the JWT, claims the event atomically
+        // and emails the signed-in user's verified Google address. Never throws.
+        async function sendFallEmailAlert(eventId, accessToken) {
+            if (!eventId || !accessToken) return null;
+            try {
+                const resp = await fetch('/api/alerts/send-email', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${accessToken}`
+                    },
+                    body: JSON.stringify({ event_id: eventId })
+                });
+                let body = null;
+                try { body = await resp.json(); } catch (_) { /* non-JSON response */ }
+                if (resp.ok) {
+                    console.info(`Email alert ${body && body.status ? body.status : 'accepted'} for event ${eventId}.`);
+                } else {
+                    console.warn(`Email alert failed (${resp.status}):`, body && body.error ? body.error : resp.statusText);
+                }
+                return body;
+            } catch (err) {
+                console.warn("Email alert request error:", err);
+                return null;
+            }
         }
 
         function roundNumber(num, dec) {
@@ -7014,9 +7431,10 @@
 
         function runInit() {
             initThreeScene();
-            initSupabaseClient();
             initWebSocketTelemetry();
-            handleUrlRouteParams();
+            // Route params are applied after the auth check so the role (admin screens)
+            // and any screen hash restored after the OAuth redirect are known.
+            initSupabaseClient().finally(handleUrlRouteParams);
         }
 
         if (document.readyState === 'loading') {

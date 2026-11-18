@@ -24,6 +24,9 @@
     <!-- Centralized App Configuration & Branding -->
     <script src="config.js" defer></script>
 
+    <!-- Supabase Auth (Google OAuth sign-in) -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
     <style>
         /* ==========================================================================
            DESIGN TOKENS & SYSTEM VARIABLES
@@ -1002,59 +1005,82 @@
             color: var(--text-muted);
         }
 
-        .form-group {
-            margin-bottom: 18px;
+        .google-auth-stack {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
         }
 
-        .form-label {
-            display: block;
-            font-size: 13px;
-            font-weight: 700;
-            color: var(--text-heading);
-            margin-bottom: 6px;
-        }
-
-        .form-input {
+        .btn-google {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
             width: 100%;
-            padding: 12px 14px;
+            min-height: 48px;
+            padding: 12px 16px;
             border-radius: 12px;
-            border: 1px solid rgba(40, 60, 110, 0.16);
+            border: 1px solid #DADCE0;
+            background: #FFFFFF;
+            color: #1F1F1F;
             font-family: var(--font-family);
-            font-size: 14px;
-            color: var(--text-heading);
-            background: #FAFCFF;
-            transition: border-color 0.2s ease, box-shadow 0.2s ease;
-        }
-
-        .form-input:focus {
-            border-color: var(--primary-blue);
-            box-shadow: 0 0 0 3px var(--primary-blue-tint);
-            outline: none;
-        }
-
-        .role-selector-row {
-            display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            gap: 8px;
-            margin-bottom: 18px;
-        }
-
-        .role-btn {
-            padding: 8px 6px;
-            font-size: 12px;
+            font-size: 15px;
             font-weight: 700;
-            border-radius: 8px;
-            border: 1px solid rgba(40, 60, 110, 0.15);
-            background: var(--bg-card);
-            color: var(--text-body);
             cursor: pointer;
+            transition: background-color 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+        }
+
+        .btn-google:hover:not(:disabled) {
+            background: #F8FAFF;
+            border-color: #C6D3EA;
+            box-shadow: 0 2px 8px rgba(27, 42, 74, 0.10);
+        }
+
+        .btn-google:focus-visible {
+            outline: none;
+            box-shadow: 0 0 0 3px var(--primary-blue-tint);
+            border-color: var(--primary-blue);
+        }
+
+        .btn-google:disabled {
+            opacity: 0.6;
+            cursor: wait;
+        }
+
+        .btn-google .google-g {
+            width: 20px;
+            height: 20px;
+            flex-shrink: 0;
+        }
+
+        .btn-google .btn-google-sub {
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--text-muted);
+        }
+
+        .auth-note {
+            margin-top: 18px;
+            font-size: 12px;
+            line-height: 1.5;
+            color: var(--text-muted);
             text-align: center;
         }
 
-        .role-btn.active {
-            background: var(--primary-blue-tint);
-            border-color: var(--primary-blue);
-            color: var(--primary-blue-dark);
+        .auth-error {
+            display: none;
+            margin-bottom: 14px;
+            padding: 10px 12px;
+            border-radius: 10px;
+            background: #FEF2F2;
+            border: 1px solid #FECACA;
+            color: #B91C1C;
+            font-size: 13px;
+            font-weight: 600;
+        }
+
+        .auth-error.visible {
+            display: block;
         }
 
         /* ==========================================================================
@@ -1646,30 +1672,31 @@
                 </svg>
             </button>
             <div class="modal-header">
-                <h3 class="modal-title" id="signin-modal-title">Access Healthcare Portal</h3>
-                <p class="modal-subtitle">Sign in to monitor assisted living patients and review verified incidents.</p>
+                <h3 class="modal-title" id="signin-modal-title">Sign in to AegisMotion</h3>
+                <p class="modal-subtitle">Use your Google account to open the monitoring dashboard.</p>
             </div>
-            <form onsubmit="handleDemoSignIn(event)">
-                <div class="form-group">
-                    <label class="form-label">Access Role</label>
-                    <div class="role-selector-row">
-                        <button type="button" class="role-btn active" onclick="selectRole(this, 'Caregiver')">Caregiver</button>
-                        <button type="button" class="role-btn" onclick="selectRole(this, 'Clinician')">Clinician</button>
-                        <button type="button" class="role-btn" onclick="selectRole(this, 'Admin')">Admin</button>
-                    </div>
-                </div>
-                <div class="form-group">
-                    <label for="signin-email" class="form-label">Work Email</label>
-                    <input type="email" id="signin-email" class="form-input" placeholder="caregiver@assistedliving.org" required value="caregiver@assistedliving.org">
-                </div>
-                <div class="form-group">
-                    <label for="signin-password" class="form-label">Password</label>
-                    <input type="password" id="signin-password" class="form-input" placeholder="••••••••" required value="demo-access-2026">
-                </div>
-                <button type="submit" class="btn btn-primary" style="width: 100%; padding: 14px; margin-top: 8px;">
-                    Open Secure Dashboard
+            <div id="signin-error" class="auth-error" role="alert" aria-live="assertive"></div>
+            <div class="google-auth-stack">
+                <button type="button" id="btn-continue-user" class="btn-google" onclick="signInWithGoogle('user')">
+                    <svg class="google-g" viewBox="0 0 48 48" aria-hidden="true">
+                        <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/>
+                        <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/>
+                        <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/>
+                        <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/>
+                    </svg>
+                    <span>Continue as User</span>
                 </button>
-            </form>
+                <button type="button" id="btn-continue-admin" class="btn-google" onclick="signInWithGoogle('admin')">
+                    <svg class="google-g" viewBox="0 0 48 48" aria-hidden="true">
+                        <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/>
+                        <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/>
+                        <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/>
+                        <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/>
+                    </svg>
+                    <span>Continue as Admin</span>
+                </button>
+            </div>
+            <p class="auth-note">Admin access is granted only to the authorised, verified Google account. Any other account signs in with standard user access.</p>
         </div>
     </div>
 
@@ -1697,12 +1724,79 @@
                 }
             }
 
-            // Check URL query parameters for action=signin
+            // Check URL query parameters for action=signin (dashboard redirects here when signed out)
             const urlParams = new URLSearchParams(window.location.search);
-            if (urlParams.get('action') === 'signin') {
+            const authError = urlParams.get('auth_error');
+            if (urlParams.get('action') === 'signin' || authError) {
                 openSignInModal();
+                if (authError) showSignInError(authError);
             }
         });
+
+        // =====================================================================
+        // Supabase Google OAuth
+        // =====================================================================
+        // Public project URL + anon key (safe for browsers; access is enforced by RLS).
+        const SUPABASE_URL = "https://qbzuwqanxnkpeuioiiao.supabase.co";
+        const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFienV3cWFueG5rcGV1aW9paWFvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTQ2MjYxMzMsImV4cCI6MjExMDIwMjEzM30.cC9AZlgWMe3doYp2DtxjYRUGdDVn5L7YmTHpiKjRP0Q";
+        let sbClient = null;
+
+        function getAuthClient() {
+            if (sbClient) return sbClient;
+            if (window.supabase && typeof window.supabase.createClient === 'function') {
+                sbClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+                    auth: { flowType: 'pkce', persistSession: true, autoRefreshToken: true, detectSessionInUrl: true }
+                });
+            }
+            return sbClient;
+        }
+
+        function showSignInError(message) {
+            const el = document.getElementById('signin-error');
+            if (!el) return;
+            el.textContent = message || '';
+            el.classList.toggle('visible', Boolean(message));
+        }
+
+        function setSignInBusy(busy) {
+            ['btn-continue-user', 'btn-continue-admin'].forEach(id => {
+                const btn = document.getElementById(id);
+                if (btn) {
+                    btn.disabled = busy;
+                    btn.setAttribute('aria-busy', busy ? 'true' : 'false');
+                }
+            });
+        }
+
+        // requestedRole is only a UI hint. The real role comes from public.user_roles,
+        // which the database assigns server-side from the verified Google identity.
+        async function signInWithGoogle(requestedRole) {
+            showSignInError('');
+            const client = getAuthClient();
+            if (!client) {
+                showSignInError('The sign-in service failed to load. Check your connection and try again.');
+                return;
+            }
+            setSignInBusy(true);
+            try {
+                sessionStorage.setItem('fg_requested_role', requestedRole === 'admin' ? 'admin' : 'user');
+            } catch (_) { /* storage unavailable; hint is optional */ }
+
+            try {
+                const { error } = await client.auth.signInWithOAuth({
+                    provider: 'google',
+                    options: {
+                        redirectTo: `${window.location.origin}/dashboard`,
+                        queryParams: { prompt: 'select_account' }
+                    }
+                });
+                if (error) throw error;
+                // On success the browser navigates to Google; nothing else to do here.
+            } catch (err) {
+                setSignInBusy(false);
+                showSignInError((err && err.message) || 'Google sign-in could not be started. Please try again.');
+            }
+        }
 
         // Mobile Nav Drawer Toggle
         function toggleMobileNav() {
@@ -1728,8 +1822,8 @@
             const modal = document.getElementById('signin-modal');
             if (modal) {
                 modal.style.display = 'flex';
-                const firstInput = document.getElementById('signin-email');
-                if (firstInput) firstInput.focus();
+                const firstBtn = document.getElementById('btn-continue-user');
+                if (firstBtn) firstBtn.focus();
             }
         }
 
@@ -1751,18 +1845,6 @@
                 closeMobileNav();
             }
         });
-
-        // Role Selector in Sign-In Modal
-        function selectRole(btn, role) {
-            document.querySelectorAll('.role-btn').forEach(b => b.classList.remove('active'));
-            btn.classList.add('active');
-        }
-
-        // Demo Sign-In Action -> Redirect to Dashboard
-        function handleDemoSignIn(e) {
-            e.preventDefault();
-            window.location.href = '/dashboard';
-        }
     </script>
 </body>
 </html>
