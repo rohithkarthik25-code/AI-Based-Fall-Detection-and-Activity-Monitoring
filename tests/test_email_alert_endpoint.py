@@ -19,6 +19,7 @@ from src.alerts.email_alert_service import (
     fetch_snapshot_bytes_from_storage,
     verify_supabase_jwt,
     check_user_is_admin,
+    check_user_is_blocked,
     claim_and_send_email_alert,
     SSRFValidationError,
     AuthPermissionError,
@@ -218,6 +219,42 @@ class TestEmailAlertEndpointSecurity(unittest.TestCase):
     # =========================================================================
     # 4. Atomic Claim & Concurrency Logic Tests
     # =========================================================================
+
+    @patch("src.alerts.email_alert_service.verify_supabase_jwt")
+    @patch("src.alerts.email_alert_service.check_user_is_blocked")
+    @patch("urllib.request.urlopen")
+    def test_blocked_user_cannot_trigger_email(self, mock_urlopen, mock_blocked, mock_jwt):
+        """A user blocked by an admin is rejected before the event is claimed."""
+        mock_jwt.return_value = {"id": "user-uuid-1111", "email": "alice@gmail.com"}
+        mock_blocked.return_value = True
+        mock_dispatcher = MagicMock()
+
+        with self.assertRaises(AuthPermissionError) as ctx:
+            claim_and_send_email_alert(
+                event_id="event-123",
+                auth_token="Bearer token",
+                service_role_key="svc-test",
+                dispatcher=mock_dispatcher
+            )
+        self.assertIn("suspended", str(ctx.exception))
+        mock_urlopen.assert_not_called()  # no claim PATCH was sent
+        mock_dispatcher.send_email_alert.assert_not_called()
+
+    @patch("urllib.request.urlopen")
+    def test_check_user_is_blocked_reads_blocked_at(self, mock_urlopen):
+        mock_resp = MagicMock()
+        mock_resp.status = 200
+        mock_resp.read.return_value = json.dumps([{"blocked_at": "2026-11-18T10:00:00Z"}]).encode("utf-8")
+        mock_urlopen.return_value.__enter__.return_value = mock_resp
+        self.assertTrue(check_user_is_blocked("user-1", service_role_key="svc-test"))
+        req = mock_urlopen.call_args[0][0]
+        self.assertIn("/rest/v1/user_roles?user_id=eq.user-1&select=blocked_at", req.full_url)
+
+        mock_resp.read.return_value = json.dumps([{"blocked_at": None}]).encode("utf-8")
+        self.assertFalse(check_user_is_blocked("user-1", service_role_key="svc-test"))
+
+        mock_resp.read.return_value = b"[]"
+        self.assertFalse(check_user_is_blocked("user-1", service_role_key="svc-test"))
 
     @patch("src.alerts.email_alert_service.verify_supabase_jwt")
     @patch("urllib.request.urlopen")

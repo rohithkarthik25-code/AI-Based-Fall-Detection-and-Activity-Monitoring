@@ -218,6 +218,186 @@
             display: none !important;
         }
 
+        /* ---- Admin console ---------------------------------------------------- */
+        .admin-tabs {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-bottom: 16px;
+        }
+        .admin-tab {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 9px 16px;
+            border-radius: 999px;
+            border: 1px solid var(--border-color);
+            background: #FFFFFF;
+            color: var(--text-secondary);
+            font-family: inherit;
+            font-size: 0.84rem;
+            font-weight: 700;
+            cursor: pointer;
+        }
+        .admin-tab.active {
+            background: var(--accent-blue);
+            border-color: var(--accent-blue);
+            color: #FFFFFF;
+        }
+        .admin-tab-count {
+            min-width: 22px;
+            padding: 1px 7px;
+            border-radius: 999px;
+            background: rgba(15, 23, 42, 0.08);
+            font-size: 0.72rem;
+            text-align: center;
+        }
+        .admin-tab.active .admin-tab-count { background: rgba(255, 255, 255, 0.25); }
+        .admin-panel[hidden] { display: none !important; }
+        .admin-panel-note {
+            padding: 0 24px 10px 24px;
+            font-size: 0.82rem;
+            color: var(--text-muted);
+        }
+        .admin-filter {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 0.8rem;
+            font-weight: 600;
+            color: var(--text-secondary);
+        }
+        .admin-filter select {
+            padding: 6px 8px;
+            border-radius: 8px;
+            border: 1px solid var(--border-color);
+            font-family: inherit;
+            font-size: 0.8rem;
+            background: #FFFFFF;
+        }
+        .admin-actions { display: flex; flex-wrap: wrap; gap: 6px; }
+        .btn-admin {
+            padding: 5px 12px;
+            border-radius: 999px;
+            border: 1.5px solid var(--border-color);
+            background: #FFFFFF;
+            color: var(--text-secondary);
+            font-family: inherit;
+            font-size: 0.74rem;
+            font-weight: 700;
+            cursor: pointer;
+            white-space: nowrap;
+        }
+        .btn-admin:hover:not(:disabled) { border-color: var(--accent-blue); color: var(--accent-blue); }
+        .btn-admin.danger { border-color: #FECACA; color: #DC2626; }
+        .btn-admin.danger:hover:not(:disabled) { background: #DC2626; border-color: #DC2626; color: #FFFFFF; }
+        .btn-admin:disabled { opacity: 0.45; cursor: not-allowed; }
+        .status-pill {
+            display: inline-block;
+            padding: 2px 9px;
+            border-radius: 999px;
+            font-size: 0.68rem;
+            font-weight: 800;
+            letter-spacing: 0.3px;
+            text-transform: uppercase;
+            background: #DCFCE7;
+            color: #15803D;
+        }
+        .status-pill.blocked, .status-pill.deleted { background: #FEE2E2; color: #B91C1C; }
+        .status-pill.open { background: #DBEAFE; color: #1D4ED8; }
+        .status-pill.in_review { background: #FEF3C7; color: #B45309; }
+        .status-pill.closed { background: #E2E8F0; color: #475569; }
+        .admin-subtext { display: block; margin-top: 3px; font-size: 0.72rem; color: var(--text-muted); }
+        tr.row-deleted td { opacity: 0.55; }
+        tr.row-deleted td:last-child { opacity: 1; }
+        .admin-ticket-list { display: flex; flex-direction: column; gap: 12px; padding: 4px 24px 24px 24px; }
+        .admin-empty { padding: 28px; text-align: center; color: var(--text-muted); font-size: 0.86rem; }
+        .admin-ticket {
+            border: 1px solid var(--border-color);
+            border-radius: 14px;
+            padding: 16px;
+            background: #FFFFFF;
+        }
+        .admin-ticket-head { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px; align-items: flex-start; }
+        .admin-ticket-subject { font-weight: 800; color: var(--text-primary); font-size: 0.95rem; }
+        .admin-ticket-meta { font-size: 0.76rem; color: var(--text-muted); margin-top: 3px; }
+        .admin-ticket-body {
+            margin: 10px 0 12px 0;
+            font-size: 0.84rem;
+            color: var(--text-secondary);
+            white-space: pre-wrap;
+            word-break: break-word;
+            max-height: 180px;
+            overflow: auto;
+        }
+        .admin-ticket-controls { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; align-items: end; }
+        .admin-ticket-controls label { display: flex; flex-direction: column; gap: 4px; font-size: 0.74rem; font-weight: 700; color: var(--text-secondary); }
+        .admin-ticket-controls select, .admin-ticket-controls textarea {
+            font-family: inherit;
+            font-size: 0.82rem;
+            padding: 7px 9px;
+            border-radius: 8px;
+            border: 1px solid var(--border-color);
+            background: #FFFFFF;
+        }
+        .admin-ticket-controls .notes-field { grid-column: 1 / -1; }
+        .admin-ticket-controls textarea { min-height: 60px; resize: vertical; }
+        .admin-ticket-buttons { display: flex; gap: 8px; flex-wrap: wrap; grid-column: 1 / -1; }
+        .admin-ticket-buttons a { text-decoration: none; }
+
+        /* Confirm dialog + toast (admin actions) */
+        .fg-dialog-backdrop {
+            position: fixed;
+            inset: 0;
+            background: rgba(15, 23, 42, 0.45);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 16px;
+            z-index: 3000;
+        }
+        .fg-dialog {
+            width: 100%;
+            max-width: 440px;
+            background: #FFFFFF;
+            border-radius: 16px;
+            padding: 22px;
+            box-shadow: 0 24px 60px rgba(15, 23, 42, 0.25);
+        }
+        .fg-dialog h3 { font-size: 1.05rem; font-weight: 800; color: var(--text-primary); margin-bottom: 8px; }
+        .fg-dialog p { font-size: 0.86rem; color: var(--text-secondary); line-height: 1.5; margin-bottom: 14px; }
+        .fg-dialog label { display: block; font-size: 0.76rem; font-weight: 700; color: var(--text-secondary); margin-bottom: 4px; }
+        .fg-dialog textarea {
+            width: 100%;
+            min-height: 70px;
+            padding: 8px 10px;
+            border-radius: 10px;
+            border: 1px solid var(--border-color);
+            font-family: inherit;
+            font-size: 0.85rem;
+            resize: vertical;
+            margin-bottom: 4px;
+        }
+        .fg-dialog .fg-dialog-error { min-height: 18px; font-size: 0.76rem; color: #DC2626; margin-bottom: 8px; }
+        .fg-dialog-buttons { display: flex; justify-content: flex-end; gap: 8px; }
+        .fg-dialog-buttons .danger { background: #DC2626; box-shadow: none; }
+        .fg-toast {
+            position: fixed;
+            right: 20px;
+            bottom: 20px;
+            max-width: min(420px, calc(100vw - 32px));
+            padding: 12px 16px;
+            border-radius: 12px;
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: #FFFFFF;
+            background: #0F172A;
+            box-shadow: 0 12px 30px rgba(15, 23, 42, 0.25);
+            z-index: 3100;
+        }
+        .fg-toast.error { background: #B91C1C; }
+        .fg-toast.success { background: #15803D; }
+
         .admin-role-notice {
             margin: 0 0 16px 0;
             padding: 10px 14px;
@@ -2707,6 +2887,9 @@
                                 <span>Cloud Incident History & Snapshot Ledger (Supabase)</span>
                             </div>
                             <div class="card-actions">
+                                <label class="admin-filter" data-admin-only hidden title="Admins only: include incidents deleted as false alarms">
+                                    <input type="checkbox" id="ledger-show-deleted" onchange="loadFallHistory()"> Show deleted
+                                </label>
                                 <button class="btn-primary" onclick="exportCSVLogs()">
                                     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg> Export CSV Logs
                                 </button>
@@ -2887,34 +3070,106 @@
                 <!-- ADMIN CONSOLE (visible only when user_roles.role = 'admin')  -->
                 <!-- ═════════════════════════════════════════════════════════════ -->
                 <section id="screen-admin-console" class="dashboard-screen" data-admin-only hidden>
-                    <div class="dashboard-card incident-table-card">
+                    <div class="admin-tabs" role="tablist" aria-label="Admin sections">
+                        <button type="button" class="admin-tab active" role="tab" aria-selected="true" data-admin-tab="users" onclick="switchAdminTab('users')">
+                            Users <span class="admin-tab-count" id="admin-count-users">–</span>
+                        </button>
+                        <button type="button" class="admin-tab" role="tab" aria-selected="false" data-admin-tab="tickets" onclick="switchAdminTab('tickets')">
+                            Support Tickets <span class="admin-tab-count" id="admin-count-tickets">–</span>
+                        </button>
+                        <button type="button" class="admin-tab" role="tab" aria-selected="false" data-admin-tab="activity" onclick="switchAdminTab('activity')">
+                            Activity Log
+                        </button>
+                    </div>
+
+                    <!-- Users -->
+                    <div class="dashboard-card incident-table-card admin-panel" data-admin-panel="users">
                         <div class="card-header">
                             <div class="card-title">
-                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
-                                <span>Registered Users, Roles & Email Alerts</span>
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/></svg>
+                                <span>Users, Roles & Access</span>
                             </div>
                             <div class="card-actions">
-                                <button class="btn-secondary" onclick="loadAdminConsole()">
+                                <button class="btn-secondary" onclick="loadAdminUsers()">
                                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/></svg> Refresh
                                 </button>
                             </div>
                         </div>
-                        <div style="padding: 0 24px 8px 24px; font-size: 0.82rem; color: var(--text-muted);" id="admin-summary">
-                            As an admin you can see every user's incidents in the Incident Ledger, including edge-camera events with no owner.
+                        <div class="admin-panel-note" id="admin-summary">
+                            Make users admins, remove admin access, or block accounts. You cannot change your own access, and the last admin cannot be removed.
                         </div>
                         <div class="table-container">
                             <table class="incident-table">
                                 <thead>
                                     <tr>
                                         <th>Email</th>
-                                        <th>User ID</th>
                                         <th>Role</th>
+                                        <th>Status</th>
                                         <th>Email Alerts</th>
                                         <th>Joined</th>
+                                        <th>Actions</th>
                                     </tr>
                                 </thead>
                                 <tbody id="admin-users-tbody">
-                                    <tr><td colspan="5" style="text-align: center; color: var(--text-muted); padding: 32px;">Loading users…</td></tr>
+                                    <tr><td colspan="6" style="text-align: center; color: var(--text-muted); padding: 32px;">Loading users…</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- Support tickets -->
+                    <div class="dashboard-card incident-table-card admin-panel" data-admin-panel="tickets" hidden>
+                        <div class="card-header">
+                            <div class="card-title">
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
+                                <span>Support Ticket Inbox</span>
+                            </div>
+                            <div class="card-actions">
+                                <label class="admin-filter">
+                                    Status
+                                    <select id="admin-ticket-filter" onchange="loadAdminTickets()">
+                                        <option value="ACTIVE">Open & in review</option>
+                                        <option value="ALL">All tickets</option>
+                                        <option value="OPEN">Open</option>
+                                        <option value="IN_REVIEW">In review</option>
+                                        <option value="RESOLVED">Resolved</option>
+                                        <option value="CLOSED">Closed</option>
+                                    </select>
+                                </label>
+                                <button class="btn-secondary" onclick="loadAdminTickets()">Refresh</button>
+                            </div>
+                        </div>
+                        <div class="admin-panel-note">Tickets are private: only admins (and the person who sent a ticket) can read them.</div>
+                        <div id="admin-tickets-list" class="admin-ticket-list">
+                            <div class="admin-empty">Loading tickets…</div>
+                        </div>
+                    </div>
+
+                    <!-- Activity log -->
+                    <div class="dashboard-card incident-table-card admin-panel" data-admin-panel="activity" hidden>
+                        <div class="card-header">
+                            <div class="card-title">
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                                <span>Activity Log</span>
+                            </div>
+                            <div class="card-actions">
+                                <button class="btn-secondary" onclick="loadAdminActivity()">Refresh</button>
+                            </div>
+                        </div>
+                        <div class="admin-panel-note">The 100 most recent actions. Entries are permanent: they cannot be edited or deleted, even by admins.</div>
+                        <div class="table-container">
+                            <table class="incident-table">
+                                <thead>
+                                    <tr>
+                                        <th>When</th>
+                                        <th>Who</th>
+                                        <th>Action</th>
+                                        <th>Target</th>
+                                        <th>Details</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="admin-activity-tbody">
+                                    <tr><td colspan="5" style="text-align: center; color: var(--text-muted); padding: 32px;">Loading activity…</td></tr>
                                 </tbody>
                             </table>
                         </div>
@@ -5373,21 +5628,31 @@
             }
         }
 
-        async function fetchUserRole(userId) {
+        // Reads the caller's own row in public.user_roles (RLS: users see only their own row).
+        async function fetchUserAccess(userId) {
+            const fallback = { role: 'user', blocked: false, reason: null };
             try {
-                const { data, error } = await sbClient
-                    .from('user_roles')
-                    .select('role')
+                let res = await sbClient.from('user_roles')
+                    .select('role, blocked_at, blocked_reason')
                     .eq('user_id', userId)
                     .maybeSingle();
-                if (error) {
-                    console.warn('Could not read user role; defaulting to user:', error.message);
-                    return 'user';
+                if (res.error) {
+                    // Block columns not migrated yet: fall back to the role only.
+                    res = await sbClient.from('user_roles').select('role').eq('user_id', userId).maybeSingle();
                 }
-                return data && data.role === 'admin' ? 'admin' : 'user';
+                if (res.error) {
+                    console.warn('Could not read user role; defaulting to user:', res.error.message);
+                    return fallback;
+                }
+                const row = res.data || {};
+                return {
+                    role: row.role === 'admin' ? 'admin' : 'user',
+                    blocked: Boolean(row.blocked_at),
+                    reason: row.blocked_reason || null
+                };
             } catch (e) {
                 console.warn('Role lookup failed; defaulting to user:', e);
-                return 'user';
+                return fallback;
             }
         }
 
@@ -5413,78 +5678,463 @@
             window.location.replace('/');
         }
 
-        async function loadAdminConsole() {
+        // =====================================================================
+        // ADMIN CONSOLE
+        // Every action calls a SECURITY DEFINER RPC that re-checks is_admin() in
+        // the database. Hiding buttons here is only convenience, not security.
+        // =====================================================================
+        let adminActiveTab = 'users';
+        let adminUsersById = new Map();   // user_id -> { email, role }
+
+        const ADMIN_ACTION_LABELS = {
+            ROLE_PROMOTED: 'Made admin',
+            ROLE_DEMOTED: 'Removed admin',
+            USER_BLOCKED: 'Blocked user',
+            USER_UNBLOCKED: 'Unblocked user',
+            INCIDENT_DELETED: 'Deleted incident',
+            INCIDENT_RESTORED: 'Restored incident',
+            INCIDENT_RESOLVED: 'Resolved incident',
+            INCIDENT_REOPENED: 'Reopened incident',
+            TICKET_UPDATED: 'Updated ticket'
+        };
+        const TICKET_STATUSES = [['OPEN', 'Open'], ['IN_REVIEW', 'In review'], ['RESOLVED', 'Resolved'], ['CLOSED', 'Closed']];
+        const TICKET_PRIORITIES = [['LOW', 'Low'], ['NORMAL', 'Normal'], ['HIGH', 'High'], ['CRITICAL', 'Critical']];
+
+        function escapeHtml(value) {
+            return String(value == null ? '' : value)
+                .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+        }
+
+        function el(tag, props = {}, children = []) {
+            const node = document.createElement(tag);
+            Object.entries(props).forEach(([k, v]) => {
+                if (v == null) return;
+                if (k === 'text') node.textContent = v;
+                else if (k === 'className') node.className = v;
+                else if (k === 'onClick') node.addEventListener('click', v);
+                else if (k in node && typeof v !== 'string') node[k] = v;
+                else node.setAttribute(k, v);
+            });
+            (Array.isArray(children) ? children : [children]).forEach(c => {
+                if (c == null) return;
+                node.appendChild(typeof c === 'string' ? document.createTextNode(c) : c);
+            });
+            return node;
+        }
+
+        function showToast(message, type = 'info') {
+            document.querySelectorAll('.fg-toast').forEach(t => t.remove());
+            const toast = el('div', { className: `fg-toast ${type}`, role: 'status', text: message });
+            document.body.appendChild(toast);
+            setTimeout(() => toast.remove(), type === 'error' ? 6000 : 3500);
+        }
+
+        // Accessible confirm dialog. Resolves { confirmed, reason }.
+        function openAdminDialog({ title, message, confirmLabel = 'Confirm', danger = false,
+                                   reasonLabel = null, reasonRequired = false, reasonPlaceholder = '' }) {
+            return new Promise(resolve => {
+                const previousFocus = document.activeElement;
+                const errorEl = el('div', { className: 'fg-dialog-error', 'aria-live': 'polite' });
+                const reasonEl = reasonLabel ? el('textarea', { id: 'fg-dialog-reason', maxlength: '300', placeholder: reasonPlaceholder }) : null;
+                const cancelBtn = el('button', { type: 'button', className: 'btn-secondary', text: 'Cancel' });
+                const okBtn = el('button', { type: 'button', className: 'btn-primary' + (danger ? ' danger' : ''), text: confirmLabel });
+                const dialog = el('div', { className: 'fg-dialog', role: 'dialog', 'aria-modal': 'true', 'aria-labelledby': 'fg-dialog-title' }, [
+                    el('h3', { id: 'fg-dialog-title', text: title }),
+                    el('p', { text: message }),
+                    reasonEl ? el('label', { for: 'fg-dialog-reason', text: reasonLabel + (reasonRequired ? ' (required)' : ' (optional)') }) : null,
+                    reasonEl,
+                    errorEl,
+                    el('div', { className: 'fg-dialog-buttons' }, [cancelBtn, okBtn])
+                ]);
+                const backdrop = el('div', { className: 'fg-dialog-backdrop' }, [dialog]);
+
+                const close = (result) => {
+                    document.removeEventListener('keydown', onKey, true);
+                    backdrop.remove();
+                    if (previousFocus && previousFocus.focus) previousFocus.focus();
+                    resolve(result);
+                };
+                const confirm = () => {
+                    const reason = reasonEl ? reasonEl.value.trim() : '';
+                    if (reasonRequired && !reason) {
+                        errorEl.textContent = 'Please enter a reason.';
+                        reasonEl.focus();
+                        return;
+                    }
+                    close({ confirmed: true, reason });
+                };
+                const onKey = (e) => {
+                    if (e.key === 'Escape') { e.stopPropagation(); close({ confirmed: false, reason: '' }); }
+                };
+                cancelBtn.addEventListener('click', () => close({ confirmed: false, reason: '' }));
+                okBtn.addEventListener('click', confirm);
+                backdrop.addEventListener('click', (e) => { if (e.target === backdrop) close({ confirmed: false, reason: '' }); });
+                document.addEventListener('keydown', onKey, true);
+                document.body.appendChild(backdrop);
+                (reasonEl || okBtn).focus();
+            });
+        }
+
+        async function runAdminRpc(fnName, params, successMessage) {
+            if (!sbClient) return false;
+            try {
+                const { error } = await sbClient.rpc(fnName, params);
+                if (error) {
+                    showToast(error.message || 'Action failed.', 'error');
+                    return false;
+                }
+                showToast(successMessage, 'success');
+                return true;
+            } catch (e) {
+                showToast('Action failed: network error.', 'error');
+                return false;
+            }
+        }
+
+        function setTableMessage(tbody, colSpan, msg, color) {
+            const td = el('td', { text: msg });
+            td.colSpan = colSpan;
+            td.style.cssText = `text-align: center; padding: 32px; color: ${color || 'var(--text-muted)'};`;
+            tbody.replaceChildren(el('tr', {}, [td]));
+        }
+
+        function switchAdminTab(tab) {
+            adminActiveTab = tab;
+            document.querySelectorAll('.admin-tab').forEach(b => {
+                const on = b.getAttribute('data-admin-tab') === tab;
+                b.classList.toggle('active', on);
+                b.setAttribute('aria-selected', on ? 'true' : 'false');
+            });
+            document.querySelectorAll('[data-admin-panel]').forEach(p => {
+                p.hidden = p.getAttribute('data-admin-panel') !== tab;
+            });
+            if (tab === 'users') loadAdminUsers();
+            if (tab === 'tickets') loadAdminTickets();
+            if (tab === 'activity') loadAdminActivity();
+        }
+
+        function loadAdminConsole() {
+            if (!sbClient || currentUserRole !== 'admin') return;
+            loadAdminUsers();
+            loadAdminTicketCount();
+            if (adminActiveTab === 'tickets') loadAdminTickets();
+            if (adminActiveTab === 'activity') loadAdminActivity();
+        }
+
+        // ---- Users ---------------------------------------------------------------
+        async function loadAdminUsers() {
             const tbody = document.getElementById('admin-users-tbody');
             if (!tbody || !sbClient || currentUserRole !== 'admin') return;
-
-            const setMessage = (msg, color) => {
-                const tr = document.createElement('tr');
-                const td = document.createElement('td');
-                td.colSpan = 5;
-                td.style.cssText = `text-align: center; padding: 32px; color: ${color || 'var(--text-muted)'};`;
-                td.textContent = msg;
-                tr.appendChild(td);
-                tbody.replaceChildren(tr);
-            };
-
             try {
-                // RLS: admins can read every row in both tables; anyone else only sees their own.
-                const [rolesRes, settingsRes] = await Promise.all([
-                    sbClient.from('user_roles').select('user_id, role, created_at').order('created_at', { ascending: true }),
-                    sbClient.from('user_alert_settings').select('user_id, email, email_alerts_enabled')
-                ]);
+                let rolesRes = await sbClient.from('user_roles')
+                    .select('user_id, role, created_at, blocked_at, blocked_reason')
+                    .order('created_at', { ascending: true });
+                let migrated = true;
                 if (rolesRes.error) {
-                    setMessage(`Error loading users: ${rolesRes.error.message}`, '#ef4444');
+                    migrated = false;
+                    rolesRes = await sbClient.from('user_roles').select('user_id, role, created_at').order('created_at', { ascending: true });
+                }
+                const settingsRes = await sbClient.from('user_alert_settings').select('user_id, email, email_alerts_enabled');
+                if (rolesRes.error) {
+                    setTableMessage(tbody, 6, `Error loading users: ${rolesRes.error.message}`, '#ef4444');
                     return;
                 }
                 const settingsById = new Map((settingsRes.data || []).map(s => [s.user_id, s]));
                 const rows = rolesRes.data || [];
-                if (rows.length === 0) {
-                    setMessage('No registered users yet.');
-                    return;
-                }
+                adminUsersById = new Map(rows.map(r => [r.user_id, {
+                    email: (settingsById.get(r.user_id) || {}).email || null, role: r.role
+                }]));
 
+                const countEl = document.getElementById('admin-count-users');
+                if (countEl) countEl.textContent = String(rows.length);
                 const summary = document.getElementById('admin-summary');
                 if (summary) {
                     const admins = rows.filter(r => r.role === 'admin').length;
-                    summary.textContent = `${rows.length} registered user(s), ${admins} admin(s). As an admin you see every user's incidents in the Incident Ledger, including edge-camera events with no owner.`;
+                    const blocked = rows.filter(r => r.blocked_at).length;
+                    summary.textContent = migrated
+                        ? `${rows.length} user(s) · ${admins} admin(s) · ${blocked} blocked. You cannot change your own access, and the last admin cannot be removed.`
+                        : 'Admin actions are unavailable until the admin-privileges database migration is applied.';
+                }
+                if (rows.length === 0) {
+                    setTableMessage(tbody, 6, 'No registered users yet.');
+                    return;
                 }
 
-                // Built with textContent (no innerHTML) so user-controlled values cannot inject markup.
+                const myId = currentSession && currentSession.user ? currentSession.user.id : null;
                 const frag = document.createDocumentFragment();
                 rows.forEach(r => {
                     const s = settingsById.get(r.user_id);
-                    const tr = document.createElement('tr');
-                    const cells = [
-                        s ? s.email : '—',
-                        `${String(r.user_id).slice(0, 8)}…`,
-                        null,
-                        s ? (s.email_alerts_enabled ? 'Enabled' : 'Disabled') : '—',
-                        r.created_at ? new Date(r.created_at).toLocaleDateString() : '—'
-                    ];
-                    cells.forEach((val, i) => {
-                        const td = document.createElement('td');
-                        if (i === 2) {
-                            const b = document.createElement('span');
-                            b.className = 'user-role-badge' + (r.role === 'admin' ? ' role-admin' : '');
-                            b.textContent = r.role === 'admin' ? 'Admin' : 'User';
-                            td.appendChild(b);
-                        } else {
-                            td.textContent = val;
-                            if (i === 1) {
-                                td.title = r.user_id;
-                                td.style.fontFamily = 'JetBrains Mono, monospace';
-                            }
-                        }
-                        tr.appendChild(td);
+                    const email = s ? s.email : `${String(r.user_id).slice(0, 8)}…`;
+                    const isSelf = r.user_id === myId;
+                    const isAdmin = r.role === 'admin';
+                    const isBlocked = Boolean(r.blocked_at);
+
+                    const roleBadge = el('span', { className: 'user-role-badge' + (isAdmin ? ' role-admin' : ''), text: isAdmin ? 'Admin' : 'User' });
+                    const statusCell = el('td', {}, [
+                        el('span', { className: 'status-pill' + (isBlocked ? ' blocked' : ''), text: isBlocked ? 'Blocked' : 'Active' }),
+                        isBlocked && r.blocked_reason ? el('span', { className: 'admin-subtext', text: r.blocked_reason }) : null
+                    ]);
+
+                    const roleBtn = el('button', {
+                        type: 'button', className: 'btn-admin',
+                        text: isAdmin ? 'Remove admin' : 'Make admin',
+                        title: isSelf ? 'You cannot change your own role' : (isBlocked && !isAdmin ? 'Unblock this user first' : ''),
+                        onClick: () => adminChangeRole(r.user_id, email, isAdmin ? 'user' : 'admin')
                     });
-                    frag.appendChild(tr);
+                    roleBtn.disabled = !migrated || isSelf || (isBlocked && !isAdmin);
+
+                    const blockBtn = el('button', {
+                        type: 'button', className: 'btn-admin' + (isBlocked ? '' : ' danger'),
+                        text: isBlocked ? 'Unblock' : 'Block',
+                        title: isSelf ? 'You cannot block yourself' : (isAdmin ? 'Remove admin role before blocking' : ''),
+                        onClick: () => adminSetBlocked(r.user_id, email, !isBlocked)
+                    });
+                    blockBtn.disabled = !migrated || isSelf || (isAdmin && !isBlocked);
+
+                    frag.appendChild(el('tr', {}, [
+                        el('td', {}, [email, isSelf ? el('span', { className: 'admin-subtext', text: 'You' }) : null]),
+                        el('td', {}, [roleBadge]),
+                        statusCell,
+                        el('td', { text: s ? (s.email_alerts_enabled ? 'Enabled' : 'Disabled') : '—' }),
+                        el('td', { text: r.created_at ? new Date(r.created_at).toLocaleDateString() : '—' }),
+                        el('td', {}, [el('div', { className: 'admin-actions' }, [roleBtn, blockBtn])])
+                    ]));
                 });
                 tbody.replaceChildren(frag);
             } catch (e) {
-                setMessage('Unexpected error loading users.', '#ef4444');
-                console.error('loadAdminConsole error:', e);
+                setTableMessage(tbody, 6, 'Unexpected error loading users.', '#ef4444');
+                console.error('loadAdminUsers error:', e);
             }
+        }
+
+        async function adminChangeRole(userId, email, newRole) {
+            const promoting = newRole === 'admin';
+            const { confirmed } = await openAdminDialog({
+                title: promoting ? 'Make this user an admin?' : 'Remove admin access?',
+                message: promoting
+                    ? `${email} will be able to see every incident, manage users, delete incidents and read support tickets.`
+                    : `${email} will become a normal user and lose access to the Admin Console.`,
+                confirmLabel: promoting ? 'Make admin' : 'Remove admin',
+                danger: !promoting
+            });
+            if (!confirmed) return;
+            const ok = await runAdminRpc('admin_set_user_role', { p_user_id: userId, p_role: newRole },
+                promoting ? `${email} is now an admin.` : `${email} is no longer an admin.`);
+            if (ok) { loadAdminUsers(); if (adminActiveTab === 'activity') loadAdminActivity(); }
+        }
+
+        async function adminSetBlocked(userId, email, block) {
+            const { confirmed, reason } = await openAdminDialog({
+                title: block ? 'Block this user?' : 'Unblock this user?',
+                message: block
+                    ? `${email} will be signed out and lose all access to incidents, alerts and uploads until unblocked.`
+                    : `${email} will be able to sign in and use the dashboard again.`,
+                confirmLabel: block ? 'Block user' : 'Unblock user',
+                danger: block,
+                reasonLabel: 'Reason',
+                reasonRequired: block,
+                reasonPlaceholder: block ? 'e.g. Account shared with unauthorised people' : ''
+            });
+            if (!confirmed) return;
+            const ok = await runAdminRpc('admin_set_user_blocked',
+                { p_user_id: userId, p_blocked: block, p_reason: reason || null },
+                block ? `${email} has been blocked.` : `${email} has been unblocked.`);
+            if (ok) { loadAdminUsers(); if (adminActiveTab === 'activity') loadAdminActivity(); }
+        }
+
+        // ---- Support tickets -----------------------------------------------------
+        async function loadAdminTicketCount() {
+            const countEl = document.getElementById('admin-count-tickets');
+            if (!countEl || !sbClient) return;
+            try {
+                const { count, error } = await sbClient.from('support_requests')
+                    .select('id', { count: 'exact', head: true })
+                    .in('status', ['OPEN', 'IN_REVIEW']);
+                countEl.textContent = error ? '–' : String(count || 0);
+            } catch (_) { countEl.textContent = '–'; }
+        }
+
+        function makeSelect(options, value) {
+            const select = el('select');
+            options.forEach(([v, label]) => {
+                const opt = el('option', { value: v, text: label });
+                if (v === value) opt.selected = true;
+                select.appendChild(opt);
+            });
+            return select;
+        }
+
+        async function loadAdminTickets() {
+            const list = document.getElementById('admin-tickets-list');
+            if (!list || !sbClient || currentUserRole !== 'admin') return;
+            const filter = (document.getElementById('admin-ticket-filter') || {}).value || 'ACTIVE';
+            list.replaceChildren(el('div', { className: 'admin-empty', text: 'Loading tickets…' }));
+            try {
+                let query = sbClient.from('support_requests').select('*').order('created_at', { ascending: false }).limit(100);
+                if (filter === 'ACTIVE') query = query.in('status', ['OPEN', 'IN_REVIEW']);
+                else if (filter !== 'ALL') query = query.eq('status', filter);
+                const { data, error } = await query;
+                loadAdminTicketCount();
+                if (error) {
+                    list.replaceChildren(el('div', { className: 'admin-empty', text: `Error loading tickets: ${error.message}` }));
+                    return;
+                }
+                if (!data || data.length === 0) {
+                    list.replaceChildren(el('div', { className: 'admin-empty', text: 'No tickets here. 🎉' }));
+                    return;
+                }
+                const frag = document.createDocumentFragment();
+                data.forEach(t => frag.appendChild(renderTicketCard(t)));
+                list.replaceChildren(frag);
+            } catch (e) {
+                list.replaceChildren(el('div', { className: 'admin-empty', text: 'Unexpected error loading tickets.' }));
+                console.error('loadAdminTickets error:', e);
+            }
+        }
+
+        function renderTicketCard(t) {
+            const statusKey = String(t.status || 'OPEN').toLowerCase();
+            const statusLabel = (TICKET_STATUSES.find(s => s[0] === t.status) || [null, t.status])[1];
+            const statusSel = makeSelect(TICKET_STATUSES, t.status);
+            const prioritySel = makeSelect(TICKET_PRIORITIES, t.priority || 'NORMAL');
+            const notes = el('textarea', { maxlength: '2000', placeholder: 'Internal notes (visible to admins only)' });
+            notes.value = t.admin_notes || '';
+
+            const saveBtn = el('button', { type: 'button', className: 'btn-primary', text: 'Save' });
+            saveBtn.addEventListener('click', async () => {
+                saveBtn.disabled = true;
+                const ok = await runAdminRpc('admin_update_support_ticket', {
+                    p_ticket_id: t.id, p_status: statusSel.value, p_priority: prioritySel.value, p_admin_notes: notes.value
+                }, 'Ticket updated.');
+                saveBtn.disabled = false;
+                if (ok) { loadAdminTickets(); if (adminActiveTab === 'activity') loadAdminActivity(); }
+            });
+
+            const buttons = [saveBtn];
+            const email = String(t.email || '').trim();
+            if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+                const reply = el('a', {
+                    className: 'btn-secondary', target: '_blank', rel: 'noopener noreferrer', text: 'Reply in Gmail',
+                    href: `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(email)}&su=${encodeURIComponent('Re: ' + (t.subject || 'Your support request') + ' [AegisMotion Support]')}`
+                });
+                buttons.push(reply);
+            }
+
+            const meta = [
+                `${t.full_name || 'Unknown'} <${email || 'no email'}>`,
+                t.category,
+                t.created_at ? new Date(t.created_at).toLocaleString() : null,
+                t.resolved_at ? `closed ${new Date(t.resolved_at).toLocaleDateString()}` : null
+            ].filter(Boolean).join(' · ');
+
+            return el('div', { className: 'admin-ticket' }, [
+                el('div', { className: 'admin-ticket-head' }, [
+                    el('div', {}, [
+                        el('div', { className: 'admin-ticket-subject', text: t.subject || '(no subject)' }),
+                        el('div', { className: 'admin-ticket-meta', text: meta })
+                    ]),
+                    el('span', { className: `status-pill ${statusKey}`, text: statusLabel })
+                ]),
+                el('div', { className: 'admin-ticket-body', text: t.description || '' }),
+                el('div', { className: 'admin-ticket-controls' }, [
+                    el('label', {}, ['Status', statusSel]),
+                    el('label', {}, ['Priority', prioritySel]),
+                    el('label', { className: 'notes-field' }, ['Admin notes', notes]),
+                    el('div', { className: 'admin-ticket-buttons' }, buttons)
+                ])
+            ]);
+        }
+
+        // ---- Activity log ----------------------------------------------------------
+        function describeAuditTarget(row) {
+            if (row.target_type === 'user') {
+                const u = adminUsersById.get(row.target_id);
+                return u && u.email ? u.email : `User ${String(row.target_id || '').slice(0, 8)}…`;
+            }
+            const label = row.target_type === 'incident' ? 'Incident' : row.target_type === 'ticket' ? 'Ticket' : row.target_type;
+            return `${label} ${String(row.target_id || '').slice(0, 8)}…`;
+        }
+
+        function describeAuditDetails(details) {
+            if (!details || typeof details !== 'object') return '';
+            const d = details;
+            const parts = [];
+            if (d.reason) parts.push(`Reason: ${d.reason}`);
+            if (d.previous_reason) parts.push(`Was deleted for: ${d.previous_reason}`);
+            if (d.from && d.to) parts.push(`${d.from} → ${d.to}`);
+            if (d.from_status && d.to_status && d.from_status !== d.to_status) parts.push(`Status ${d.from_status} → ${d.to_status}`);
+            if (d.from_priority && d.to_priority && d.from_priority !== d.to_priority) parts.push(`Priority ${d.from_priority} → ${d.to_priority}`);
+            if (d.severity) parts.push(`Severity ${d.severity}`);
+            return parts.join(' · ');
+        }
+
+        async function loadAdminActivity() {
+            const tbody = document.getElementById('admin-activity-tbody');
+            if (!tbody || !sbClient || currentUserRole !== 'admin') return;
+            try {
+                if (adminUsersById.size === 0) await loadAdminUsers();
+                const { data, error } = await sbClient.from('admin_audit_log')
+                    .select('created_at, actor_email, action, target_type, target_id, details')
+                    .order('created_at', { ascending: false })
+                    .limit(100);
+                if (error) {
+                    setTableMessage(tbody, 5, `Error loading activity: ${error.message}`, '#ef4444');
+                    return;
+                }
+                if (!data || data.length === 0) {
+                    setTableMessage(tbody, 5, 'No activity recorded yet.');
+                    return;
+                }
+                const frag = document.createDocumentFragment();
+                data.forEach(row => {
+                    frag.appendChild(el('tr', {}, [
+                        el('td', { text: new Date(row.created_at).toLocaleString() }),
+                        el('td', { text: row.actor_email || 'System' }),
+                        el('td', { text: ADMIN_ACTION_LABELS[row.action] || row.action }),
+                        el('td', { text: describeAuditTarget(row) }),
+                        el('td', { text: describeAuditDetails(row.details) || '—' })
+                    ]));
+                });
+                tbody.replaceChildren(frag);
+            } catch (e) {
+                setTableMessage(tbody, 5, 'Unexpected error loading activity.', '#ef4444');
+                console.error('loadAdminActivity error:', e);
+            }
+        }
+
+        // ---- Incident delete / restore (Incident Ledger) ---------------------------
+        async function adminDeleteIncident(eventId) {
+            const { confirmed, reason } = await openAdminDialog({
+                title: 'Delete this incident?',
+                message: 'The incident will be hidden from its owner and marked as deleted. Admins can still see and restore it, and the action is recorded in the Activity Log.',
+                confirmLabel: 'Delete incident',
+                danger: true,
+                reasonLabel: 'Reason',
+                reasonRequired: true,
+                reasonPlaceholder: 'e.g. False alarm: person sat down quickly'
+            });
+            if (!confirmed) return;
+            const ok = await runAdminRpc('admin_delete_fall_event', { p_event_id: eventId, p_reason: reason }, 'Incident deleted.');
+            if (ok) {
+                if (activeFallEvent && activeFallEvent.id === eventId) {
+                    const banner = document.getElementById('emergency-banner');
+                    if (banner) banner.style.display = 'none';
+                    activeFallEvent = null;
+                }
+                loadFallHistory();
+            }
+        }
+
+        async function adminRestoreIncident(eventId) {
+            const { confirmed } = await openAdminDialog({
+                title: 'Restore this incident?',
+                message: 'The incident will be visible to its owner again.',
+                confirmLabel: 'Restore'
+            });
+            if (!confirmed) return;
+            const ok = await runAdminRpc('admin_restore_fall_event', { p_event_id: eventId }, 'Incident restored.');
+            if (ok) loadFallHistory();
         }
 
         // ---- Client init + auth gate ---------------------------------------------
@@ -5511,7 +6161,16 @@
                     }
                     cleanAuthRedirectUrl();
 
-                    currentUserRole = await fetchUserRole(session.user.id);
+                    const access = await fetchUserAccess(session.user.id);
+                    if (access.blocked) {
+                        // Suspended by an admin: RLS already denies data access; end the session too.
+                        try { await sbClient.auth.signOut(); } catch (_) { /* ignore */ }
+                        currentSession = null;
+                        redirectToLogin('Your account has been suspended by an administrator.' +
+                            (access.reason ? ` Reason: ${access.reason}` : ''));
+                        return;
+                    }
+                    currentUserRole = access.role;
                     renderUserProfile(session.user, currentUserRole);
                     revealAuthenticatedUI();
                     console.log("Supabase session verified.");
@@ -5561,11 +6220,18 @@
         async function loadFallHistory() {
             if (!sbClient) return;
             try {
-                const { data, error } = await sbClient
-                    .from('fall_events')
-                    .select('*')
-                    .order('created_at', { ascending: false })
-                    .limit(25);
+                const isAdminView = currentUserRole === 'admin';
+                const showDeletedBox = document.getElementById('ledger-show-deleted');
+                const showDeleted = isAdminView && showDeletedBox && showDeletedBox.checked;
+                const buildQuery = (hideDeleted) => {
+                    let q = sbClient.from('fall_events').select('*').order('created_at', { ascending: false }).limit(25);
+                    return hideDeleted ? q.is('deleted_at', null) : q;
+                };
+                let { data, error } = await buildQuery(!showDeleted);
+                if (error && error.code === '42703') {
+                    // deleted_at column not migrated yet: load without the filter.
+                    ({ data, error } = await buildQuery(false));
+                }
 
                 const tbody = document.getElementById('incident-tbody');
                 if (!tbody) return;
@@ -5587,17 +6253,27 @@
                         ? `<img class="snapshot-thumb" src="${row.snapshot_url}" onclick="openLightbox('${row.snapshot_url}')" title="Click to view snapshot">`
                         : '<span style="color: var(--text-muted);">None</span>';
                     
-                    const statusBadge = row.resolved 
-                        ? '<span style="color: #10b981; font-weight: 700; display: inline-flex; align-items: center; gap: 4px;">✓ Resolved</span>' 
+                    const isDeleted = Boolean(row.deleted_at);
+                    const safeId = escapeHtml(row.id);
+                    let statusBadge = row.resolved
+                        ? '<span style="color: #10b981; font-weight: 700; display: inline-flex; align-items: center; gap: 4px;">✓ Resolved</span>'
                         : '<span style="color: #dc2626; font-weight: 700; display: inline-flex; align-items: center; gap: 4px;">▲ ACTIVE</span>';
+                    if (isDeleted) {
+                        statusBadge = `<span class="status-pill deleted">Deleted</span><span class="admin-subtext">${escapeHtml(row.delete_reason || '')}</span>`;
+                    }
 
-                    const actionHtml = row.resolved 
-                        ? '<span style="color: var(--text-muted);">-</span>' 
-                        : `<button class="btn-resolve-table" onclick="resolveFall('${row.id}')">Resolve</button>`;
+                    let actionHtml = row.resolved
+                        ? '<span style="color: var(--text-muted);">-</span>'
+                        : `<button class="btn-resolve-table" onclick="resolveFall('${safeId}')">Resolve</button>`;
+                    if (isAdminView) {
+                        actionHtml = isDeleted
+                            ? `<button class="btn-admin" onclick="adminRestoreIncident('${safeId}')">Restore</button>`
+                            : `<div class="admin-actions">${row.resolved ? '' : `<button class="btn-resolve-table" onclick="resolveFall('${safeId}')">Resolve</button>`}<button class="btn-admin danger" onclick="adminDeleteIncident('${safeId}')" title="Delete as false alarm">Delete</button></div>`;
+                    }
 
                     const timeStr = new Date(row.created_at).toLocaleTimeString();
 
-                    return `<tr>
+                    return `<tr${isDeleted ? ' class="row-deleted"' : ''}>
                         <td style="font-weight: 500; color: #0f172a;">${timeStr}</td>
                         <td style="font-weight: 600; color: #475569;">#${row.person_id}</td>
                         <td><span class="badge-severity sev-${row.severity}">${row.severity}</span></td>

@@ -48,6 +48,20 @@ module.exports = async function handler(req, res) {
       return res.status(500).json({ error: 'Server misconfiguration: SUPABASE_SERVICE_ROLE_KEY is required' });
     }
 
+    // 1b. Suspended accounts cannot trigger alerts (RLS is the primary enforcement).
+    const blockResp = await fetch(`${SUPABASE_URL}/rest/v1/user_roles?user_id=eq.${encodeURIComponent(callerId)}&select=blocked_at`, {
+      headers: {
+        'apikey': SUPABASE_SERVICE_ROLE_KEY,
+        'Authorization': `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`
+      }
+    });
+    if (blockResp.ok) {
+      const rows = await blockResp.json();
+      if (Array.isArray(rows) && rows.some(r => r && r.blocked_at)) {
+        return res.status(403).json({ error: 'Forbidden: This account has been suspended by an administrator.' });
+      }
+    }
+
     // 2. Atomic Claim Query via Supabase PostgREST
     const twoMinutesAgo = new Date(Date.now() - 2 * 60 * 1000).toISOString();
     const claimUrl = `${SUPABASE_URL}/rest/v1/fall_events?id=eq.${event_id}&email_sent_at=is.null&or=(email_claimed_at.is.null,email_claimed_at.lt.${twoMinutesAgo})`;

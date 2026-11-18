@@ -148,6 +148,34 @@ def check_user_is_admin(user_id: str, supabase_url: str = DEFAULT_SUPABASE_URL, 
     return False
 
 
+def check_user_is_blocked(user_id: str, supabase_url: str = DEFAULT_SUPABASE_URL, service_role_key: str | None = None) -> bool:
+    """
+    Returns True if an admin has blocked this user (public.user_roles.blocked_at is set).
+    RLS already cuts blocked users off from the database; this keeps the email endpoint
+    consistent with that. Lookup failures are treated as "not blocked" (logged), because
+    the primary enforcement is in the database.
+    """
+    key = service_role_key or os.environ.get("SUPABASE_SERVICE_ROLE_KEY", "")
+    if not key:
+        return False
+
+    url = f"{supabase_url.rstrip('/')}/rest/v1/user_roles?user_id=eq.{user_id}&select=blocked_at"
+    headers = {
+        "apikey": key,
+        "Authorization": f"Bearer {key}",
+        "Content-Type": "application/json"
+    }
+    req = urllib.request.Request(url, headers=headers, method="GET")
+    try:
+        with urllib.request.urlopen(req, timeout=5) as resp:
+            if resp.status == 200:
+                rows = json.loads(resp.read().decode("utf-8"))
+                return any(isinstance(r, dict) and r.get("blocked_at") for r in (rows or []))
+    except Exception as e:
+        print(f"[EmailAlertService] Blocked-status check error for {user_id}: {e}")
+    return False
+
+
 def claim_and_send_email_alert(
     event_id: str,
     auth_token: str,
@@ -179,6 +207,10 @@ def claim_and_send_email_alert(
 
     if not caller_id or not caller_email:
         raise AuthPermissionError("Could not determine verified user identity.")
+
+    # Step 1b: Suspended accounts cannot trigger alerts (checked before claiming the event).
+    if check_user_is_blocked(caller_id, supabase_url=supabase_url, service_role_key=key):
+        raise AuthPermissionError("Forbidden: This account has been suspended by an administrator.")
 
     # Step 2: Atomic Claim
     # UPDATE public.fall_events SET email_claimed_at = now(), email_status = 'CLAIMED', email_attempts = email_attempts + 1
