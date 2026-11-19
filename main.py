@@ -93,7 +93,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--no-alerts",
         action="store_true",
-        help="Disable multi-channel alert dispatch (Telegram / Email)"
+        help="Disable email alert dispatch"
     )
 
     parser.add_argument(

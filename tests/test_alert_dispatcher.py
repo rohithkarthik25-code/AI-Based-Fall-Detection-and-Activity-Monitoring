@@ -1,5 +1,5 @@
 """
-Comprehensive unit test suite for Instant Alert Dispatcher (Telegram & Email).
+Comprehensive unit test suite for Instant Email Alert Dispatcher.
 Tests asynchronous execution, simulation fallback, debouncing/cooldown,
 snapshot persistence, and multi-subject independent dispatching.
 """
@@ -26,11 +26,6 @@ class TestAlertDispatcher(unittest.TestCase):
             "enabled": True,
             "simulation_mode": True,
             "cooldown_seconds": 2.0,  # Short cooldown for test speed
-            "telegram": {
-                "enabled": False,
-                "bot_token": "TEST_TOKEN",
-                "chat_id": "12345678",
-            },
             "email": {
                 "enabled": False,
                 "smtp_server": "smtp.test.com",

@@ -277,7 +277,7 @@ def parse_args():
     parser.add_argument("--source", default="0", help="Video source (webcam index or video path)")
     parser.add_argument("--no-3d", action="store_true", help="Disable 3D skeleton in stream")
     parser.add_argument("--no-activity", action="store_true", help="Disable activity recognition")
-    parser.add_argument("--no-alerts", action="store_true", help="Disable Telegram/Email alerts")
+    parser.add_argument("--no-alerts", action="store_true", help="Disable email alerts")
     return parser.parse_args()
 
 

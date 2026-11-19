@@ -1,5 +1,5 @@
 """
-Quick test script to verify your Telegram and Email alert dispatch.
+Quick test script to verify your Email alert dispatch.
 Sends a test emergency alert with an annotated test snapshot.
 """
 
@@ -11,13 +11,12 @@ from alert_dispatcher import AlertDispatcher
 
 def main():
     print("=" * 60)
-    print("Testing Instant Alert Dispatch (Telegram & Email)...")
+    print("Testing Instant Email Alert Dispatch...")
     print("=" * 60)
 
     dispatcher = AlertDispatcher(config_path="alert_config.json")
 
     print(f"Simulation Mode : {dispatcher.config.get('simulation_mode')}")
-    print(f"Telegram Active : {dispatcher.config.get('telegram', {}).get('enabled')}")
     print(f"Email Active    : {dispatcher.config.get('email', {}).get('enabled')}")
     print("-" * 60)
 
@@ -45,12 +44,12 @@ def main():
         print("Alert was throttled or disabled.")
 
     # Allow worker thread time to connect and complete network transfer
-    print("[2/2] Awaiting network response from Telegram and SMTP server...")
+    print("[2/2] Awaiting network response from SMTP server...")
     time.sleep(5)
 
     dispatcher.close()
     print("=" * 60)
-    print("Test complete. Check your Telegram chat and Email inbox!")
+    print("Test complete. Check your Email inbox!")
     print("=" * 60)
 
 

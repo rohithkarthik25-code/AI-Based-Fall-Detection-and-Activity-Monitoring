@@ -2449,7 +2449,7 @@
                 <div class="countdown-bar-fill" id="modal-countdown-bar" style="width: 100%;"></div>
             </div>
             <div style="font-size: 0.82rem; color: var(--text-muted); margin-bottom: 20px;">
-                Resident recovery confirmation requested. Emergency Telegram dispatcher armed.
+                Resident recovery confirmation requested. Emergency email alert armed.
             </div>
             <div class="modal-btn-row">
                 <button class="btn-im-ok" onclick="dismissAlertByResident()">I'm OK / Cancel Alarm</button>
@@ -2511,9 +2511,9 @@
                     <span class="nav-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg></span>
                     <span>3D Skeleton Viewer</span>
                 </button>
-                <button class="sidebar-nav-item sidebar-nav-btn" data-screen="screen-alerts-telegram" onclick="switchDashboardScreen('screen-alerts-telegram')">
+                <button class="sidebar-nav-item sidebar-nav-btn" data-screen="screen-alerts-email" onclick="switchDashboardScreen('screen-alerts-email')">
                     <span class="nav-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/></svg></span>
-                    <span>Alerts & Telegram</span>
+                    <span>Alerts & Email</span>
                 </button>
 
                 <div class="nav-section-title">COLLECTIONS</div>
@@ -2548,7 +2548,7 @@
                 </div>
                 <div class="top-bar-right">
                     <div class="chip" id="chip-status"><span class="dot-green"></span> Supabase Connected</div>
-                    <div class="chip">Telegram: <span style="color: #10B981; font-weight: 700;">CONNECTED</span></div>
+                    <div class="chip">Email Alerts: <span style="color: #10B981; font-weight: 700;">ACTIVE</span></div>
                     <div class="chip">Throughput: <span id="hud-fps" style="color: var(--accent-blue); font-weight: 700;">-- FPS</span></div>
                 </div>
             </header>
@@ -2559,7 +2559,7 @@
                     <span style="font-size: 1.2rem;">⚠️</span>
                     <div>
                         <strong id="emergency-title">FALL DETECTED!</strong>
-                        <span id="emergency-desc" style="margin-left: 8px; font-size: 0.88rem;">Person confirmed fall. Telegram alert dispatched.</span>
+                        <span id="emergency-desc" style="margin-left: 8px; font-size: 0.88rem;">Person confirmed fall. Email alert dispatched.</span>
                     </div>
                 </div>
                 <button class="btn-resolve" onclick="resolveCurrentFall()">Acknowledge & Resolve</button>
@@ -2692,7 +2692,7 @@
                                             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z"/><circle cx="12" cy="13" r="4"/></svg> Turn Camera ON
                                         </button>
                                         <button class="btn-danger-outline" onclick="simulateFallTest()">
-                                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg> Test Alarm & Telegram
+                                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg> Test Alarm & Email
                                         </button>
                                     </div>
                                 </div>
@@ -2966,9 +2966,9 @@
                 </section>
 
                 <!-- ═════════════════════════════════════════════════════════════ -->
-                <!-- SCREEN 5: ALERTS & TELEGRAM                                  -->
+                <!-- SCREEN 5: ALERTS & EMAIL                                     -->
                 <!-- ═════════════════════════════════════════════════════════════ -->
-                <section id="screen-alerts-telegram" class="dashboard-screen">
+                <section id="screen-alerts-email" class="dashboard-screen">
                     <div class="dashboard-card">
                         <div class="card-header">
                             <div class="card-title">
@@ -2982,13 +2982,13 @@
                         <div style="padding: 28px;">
                             <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 24px;">
                                 <div class="adl-duration-tile">
-                                    <h4 style="font-size: 1rem; font-weight: 700; margin-bottom: 12px; color: var(--text-primary);">Telegram Bot Integration</h4>
+                                    <h4 style="font-size: 1rem; font-weight: 700; margin-bottom: 12px; color: var(--text-primary);">Email Alert Integration</h4>
                                     <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 12px;">
-                                        <span class="chip-status-green">● Bot Connected</span>
-                                        <span style="font-size: 0.82rem; color: var(--text-muted);">@AegisMotionAlertBot</span>
+                                        <span class="chip-status-green">● Email Alerts Active</span>
+                                        <span style="font-size: 0.82rem; color: var(--text-muted);">Sent to your Google account email</span>
                                     </div>
                                     <p style="font-size: 0.84rem; color: var(--text-muted); line-height: 1.5;">
-                                        Instant photo snapshot evidence, resident identifier, fall severity classification, and GPS coordinates are broadcasted automatically to caregiver channels upon 5-second unconfirmed posture.
+                                        Instant photo snapshot evidence, resident identifier, fall severity classification, and GPS coordinates are emailed automatically to the caregiver's inbox upon 5-second unconfirmed posture.
                                     </p>
                                 </div>
                                 <div class="adl-duration-tile">
@@ -3274,10 +3274,10 @@
                                 </div>
 
                                 <div class="status-metric-box">
-                                    <div id="status-telegram-dot" class="status-dot-pulse green"></div>
+                                    <div id="status-email-dot" class="status-dot-pulse green"></div>
                                     <div>
-                                        <div style="font-size: 0.72rem; color: var(--text-muted); font-weight: 700; text-transform: uppercase;">Telegram Dispatcher</div>
-                                        <div id="status-telegram-text" style="font-size: 0.84rem; font-weight: 700; color: #10B981;">Armed (@AegisMotionAlertBot)</div>
+                                        <div style="font-size: 0.72rem; color: var(--text-muted); font-weight: 700; text-transform: uppercase;">Email Dispatcher</div>
+                                        <div id="status-email-text" style="font-size: 0.84rem; font-weight: 700; color: #10B981;">Armed (Email Alerts)</div>
                                     </div>
                                 </div>
 
@@ -3386,7 +3386,7 @@
                                         </a>
                                     </div>
                                     <p style="font-size: 0.80rem; color: var(--text-muted); line-height: 1.45; margin-bottom: 16px;">
-                                        Directs Three.js WebGL visualization, dashboard UX, Supabase RLS policies, and Telegram emergency broadcasting.
+                                        Directs Three.js WebGL visualization, dashboard UX, Supabase RLS policies, and email emergency alerts.
                                     </p>
                                     <a href="https://mail.google.com/mail/?view=cm&fs=1&to=cs23i1046@iiitdm.ac.in&su=AegisMotion%20AI%20Support%20-%20Query" target="_blank" rel="noopener noreferrer" class="support-team-btn" style="text-decoration: none;" title="Open in Gmail">
                                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
@@ -3489,7 +3489,7 @@
                                             <li><strong>Keypoint Extraction:</strong> MediaPipe tracks 33 3D anatomical joints across shoulders, hips, knees, and ankles.</li>
                                             <li><strong>Kinematic Angle Calculation:</strong> The Torso Angle from vertical (&theta; = |atan2(&Delta;x, &Delta;y)|) and Bounding Box Aspect Ratio (Width/Height) are computed continuously.</li>
                                             <li><strong>Threshold Activation:</strong> When the torso exceeds 55&deg;, aspect ratio exceeds 0.85, and downward vertical velocity surges, Fall Probability rises past 50%.</li>
-                                            <li><strong>5-Second Non-Recovery Verification:</strong> An automated Finite State Machine (FSM) enters a 5.0-second countdown. If the subject remains down and does not self-recover into a seated or standing posture, the fall is classified as confirmed, triggering siren synthesis, Supabase persistence, and Telegram dispatch.</li>
+                                            <li><strong>5-Second Non-Recovery Verification:</strong> An automated Finite State Machine (FSM) enters a 5.0-second countdown. If the subject remains down and does not self-recover into a seated or standing posture, the fall is classified as confirmed, triggering siren synthesis, Supabase persistence, and email alert dispatch.</li>
                                         </ol>
                                     </div>
                                 </div>
@@ -3587,11 +3587,11 @@
                                 <!-- Category D: Cloud & Notifications -->
                                 <div class="faq-item" data-category="cloud-alerts">
                                     <button class="faq-question-btn" onclick="toggleFaq(this)">
-                                        <span>14. How do Telegram notifications work?</span>
+                                        <span>14. How do email alerts work?</span>
                                         <svg class="faq-chevron" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
                                     </button>
                                     <div class="faq-answer-panel">
-                                        When a fall incident is confirmed, AegisMotion dispatches a high-priority alert payload via the Telegram Bot API (using <code>@AegisMotionAlertBot</code>). The broadcast includes the resident identifier, classification severity, detection confidence, timestamp, GPS telemetry, and an immediate visual photographic snapshot taken at the moment of fall confirmation.
+                                        When a fall incident is confirmed, AegisMotion generates a high-priority alert email and sends it to the signed-in user's verified Google email address. The email includes the resident identifier, classification severity, detection confidence, timestamp, and an immediate visual photographic snapshot taken at the moment of fall confirmation.
                                     </div>
                                 </div>
 
@@ -3720,12 +3720,12 @@
                                 <!-- Problem 8 -->
                                 <div class="trouble-card">
                                     <div class="trouble-header">
-                                        <div class="trouble-title">8. Telegram Notifications Not Working</div>
+                                        <div class="trouble-title">8. Email Alerts Not Working</div>
                                         <span class="trouble-badge trouble-badge-net">NOTIFICATIONS</span>
                                     </div>
-                                    <div class="trouble-desc">Confirmed fall occurs but no Telegram notification arrives on caregiver mobile devices.</div>
-                                    <div class="trouble-cause-box"><strong>Possible Cause:</strong> Caregiver has not initiated a conversation with the Telegram bot or incorrect chat ID configured.</div>
-                                    <div class="trouble-solution-box"><strong>Recommended Solution:</strong> Open Telegram, search for <code>@AegisMotionAlertBot</code>, and tap <strong>/start</strong>. Verify your Chat ID is authorized in <code>alert_config.json</code>.</div>
+                                    <div class="trouble-desc">Confirmed fall occurs but no alert email arrives in the caregiver's inbox.</div>
+                                    <div class="trouble-cause-box"><strong>Possible Cause:</strong> Email alerts are disabled for the account, the user is not signed in, or the alert email was filtered into Spam.</div>
+                                    <div class="trouble-solution-box"><strong>Recommended Solution:</strong> Sign in with Google and confirm email alerts are enabled for your account. Check the Spam folder and mark the alert sender as <strong>Not spam</strong>. Verify the SMTP credentials are configured in <code>.env</code>.</div>
                                 </div>
 
                                 <!-- Problem 9 -->
@@ -3857,7 +3857,7 @@
                                         </div>
                                         <div style="background: #F8FAFC; padding: 12px; border-radius: 8px; border: 1px solid var(--border-color);">
                                             <strong style="color: var(--text-primary); display: block; margin-bottom: 4px;">Network Connectivity</strong>
-                                            Broadband internet (&gt;2 Mbps) for Supabase WebSocket syncing & Telegram notifications.
+                                            Broadband internet (&gt;2 Mbps) for Supabase WebSocket syncing & email alerts.
                                         </div>
                                         <div style="background: #F8FAFC; padding: 12px; border-radius: 8px; border: 1px solid var(--border-color);">
                                             <strong style="color: var(--text-primary); display: block; margin-bottom: 4px;">Hardware Acceleration</strong>
@@ -3910,7 +3910,7 @@
                                                 <option value="3D Visualization Issues">3D Visualization Issues</option>
                                                 <option value="Biomechanical Measurement Issues">Biomechanical Measurement Issues</option>
                                                 <option value="Performance Issues">Performance Issues</option>
-                                                <option value="Telegram Notifications">Telegram Notifications</option>
+                                                <option value="Email Notifications">Email Notifications</option>
                                                 <option value="Supabase / Database Issues">Supabase / Database Issues</option>
                                                 <option value="Other">Other</option>
                                             </select>
@@ -4030,7 +4030,7 @@
                 'screen-adl-analytics': { title: 'ADL & Sedentary Analytics', subtitle: 'Activities of daily living, today' },
                 'screen-incident-ledger': { title: 'Incident Ledger', subtitle: 'Cloud incident history & snapshot ledger' },
                 'screen-skeleton-viewer': { title: '3D Skeleton Viewer', subtitle: 'Full-spectrum kinematic avatar and postural analysis' },
-                'screen-alerts-telegram': { title: 'Alerts & Telegram', subtitle: 'Automated notification and emergency broadcast channels' },
+                'screen-alerts-email': { title: 'Alerts & Email', subtitle: 'Automated notification and emergency broadcast channels' },
                 'screen-reports': { title: 'Reports & Clinical Export', subtitle: 'Biomechanical gait logs and exportable healthcare telemetry' },
                 'screen-settings': { title: 'System Settings', subtitle: 'Detection thresholds, video hardware, and platform controls' },
                 'screen-help-support': { title: 'Help & Support Centre', subtitle: 'Technical documentation, clinical guides, FAQ & customer support portal' },
@@ -4485,8 +4485,6 @@
         // Supabase & Cloud Config
         const SUPABASE_URL = "https://qbzuwqanxnkpeuioiiao.supabase.co";
         const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFienV3cWFueG5rcGV1aW9paWFvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTQ2MjYxMzMsImV4cCI6MjExMDIwMjEzM30.cC9AZlgWMe3doYp2DtxjYRUGdDVn5L7YmTHpiKjRP0Q";
-        const TELEGRAM_BOT_TOKEN = "9062818901:AAGIXsLlOJ-6V70_Wp_kTIAbIPSSD4-PFao";
-        const TELEGRAM_CHAT_ID = "6666395760";
         let sbClient = null;
         let currentSession = null;      // Supabase Auth session (Google OAuth)
         let currentUserRole = 'user';   // From public.user_roles; 'admin' unlocks admin UI
@@ -6192,7 +6190,7 @@
                             const title = document.getElementById('emergency-title');
                             if (title) title.textContent = `🚨 ${rec.severity} FALL DETECTED!`;
                             const desc = document.getElementById('emergency-desc');
-                            if (desc) desc.textContent = `Person #${rec.person_id} fell (Score: ${(Number(rec.fall_score) * 100).toFixed(0)}%). Telegram alert sent.`;
+                            if (desc) desc.textContent = `Person #${rec.person_id} fell (Score: ${(Number(rec.fall_score) * 100).toFixed(0)}%). Email alert sent.`;
                             playEmergencyTone();
                             loadFallHistory();
                         })
@@ -6651,7 +6649,7 @@
         }
 
         // =========================================================================
-        // 9. SNAPSHOT CAPTURE & TELEGRAM DISPATCH
+        // 9. SNAPSHOT CAPTURE & EMAIL DISPATCH
         // =========================================================================
 
         async function captureCurrentSnapshotBlob() {
@@ -6708,70 +6706,6 @@
             return new Promise(resolve => snapCanvas.toBlob(resolve, 'image/jpeg', 0.90));
         }
 
-        async function sendDirectTelegramAlert(severity, score, snapshotBlob, snapshotUrl) {
-            const timeStr = new Date().toLocaleTimeString();
-            const sourceDesc = (currentSourceType === 'upload') ? `Uploaded Video (${activeFileName || 'Test'})` : ((currentSourceType === 'webcam') ? 'Live Webcam' : 'AI Fall Detection System');
-            const text = `🚨 <b>EMERGENCY: FALL DETECTED!</b>\n━━━━━━━━━━━━━━━━━━━\n👤 <b>Person:</b> #1\n⚠️ <b>Severity:</b> ${severity}\n📊 <b>Confidence Score:</b> ${(score * 100).toFixed(0)}%\n⏱️ <b>Duration Down:</b> 5.0s (No Recovery)\n🕒 <b>Time:</b> ${timeStr}\n🌐 <b>Source:</b> ${sourceDesc}\n━━━━━━━━━━━━━━━━━━━\n<i>Immediate caregiver attention required! Check dashboard now.</i>`;
-            
-            if (snapshotBlob) {
-                try {
-                    const formData = new FormData();
-                    formData.append('chat_id', TELEGRAM_CHAT_ID);
-                    formData.append('photo', snapshotBlob, `fall_incident_${Date.now()}.jpg`);
-                    formData.append('caption', text);
-                    formData.append('parse_mode', 'HTML');
-
-                    const resp = await fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendPhoto`, {
-                        method: 'POST',
-                        body: formData
-                    });
-                    const resJson = await resp.json();
-                    if (resJson && resJson.ok) {
-                        console.log("Telegram alert with photo sent successfully (direct multipart)!");
-                        return true;
-                    }
-                } catch (err) {
-                    console.warn("Direct Telegram multipart fetch failed:", err);
-                }
-            }
-
-            if (snapshotUrl && snapshotUrl.startsWith('http')) {
-                try {
-                    const resp = await fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendPhoto`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            chat_id: TELEGRAM_CHAT_ID,
-                            photo: snapshotUrl,
-                            caption: text,
-                            parse_mode: 'HTML'
-                        })
-                    });
-                    const resJson = await resp.json();
-                    if (resJson && resJson.ok) {
-                        console.log("Telegram alert with photo sent successfully (via URL)!");
-                        return true;
-                    }
-                } catch (err) {
-                    console.warn("Telegram sendPhoto URL failed:", err);
-                }
-            }
-
-            try {
-                await fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        chat_id: TELEGRAM_CHAT_ID,
-                        text: text,
-                        parse_mode: 'HTML'
-                    })
-                });
-            } catch (err) {
-                console.warn("Telegram sendMessage fallback error:", err);
-            }
-            return false;
-        }
 
         async function triggerConfirmedFall(fallScore, severity, customNotes = "In-Browser WebAI Live") {
             const now = Date.now();
@@ -6828,7 +6762,7 @@
                         console.warn("fall_events insert rejected:", insertError.message);
                     } else if (insertedData && insertedData[0]) {
                         activeFallEvent = insertedData[0];
-                        // Fire the email alert right away without delaying the Telegram path below.
+                        // Fire the email alert right away.
                         sendFallEmailAlert(insertedData[0].id, session.access_token);
                     }
                 } catch (e) {
@@ -6838,7 +6772,6 @@
                 console.warn("No active session; fall event not saved to Supabase.");
             }
 
-            await sendDirectTelegramAlert(severity, fallScore, snapshotBlob, snapshotUrl);
             loadFallHistory();
         }
 
@@ -7498,7 +7431,7 @@
                     };
                     const vChip = document.getElementById('hud-verification-chip');
                     if (vChip) {
-                        vChip.textContent = '⚠️ FALL DETECTED: Awaiting Recovery (5.0s before Telegram Alert)...';
+                        vChip.textContent = '⚠️ FALL DETECTED: Awaiting Recovery (5.0s before Email Alert)...';
                         vChip.style.background = 'rgba(245, 158, 11, 0.92)';
                         vChip.style.color = '#0b0f19';
                         vChip.style.display = 'block';
@@ -7508,7 +7441,7 @@
                     const remaining = Math.max(0, ((FSM_NON_RECOVERY_WINDOW_MS - elapsed) / 1000)).toFixed(1);
                     const vChip = document.getElementById('hud-verification-chip');
                     if (vChip) {
-                        vChip.textContent = `⚠️ FALL DETECTED — Subject Down (${remaining}s remaining before Telegram Dispatch)`;
+                        vChip.textContent = `⚠️ FALL DETECTED — Subject Down (${remaining}s remaining before Email Dispatch)`;
                         vChip.style.background = 'rgba(245, 158, 11, 0.92)';
                         vChip.style.color = '#0b0f19';
                         vChip.style.display = 'block';
@@ -7519,14 +7452,14 @@
                         fallConfirmed = true;
 
                         if (vChip) {
-                            vChip.textContent = '🚨 FALL CONFIRMED (>5s Non-Recovery) — Alert Dispatched to Telegram!';
+                            vChip.textContent = '🚨 FALL CONFIRMED (>5s Non-Recovery) — Email Alert Dispatched!';
                             vChip.style.background = 'rgba(239, 68, 68, 0.95)';
                             vChip.style.color = '#ffffff';
                             vChip.style.display = 'block';
                         }
 
                         startEmergencyAudioSiren();
-                        speakAlert("Emergency alert: Fall confirmed. Person has not recovered. Dispatching alert to Telegram.");
+                        speakAlert("Emergency alert: Fall confirmed. Person has not recovered. Dispatching email alert.");
 
                         const sev = (pendingFallData && pendingFallData.severity) || (fallProbability > 0.82 ? 'SEVERE' : (fallProbability > 0.65 ? 'MODERATE' : 'MILD'));
                         const score = (pendingFallData && pendingFallData.score) || fallProbability;
@@ -7628,7 +7561,7 @@
 
         async function simulateFallTest() {
             clearSimulation();
-            speakAlert("Simulating emergency fall test. Monitoring 5 seconds of non-recovery before direct Telegram dispatch.");
+            speakAlert("Simulating emergency fall test. Monitoring 5 seconds of non-recovery before email alert dispatch.");
             fsmFallState = FSM_VERIFYING;
             fsmVerificationStartTime = performance.now();
             pendingFallData = {
@@ -7664,13 +7597,13 @@
                     fsmFallState = FSM_FALL_CONFIRMED;
                     fallConfirmed = true;
                     if (vChip) {
-                        vChip.textContent = '🚨 FALL CONFIRMED (>5s Non-Recovery) — Alert Dispatched to Telegram!';
+                        vChip.textContent = '🚨 FALL CONFIRMED (>5s Non-Recovery) — Email Alert Dispatched!';
                         vChip.style.background = 'rgba(239, 68, 68, 0.95)';
                         vChip.style.color = '#ffffff';
                         vChip.style.display = 'block';
                     }
                     startEmergencyAudioSiren();
-                    speakAlert("Emergency alert: Fall confirmed. Person has not recovered. Dispatching alert to Telegram.");
+                    speakAlert("Emergency alert: Fall confirmed. Person has not recovered. Dispatching email alert.");
                     triggerConfirmedFall(0.95, 'SEVERE', 'Simulation Test (>5s Non-Recovery)');
                 }
             }, 5000);
@@ -7864,13 +7797,13 @@
                 }
             }
 
-            // 2. Telegram indicator
-            const tgDot = document.getElementById('status-telegram-dot');
-            const tgText = document.getElementById('status-telegram-text');
-            if (tgDot && tgText) {
-                tgDot.className = 'status-dot-pulse green';
-                tgText.textContent = 'Armed (@AegisMotionAlertBot)';
-                tgText.style.color = '#10B981';
+            // 2. Email alert indicator
+            const emailDot = document.getElementById('status-email-dot');
+            const emailText = document.getElementById('status-email-text');
+            if (emailDot && emailText) {
+                emailDot.className = 'status-dot-pulse green';
+                emailText.textContent = 'Armed (Email Alerts)';
+                emailText.style.color = '#10B981';
             }
 
             // 3. AI Pipeline indicator
@@ -8080,7 +8013,7 @@
                         'screen-adl-analytics': 'screen-adl-analytics',
                         'screen-incident-ledger': 'screen-incident-ledger',
                         'screen-skeleton-viewer': 'screen-skeleton-viewer',
-                        'screen-alerts-telegram': 'screen-alerts-telegram',
+                        'screen-alerts-email': 'screen-alerts-email',
                         'screen-reports': 'screen-reports',
                         'screen-settings': 'screen-settings',
                         'screen-help-support': 'screen-help-support',
@@ -8088,7 +8021,7 @@
                         'adl-analytics': 'screen-adl-analytics',
                         'incident-ledger': 'screen-incident-ledger',
                         'skeleton-viewer': 'screen-skeleton-viewer',
-                        'alerts-telegram': 'screen-alerts-telegram',
+                        'alerts-email': 'screen-alerts-email',
                         'help-support': 'screen-help-support'
                     };
                     const screenId = screenMap[target] || (document.getElementById(target) ? target : null);

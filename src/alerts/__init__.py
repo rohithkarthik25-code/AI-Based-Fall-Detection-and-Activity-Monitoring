@@ -1,2 +1,2 @@
-"""Audio siren alarms, email/telegram dispatchers, and incident logging."""
+"""Audio siren alarms, email alert dispatchers, and incident logging."""
 

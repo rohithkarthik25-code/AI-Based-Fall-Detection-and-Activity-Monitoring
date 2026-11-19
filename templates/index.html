@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>AegisMotion AI — Detect falls in seconds. Protect who matters.</title>
-    <meta name="description" content="AI-assisted living safety platform featuring real-time pose estimation, interactive 3D biomechanical skeleton tracking, instant Telegram emergency alerts, and cloud incident ledger.">
+    <meta name="description" content="AI-assisted living safety platform featuring real-time pose estimation, interactive 3D biomechanical skeleton tracking, instant email emergency alerts, and cloud incident ledger.">
     
     <!-- Open Graph Metadata -->
     <meta property="og:title" content="AegisMotion AI — AI Fall Detection & Biomechanical Monitor">
@@ -785,8 +785,8 @@
             color: var(--text-muted);
         }
 
-        /* Floating Card D: Bottom-Right (Telegram Alert Sent) */
-        .card-telegram {
+        /* Floating Card D: Bottom-Right (Email Alert Sent) */
+        .card-email {
             bottom: -40px;
             right: 25px;
             width: 260px;
@@ -809,14 +809,14 @@
             flex-shrink: 0;
         }
 
-        .telegram-title {
+        .email-title {
             font-size: 13px;
             font-weight: 800;
             color: var(--text-heading);
             line-height: 1.2;
         }
 
-        .telegram-time {
+        .email-time {
             font-size: 11px;
             font-weight: 600;
             color: var(--text-muted);
@@ -1305,7 +1305,7 @@
                 order: 4;
             }
 
-            .card-telegram {
+            .card-email {
                 order: 5;
             }
 
@@ -1415,7 +1415,7 @@
 
                     <!-- Paragraph Description -->
                     <p class="hero-desc" id="hero-desc">
-                        Real-time pose estimation, a live 3D biomechanical skeleton and instant Telegram alerts, backed by a cloud incident ledger for every event.
+                        Real-time pose estimation, a live 3D biomechanical skeleton and instant email alerts, backed by a cloud incident ledger for every event.
                     </p>
 
                     <!-- CTA Buttons -->
@@ -1436,7 +1436,7 @@
                         </div>
                         <div class="hero-note-item">
                             <span class="note-primary">Instant alerts</span>
-                            <span class="note-secondary">via Telegram</span>
+                            <span class="note-secondary">via Email</span>
                         </div>
                         <div class="hero-note-item">
                             <span class="note-primary">Cloud ledger</span>
@@ -1564,8 +1564,8 @@
                         <div class="card-posture-angles">Torso 0° · Hip / Knee 175° / 175°</div>
                     </div>
 
-                    <!-- Floating Card D: Bottom-Right (Telegram Alert Sent) -->
-                    <div class="floating-card card-telegram" role="region" aria-label="Sample Notification: Telegram Alert Sent">
+                    <!-- Floating Card D: Bottom-Right (Email Alert Sent) -->
+                    <div class="floating-card card-email" role="region" aria-label="Sample Notification: Email Alert Sent">
                         <div class="icon-chip-teal" aria-hidden="true">
                             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                 <line x1="22" y1="2" x2="11" y2="13"></line>
@@ -1573,8 +1573,8 @@
                             </svg>
                         </div>
                         <div>
-                            <div class="telegram-title">Telegram alert sent</div>
-                            <div class="telegram-time">Caregiver notified · 2:04 AM</div>
+                            <div class="email-title">Email alert sent</div>
+                            <div class="email-time">Caregiver notified · 2:04 AM</div>
                         </div>
                     </div>
 

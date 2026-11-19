@@ -184,7 +184,7 @@ class SlideDeckGenerator:
         pm1.font.color.rgb = COLOR_ACCENT_AMBER
 
         pm2 = tf_m.add_paragraph()
-        pm2.text = "• YOLOv8 Nano Detection  |  ByteTrack Kalman Multi-Object Tracking  |  MediaPipe 3D Pose Estimation\n• 12-Factor Biomechanical Scoring Engine  |  Finite Temporal State Machine  |  Custom 3D Mol* Projection\n• Workstation Dual-Panel HUD  |  Non-Blocking Multi-Channel Alert Dispatch (Telegram Bot + SMTP Email)"
+        pm2.text = "• YOLOv8 Nano Detection  |  ByteTrack Kalman Multi-Object Tracking  |  MediaPipe 3D Pose Estimation\n• 12-Factor Biomechanical Scoring Engine  |  Finite Temporal State Machine  |  Custom 3D Mol* Projection\n• Workstation Dual-Panel HUD  |  Non-Blocking Email Alert Dispatch (SMTP Email)"
         pm2.alignment = PP_ALIGN.CENTER
         pm2.font.size = Pt(11)
         pm2.font.color.rgb = COLOR_TEXT_LIGHT
@@ -372,7 +372,7 @@ def build_all_48_slides():
             "Autonomous Real-Time Fall Detection: Achieve high sensitivity (>96%) and specificity (>98%) on standard consumer CPUs without requiring discrete GPUs.",
             "Continuous Multi-Posture Monitoring: Classify and record continuous daily activities (Standing, Sitting, Walking, Bending, Lying Down) with sedentary analytics.",
             "Interactive 3D Biomechanical Visualization: Develop a custom 3D perspective projection engine rendering an anatomically accurate skeleton with orbit/pan/zoom.",
-            "Autonomous Multi-Channel Escalation: Trigger immediate two-phase local acoustic alarms and dispatch push alerts via Telegram Bot and SMTP Email with snapshots.",
+            "Autonomous Multi-Channel Escalation: Trigger immediate two-phase local acoustic alarms and dispatch email alerts via SMTP with snapshots.",
             "Open Architecture & Low Cost: Build the entire pipeline on accessible, open-source libraries (PyTorch, OpenCV, MediaPipe, NumPy) for rapid deployment."
         ],
         takeaway="The system bridges deep neural perception, 3D anatomical visualization, and autonomous IoT alerting on commodity hardware.",
@@ -483,7 +483,7 @@ def build_all_48_slides():
             "Layer 2: Neural Perception: YOLOv8 Nano identifies person bounding boxes; ByteTrack assigns persistent track IDs across frames.",
             "Layer 3: Kinematic Extraction: MediaPipe Pose Landmarker derives 33 landmarks; FeatureExtractor computes 12 biomechanical metrics.",
             "Layer 4: Decision & State Machine: WeightedScorer evaluates probabilistic fall risk; TemporalStateMachine enforces temporal persistence.",
-            "Layer 5: Audio & Network Dispatch: AlarmSystem triggers two-phase beeps; AlertDispatcher transmits Telegram photos and SMTP emails.",
+            "Layer 5: Audio & Network Dispatch: AlarmSystem triggers two-phase beeps; AlertDispatcher transmits SMTP email alerts with snapshots.",
             "Layer 6: Workstation Visualization: Dashboard renders 5-tier HUD; SkeletonVisualizer3D renders depth-sorted 3D interactive avatar."
         ],
         takeaway="Strict separation of concerns across 6 modular layers ensures maintainability, deterministic testing, and zero memory leaks.",
@@ -535,7 +535,6 @@ def build_all_48_slides():
         card2_bullets=[
             "ByteTrack: Robust multi-object tracking library utilizing dual-threshold Kalman filtering.",
             "Winsound / PyGame: Low-latency kernel acoustic alarm generation with cross-platform fallback.",
-            "Requests: REST API communication for Telegram Bot photo and message payloads.",
             "SMTPLib & SSL: Standard library secure TLS/SSL email generation with inline MIME images.",
             "Python-PPTX & Unittest: Native automated verification suite and presentation compilation."
         ],
@@ -1239,26 +1238,26 @@ def build_all_48_slides():
     )
 
     # ─────────────────────────────────────────────────────────────────────────
-    # Slide 42: Instant Telegram Bot Alert Dispatcher
+    # Slide 42: Instant Email Alert Dispatcher
     # ─────────────────────────────────────────────────────────────────────────
     builder.add_dual_card_slide(
         category="Part 12: Alerts & Escalation",
-        title="Instant Telegram Bot Alert Dispatcher",
-        card1_title="Direct Push Alert Architecture",
+        title="Instant Email Alert Dispatcher",
+        card1_title="Direct Email Alert Architecture",
         card1_bullets=[
-            "Telegram Bot API Integration: Communicates directly with Telegram cloud servers via HTTPS POST requests.",
-            "Dedicated Push Channel: Sends alerts instantly to caregivers' smartphones or central nurse station channels.",
-            "Markdown Formatted Telemetry: Subject ID, Fall Severity, Confidence Score, Floor Duration, Prior Activity, and Timestamp.",
-            "Recovery Confirmation: Dispatches a follow-up notification when subject stands up: STATUS UPDATE: SUBJECT RECOVERED."
+            "SMTP Email Integration: Connects securely to the mail server (Gmail SMTP with App Passwords) over TLS.",
+            "Dedicated Alert Inbox: Delivers alerts instantly to caregivers' email inboxes on phone or desktop.",
+            "HTML Formatted Telemetry: Subject ID, Fall Severity, Confidence Score, Prior Activity, Location, and Timestamp.",
+            "Per-User Preferences: Signed-in users receive alerts at their verified Google address and can toggle email alerts."
         ],
         card2_title="Automated Image Attachment",
         card2_bullets=[
             "Annotated Incident Snapshot: Captured frame is watermarked with an emergency red banner and saved to disk.",
-            "sendPhoto API Call: Transmits the annotated JPEG snapshot directly into the Telegram chat.",
+            "Inline Image Embedding: Attaches the annotated JPEG snapshot inline in the alert email (cid:snapshot_img).",
             "Instant Visual Triage: Allows clinicians to remotely verify whether a fall is severe or a false alarm.",
-            "Live Verified: Successfully tested with real bot tokens and chat IDs with zero delivery failures."
+            "Live Verified: Successfully tested with real SMTP credentials and caregiver inboxes."
         ],
-        takeaway="Transmitting an annotated photo directly to caregivers' phones allows instant remote medical triage.",
+        takeaway="Emailing an annotated photo directly to caregivers allows instant remote medical triage.",
         card1_color=COLOR_ACCENT_CYAN,
         card2_color=COLOR_ACCENT_GREEN
     )
@@ -1391,7 +1390,7 @@ def build_all_48_slides():
             "Edge Performance Achieved: Optimized pipeline throughput from 8.9 FPS to 30.5 FPS sustained on CPU using adaptive pose and resolution tuning.",
             "Anatomical 3D Visualizer: Formulated an extended 35-keypoint topology with central spine, multi-tier joint hierarchy, and depth-sorted rendering.",
             "Robust 12-Factor Decision Engine: Achieved 97.5% overall accuracy with 96.8% sensitivity and 98.1% specificity across clinical benchmarks.",
-            "Enterprise Alerting & UX: Integrated two-phase acoustic sirens, non-blocking Telegram/Email push dispatch, and a 5-tier workstation dashboard.",
+            "Enterprise Alerting & UX: Integrated two-phase acoustic sirens, non-blocking email alert dispatch, and a 5-tier workstation dashboard.",
             "Academic Conclusion: Contactless, edge-deployable AI can provide life-saving geriatric monitoring without compromising user privacy or requiring expensive GPUs."
         ],
         takeaway="Thank You! The system is fully operational, verified across 60 unit tests, and ready for deployment.",

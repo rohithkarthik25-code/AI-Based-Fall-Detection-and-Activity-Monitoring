@@ -14,7 +14,7 @@ CREATE TABLE IF NOT EXISTS public.support_requests (
         '3D Visualization Issues',
         'Biomechanical Measurement Issues',
         'Performance Issues',
-        'Telegram Notifications',
+        'Email Notifications',
         'Supabase / Database Issues',
         'Other'
     )),

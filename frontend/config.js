@@ -17,7 +17,7 @@ const APP_CONFIG = {
         eyebrow: "AI-powered assisted living safety",
         headingMain: "Detect falls in seconds.",
         headingAccent: "Protect who matters.",
-        description: "Real-time pose estimation, a live 3D biomechanical skeleton and instant Telegram alerts, backed by a cloud incident ledger for every event.",
+        description: "Real-time pose estimation, a live 3D biomechanical skeleton and instant email alerts, backed by a cloud incident ledger for every event.",
         ctaPrimary: {
             text: "Launch live monitor",
             href: "/dashboard#screen-live-monitor",
@@ -35,7 +35,7 @@ const APP_CONFIG = {
             },
             {
                 primary: "Instant alerts",
-                secondary: "via Telegram"
+                secondary: "via Email"
             },
             {
                 primary: "Cloud ledger",
@@ -81,8 +81,8 @@ const APP_CONFIG = {
             state: "Standing",
             angles: "Torso 0° · Hip / Knee 175° / 175°"
         },
-        telegramAlert: {
-            title: "Telegram alert sent",
+        emailAlert: {
+            title: "Email alert sent",
             meta: "Caregiver notified · 2:04 AM"
         }
     },

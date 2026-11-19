@@ -1,6 +1,6 @@
 """
-Instant Multi-Channel Alert Dispatcher (Telegram Bot & Email/SMTP).
-Dispatches asynchronous notifications with annotated fall snapshots,
+Instant Email Alert Dispatcher (SMTP).
+Dispatches asynchronous email notifications with annotated fall snapshots,
 severity levels, biomechanical scores, and recovery status.
 Executes non-blocking network calls via a background thread pool.
 """
@@ -22,18 +22,12 @@ from typing import Any, Dict, Optional, Tuple
 
 import cv2
 import numpy as np
-import requests
 
 
 DEFAULT_CONFIG: Dict[str, Any] = {
     "enabled": True,
     "simulation_mode": True,  # When True, logs alerts locally without requiring live API keys
     "cooldown_seconds": 30.0,
-    "telegram": {
-        "enabled": False,
-        "bot_token": "",
-        "chat_id": "",
-    },
     "email": {
         "enabled": False,
         "smtp_server": "smtp.gmail.com",
@@ -74,8 +68,8 @@ def _load_dotenv(filepath: str = ".env") -> None:
 
 class AlertDispatcher:
     """
-    Non-blocking, multi-channel alert dispatcher for fall incidents.
-    Supports Telegram Bot (text + snapshot) and SMTP Email (HTML + embedded snapshot).
+    Non-blocking email alert dispatcher for fall incidents.
+    Sends SMTP Email alerts (HTML + embedded snapshot).
     """
 
     def __init__(
@@ -100,12 +94,6 @@ class AlertDispatcher:
         _load_dotenv()
 
         # Environment variable overrides
-        if os.getenv("TELEGRAM_BOT_TOKEN") and os.getenv("TELEGRAM_CHAT_ID"):
-            self.config["telegram"]["enabled"] = True
-            self.config["telegram"]["bot_token"] = os.getenv("TELEGRAM_BOT_TOKEN")
-            self.config["telegram"]["chat_id"] = os.getenv("TELEGRAM_CHAT_ID")
-            self.config["simulation_mode"] = False
-
         # Support both SMTP_EMAIL/SMTP_PASSWORD and SMTP_USER/SMTP_APP_PASSWORD
         smtp_user = os.getenv("SMTP_USER") or os.getenv("SMTP_EMAIL")
         smtp_pass = os.getenv("SMTP_APP_PASSWORD") or os.getenv("SMTP_PASSWORD")
@@ -233,7 +221,6 @@ class AlertDispatcher:
     ) -> None:
         """Background thread worker for disk persistence and network dispatch."""
         sim_mode = self.config.get("simulation_mode", False)
-        tg_cfg = self.config.get("telegram", {})
         email_cfg = self.config.get("email", {})
 
         # Asynchronously annotate and write snapshot on background thread
@@ -244,42 +231,18 @@ class AlertDispatcher:
             snapshot_path = os.path.join(self.snapshot_dir, filename)
             cv2.imwrite(snapshot_path, annotated_snapshot)
 
-        # Message formulation
-        msg_text = (
-            f"🚨 *CRITICAL EMERGENCY ALERT: FALL DETECTED*\n"
-            f"━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-            f"👤 *Subject ID* : Person #{person_id}\n"
-            f"⚠️ *Severity*   : {severity}\n"
-            f"📊 *Fall Score* : {score:.2f} / 1.00\n"
-            f"⏱️ *Duration*   : {duration:.1f}s on ground\n"
-            f"🏃 *Last State* : {activity.upper()}\n"
-            f"📍 *Location*   : {location}\n"
-            f"🕒 *Timestamp*  : {timestamp_str}\n"
-            f"━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-            f"Action Required: Check subject immediately."
-        )
-
-        if sim_mode or (not tg_cfg.get("enabled") and not email_cfg.get("enabled")):
+        if sim_mode or not email_cfg.get("enabled"):
             print("\n" + "=" * 60)
             print("[ALERT DISPATCHER - SIMULATION MODE]")
             print(f"Alert successfully generated for Person {person_id}!")
             print(f"Details : {severity} fall (score={score:.2f}) at {timestamp_str}")
             if snapshot_path:
                 print(f"Snapshot: {snapshot_path}")
-            print("Configure alert_config.json to send to live Telegram/Email.")
+            print("Configure alert_config.json to send live Email alerts.")
             print("=" * 60 + "\n")
             return
 
-        # ── 1. Dispatch to Telegram Bot ──
-        if tg_cfg.get("enabled") and tg_cfg.get("bot_token") and tg_cfg.get("chat_id"):
-            self._send_telegram(
-                bot_token=tg_cfg["bot_token"],
-                chat_id=tg_cfg["chat_id"],
-                caption=msg_text,
-                snapshot_path=snapshot_path,
-            )
-
-        # ── 2. Dispatch to Email / SMTP ──
+        # ── Dispatch to Email / SMTP ──
         if email_cfg.get("enabled") and email_cfg.get("sender_email") and email_cfg.get("recipient_email"):
             self._send_email(
                 cfg=email_cfg,
@@ -292,33 +255,6 @@ class AlertDispatcher:
                 timestamp_str=timestamp_str,
                 snapshot_path=snapshot_path,
             )
-
-    def _send_telegram(
-        self,
-        bot_token: str,
-        chat_id: str,
-        caption: str,
-        snapshot_path: Optional[str],
-    ) -> None:
-        """Sends alert message with photo attachment via Telegram Bot API."""
-        try:
-            if snapshot_path and os.path.exists(snapshot_path):
-                url = f"https://api.telegram.org/bot{bot_token}/sendPhoto"
-                with open(snapshot_path, "rb") as photo_file:
-                    files = {"photo": photo_file}
-                    data = {"chat_id": chat_id, "caption": caption, "parse_mode": "Markdown"}
-                    resp = requests.post(url, files=files, data=data, timeout=10)
-            else:
-                url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
-                data = {"chat_id": chat_id, "text": caption, "parse_mode": "Markdown"}
-                resp = requests.post(url, data=data, timeout=10)
-
-            if resp.status_code == 200:
-                print(f"[AlertDispatcher] Telegram alert dispatched successfully to chat {chat_id}.")
-            else:
-                print(f"[AlertDispatcher] Telegram dispatch error ({resp.status_code}): {resp.text}")
-        except Exception as e:
-            print(f"[AlertDispatcher] Telegram dispatch failed: {e}")
 
     def _send_email(
         self,
@@ -464,30 +400,11 @@ class AlertDispatcher:
                 pass
 
     def _send_recovery_worker(self, person_id: int, duration: float, timestamp_str: str) -> None:
-        """Worker for sending recovery notifications."""
-        sim_mode = self.config.get("simulation_mode", False)
-        tg_cfg = self.config.get("telegram", {})
-
-        msg = (
-            f"✅ *STATUS UPDATE: SUBJECT RECOVERED*\n"
-            f"━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-            f"👤 *Subject ID* : Person #{person_id}\n"
-            f"⏱️ *Floor Time* : {duration:.1f} seconds\n"
-            f"🕒 *Timestamp*  : {timestamp_str}\n"
-            f"Status: Subject has successfully returned to an upright/normal posture."
+        """Worker for recording recovery events."""
+        print(
+            f"[AlertDispatcher] Recovery recorded for Person #{person_id} at {timestamp_str} "
+            f"(floor time {duration:.1f}s)."
         )
-
-        if sim_mode or not tg_cfg.get("enabled"):
-            print(f"[AlertDispatcher - SIMULATION] Recovery recorded for Person #{person_id} at {timestamp_str}.")
-            return
-
-        if tg_cfg.get("enabled") and tg_cfg.get("bot_token") and tg_cfg.get("chat_id"):
-            try:
-                url = f"https://api.telegram.org/bot{tg_cfg['bot_token']}/sendMessage"
-                data = {"chat_id": tg_cfg["chat_id"], "text": msg, "parse_mode": "Markdown"}
-                requests.post(url, data=data, timeout=8)
-            except Exception as e:
-                print(f"[AlertDispatcher] Recovery notification failed: {e}")
 
     def close(self) -> None:
         """Gracefully shuts down the background thread pool."""
